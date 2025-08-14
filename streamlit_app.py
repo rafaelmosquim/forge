@@ -31,7 +31,7 @@ import pathlib
 from typing import Dict, List, Tuple, Set
 import json, uuid, hashlib, sys, platform
 from datetime import datetime
-import yaml  # make sure this is available at top-level (you already use it)
+
 import streamlit as st
 import pandas as pd
 import yaml
@@ -98,51 +98,31 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-/* === Make radios blue (works across Streamlit/BaseWeb DOMs) =============== */
-
-/* 1) Nudge theme primary color (helps many components) */
 :root { --primary-color: #2563eb; }
-
-/* 2) BaseWeb radios: selected dot & ring */
 div[data-baseweb="radio"] [aria-checked="true"] > div:first-child {
-  background-color: #2563eb !important;
-  border-color: #2563eb !important;
+  background-color: #2563eb !important; border-color: #2563eb !important;
 }
 div[data-baseweb="radio"] [aria-checked="false"] > div:first-child {
   border-color: #2563eb !important;
 }
-
-/* 3) Older/fallback structure */
 [role="radiogroup"] [role="radio"][aria-checked="true"] > div:first-child {
-  background-color: #2563eb !important;
-  border-color: #2563eb !important;
+  background-color: #2563eb !important; border-color: #2563eb !important;
 }
-
-/* 4) Your chip highlight for the whole label when selected */
 div[role="radiogroup"] > label:has(input:checked) {
-  border-color: #2563eb;
-  background: rgba(37, 99, 235, 0.08);
+  border-color: #2563eb; background: rgba(37, 99, 235, 0.08);
 }
-
-/* === Primary buttons (Run model) → green =================================== */
 button[kind="primary"], [data-testid="baseButton-primary"] {
-  background-color: #16a34a !important;
-  border-color: #16a34a !important;
-  color: #fff !important;
+  background-color: #16a34a !important; border-color: #16a34a !important; color: #fff !important;
 }
 button[kind="primary"]:hover, [data-testid="baseButton-primary"]:hover {
-  background-color: #15803d !important;
-  border-color: #15803d !important;
+  background-color: #15803d !important; border-color: #15803d !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
 
 # --- Branding header (replaces old st.title/st.caption) ----------------------
-
-def app_header(
-    title: str = "Steel Carbon Intensity Model",
-):
+def app_header(title: str = "Steel Carbon Intensity Model"):
     st.markdown("""
     <style>
       .app-hero { padding:.25rem 0 0 0; text-align:center; }
@@ -151,15 +131,14 @@ def app_header(
     </style>
     """, unsafe_allow_html=True)
     st.markdown(f'<div class="app-hero"><h1>{title}</h1></div>', unsafe_allow_html=True)
-    #st.markdown('<div class="hr"></div>', unsafe_allow_html=True)
-    
+
 app_header(title="Steel Carbon Intensity Model")
 
 # Sidebar – data location and scenario selection
 with st.sidebar:
-    # --- Top logos side-by-side (80 px each)
+    # logos (optional)
     logo_paths = [ "assets/university_logo.png", "assets/faculty_logo.png" ]
-    logo_paths = [p for p in logo_paths if os.path.exists(p)]  # only those that exist
+    logo_paths = [p for p in logo_paths if os.path.exists(p)]
     if logo_paths:
         cols = st.columns(len(logo_paths))
         for col, path in zip(cols, logo_paths):
@@ -193,11 +172,8 @@ with st.sidebar:
         scenario_name = "(no scenario)"
         st.warning("No scenario .yml files found in data/scenarios")
 
-    # --- Run options (moved up, right under Setup) ---------------------------
-    #st.divider()
+    # --- Run options
     st.header("Run options")
-
-    # lock route to scenario
     route = _route_from_scenario(scenario, scenario_name)
     st.caption(f"Route preset: **{route}** (locked by scenario)")
     if route == "auto":
@@ -206,13 +182,13 @@ with st.sidebar:
     stage_key = st.selectbox("Stop at stage", options=list(STAGE_MATS.keys()), index=0)
     demand_qty = st.number_input("Demand quantity at selected stage", value=1000.0, min_value=0.0, step=100.0)
 
-    #st.divider()
-    #st.checkbox("Advanced: custom overrides (energy/process)", key="show_adv")
+    # --- Logging controls (fixed)
+    st.header("Logging")
+    log_runs = st.checkbox("Create run bundle (ZIP) & save", value=False)
+    log_folder = st.text_input("Save folder", value="run_logs")
+    uploaded = None  # (no file-upload UI at the moment)
 
-       
 data_dir = DATA_ROOT
-  
-    
 
 # Load base tables once per change in data_dir
 @st.cache_data(show_spinner=False)
@@ -251,11 +227,8 @@ apply_dict_overrides(energy_shares,  scenario.get('energy_matrix', {}))
 apply_dict_overrides(energy_content, scenario.get('energy_content', {}))
 apply_dict_overrides(e_efs,          scenario.get('emission_factors', {}))
 
-# Params (deep-ish merge): reuse the helper from core script
+# Params (deep-ish merge)
 from types import SimpleNamespace
-
-
-
 
 def _recursive_ns_update(ns, patch):
     for k, v in (patch or {}).items():
@@ -296,7 +269,7 @@ adjust_process_gas_intensity('Coke Production', 'process_gas_coke', energy_int, 
 recipes = load_recipes_from_yaml(os.path.join(data_dir, 'recipes.yml'), params, energy_int, energy_shares, energy_content)
 recipes = apply_recipe_overrides(recipes, scenario.get('recipe_overrides', {}), params, energy_int, energy_shares, energy_content)
 
-# Pre-mask for route & pre-select disabling of conflicting upstream cores (mirrors CLI)
+# Pre-mask for route & pre-select disabling of conflicting upstream cores
 pre_mask = build_route_mask(route, recipes)
 feed_mode = {
     "EAF-Scrap": "scrap",
@@ -306,12 +279,12 @@ feed_mode = {
     "auto":      None,
 }.get(route)
 
-# Enforce EAF feed on a *copy* of recipes so user can flip route without side-effects
+# Enforce EAF feed on a copy of recipes so user can flip route without side-effects
 import copy
 recipes_for_ui = copy.deepcopy(recipes)
 enforce_eaf_feed(recipes_for_ui, feed_mode)
 
-# Soft pre-select disabling for upstream cores (for clearer UI defaults)
+# Soft pre-select disabling for upstream cores (clearer UI defaults)
 UPSTREAM_CORE = {
     "Blast Furnace", "Basic Oxygen Furnace", "Direct Reduction Iron", "Electric Arc Furnace", "Scrap Purchase"
 }
@@ -324,11 +297,8 @@ route_disable = {
 }.get(route, set())
 pre_select_soft = {p: 0 for p in route_disable if p in UPSTREAM_CORE}
 
-# Ambiguous materials along the chain (after route constraints)
-from typing import Set
-
+# ----------------------------- helpers ---------------------------------------
 def _ns_to_dict(ns):
-    # Convert SimpleNamespace → plain dict (recursive)
     try:
         return {k: _ns_to_dict(getattr(ns, k)) for k in vars(ns)}
     except Exception:
@@ -340,7 +310,6 @@ def _ns_to_dict(ns):
 
 def _sha256(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
-
 
 def build_producers_index(recipes: List[Process]) -> Dict[str, List[Process]]:
     prod = {}
@@ -365,13 +334,11 @@ def gather_ambiguous_chain_materials(
     q = deque([demand_mat])
     while q:
         mat = q.popleft()
-        if mat in seen_mats:
-            continue
+        if mat in seen_mats: continue
         seen_mats.add(mat)
         cand = producers.get(mat, [])
         enabled = [r for r in cand if pre_mask.get(r.name, 1) > 0 and pre_select.get(r.name, 1) > 0]
-        if not cand:
-            continue
+        if not cand: continue
         if len(enabled) <= 1:
             pick = enabled[0] if len(enabled) == 1 else None
             if pick:
@@ -402,13 +369,11 @@ def build_routes_from_ui(
     q = deque([demand_mat])
     while q:
         mat = q.popleft()
-        if mat in visited_mats:
-            continue
+        if mat in visited_mats: continue
         visited_mats.add(mat)
         cand = producers.get(mat, [])
         enabled = [r for r in cand if pre_mask.get(r.name, 1) > 0 and pre_select.get(r.name, 1) > 0]
-        if not enabled:
-            continue
+        if not enabled: continue
         pick: Process | None = None
         if len(enabled) == 1:
             pick = enabled[0]
@@ -427,7 +392,7 @@ def build_routes_from_ui(
                 q.append(im)
     return chosen
 
-
+# ----------------------------- UI --------------------------------------------
 demand_mat = STAGE_MATS[stage_key]
 ambiguous = gather_ambiguous_chain_materials(recipes_for_ui, demand_mat, pre_mask=pre_mask, pre_select=pre_select_soft)
 
@@ -443,7 +408,6 @@ cols = st.columns(2)
 with cols[0]:
     st.write("Select one producer per material (only where multiple options exist):")
 
-# --- staged radio helpers (UI-only; no model logic changed) -------------------
 def _stage_label_for(mat_name: str) -> str:
     if "Finished" in mat_name:
         return "Finish"
@@ -454,7 +418,6 @@ def _stage_label_for(mat_name: str) -> str:
         return "Liquid"
     return "Other"
 
-# Short labels for specific materials (fallback: show original process name)
 OPTION_LABELS = {
     "Finished Products": {
         "No Coating": "NONE",
@@ -462,8 +425,6 @@ OPTION_LABELS = {
         "Electrolytic Metal Coating FP": "EG",
         "Organic or Sintetic Coating (painting)": "PAINT",
     },
-    # You can add more material-specific label maps here if you want:
-    # "Manufactured Feed (IP4)": { ... }
 }
 
 from collections import defaultdict
@@ -474,50 +435,38 @@ for mat, options in ambiguous:
 _stage_order = ["Finished", "IP4", "IP3", "IP2", "IP1", "Liquid", "Other"]
 
 def _use_selectbox(options: list[str]) -> bool:
-    # Heuristic: too many or too long → dropdown saves space
     return (len(options) > 5) or (max(len(o) for o in options) > 28)
 
 for stage in _stage_order:
     items = groups.get(stage, [])
     if not items:
         continue
-
     st.markdown(f"**{stage}**")
-
-    # 2 columns to reduce vertical scrolling
     cols = st.columns(2) if len(items) > 1 else [st.container()]
-
     for i, (mat, options) in enumerate(items):
         with cols[i % len(cols)]:
-            # Current choice (full process name)
             default_proc = st.session_state.picks_by_material.get(mat, options[0])
             default_idx = options.index(default_proc) if default_proc in options else 0
-
-            show_label = len(items) > 1  # hide redundant label if single item in stage
-
+            show_label = len(items) > 1
             if _use_selectbox(options):
-                # Compact dropdown when many/long options
                 st.session_state.picks_by_material[mat] = st.selectbox(
                     label = mat if show_label else "",
-                    options = options,                     # full names
+                    options = options,
                     index = default_idx,
                     key = f"pick_{mat}",
                     label_visibility = "visible" if show_label else "collapsed",
                 )
             else:
-                # Chip-style radios (full names displayed; CSS makes them compact)
                 choice_idx = st.radio(
                     label = mat if show_label else "",
                     options = list(range(len(options))),
                     index = default_idx,
-                    format_func = lambda i, opts=options: opts[i],  # show full names
+                    format_func = lambda i, opts=options: opts[i],
                     horizontal = True,
                     key = f"radio_{mat}",
                     label_visibility = "visible" if show_label else "collapsed",
                 )
                 st.session_state.picks_by_material[mat] = options[choice_idx]
-
-
 
 c1, c2, c3 = st.columns([1,1,3])
 with c1:
@@ -535,7 +484,6 @@ with c2:
 # -----------------------------
 if run_now:
     with st.spinner("Running model…"):
-        # Build production_routes from UI picks
         production_routes = build_routes_from_ui(
             recipes_for_ui,
             demand_mat,
@@ -543,7 +491,6 @@ if run_now:
             pre_mask=pre_mask,
             pre_select=pre_select_soft,
         )
-
         final_demand = {demand_mat: float(demand_qty)}
 
         # Solve material balance
@@ -577,10 +524,10 @@ if run_now:
                 if carrier != 'Electricity':
                     energy_balance.loc['Coke Production', carrier] = cp_runs * base_cp * float(cp_sh.get(carrier, 0.0))
 
-        # Apply internal electricity credit
+        # Internal electricity credit
         energy_balance = adjust_energy_balance(energy_balance, internal_elec)
 
-        # Compute dynamic EF for recovered gas (matches CLI)
+        # Dynamic EF for recovered gas (matches CLI)
         gas_coke_MJ = prod_lvl.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get('Process Gas', 0.0)
         gas_bf_MJ   = (getattr(params, 'bf_adj_intensity', 0.0) - getattr(params, 'bf_base_intensity', 0.0)) * prod_lvl.get('Blast Furnace', 0.0)
         total_gas_MJ = float(gas_coke_MJ + gas_bf_MJ)
@@ -610,28 +557,24 @@ if run_now:
             total_gas_MJ,
             EF_process_gas,
         )
-        
-        
+
         if emissions is not None and 'TOTAL' not in emissions.index:
             emissions.loc['TOTAL'] = emissions.sum()
-
 
     # -----------------------------
     # Display results
     # -----------------------------
     st.success("Model run complete.")
-    
-    # Keep df_runs so the logging code can write production_runs.csv
+
     df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")
-    
-    # Compute total safely; don't render any tables
+
     total = None
     if (emissions is not None) and (not emissions.empty):
         if ("TOTAL" in emissions.index) and ("TOTAL CO2e" in emissions.columns):
             total = float(emissions.loc["TOTAL", "TOTAL CO2e"])
         elif "TOTAL CO2e" in emissions.columns:
             total = float(emissions["TOTAL CO2e"].sum())
-    
+
     if total is not None:
         st.metric("Total CO₂e", f"{total:,.2f} kg")
     else:
@@ -678,8 +621,6 @@ if run_now:
 
     # Downloads (CSV + HTMLs zipped)
     st.subheader("Downloads")
-
-    # CSVs
     csv_col1, csv_col2, csv_col3 = st.columns(3)
     csv_col1.download_button(
         label="Download production runs (CSV)",
@@ -709,14 +650,12 @@ if run_now:
     if emissions is not None and not emissions.empty:
         html_files["hybrid_sankey.html"] = fig_hybrid.to_html(include_plotlyjs="cdn")
         html_files["energy_to_process_sankey.html"] = fig_energy_ranked.to_html(include_plotlyjs="cdn")
-        
-    # -----------------------------
+
     # Create "run bundle" ZIP (config + results + figures) + save to disk
-    # -----------------------------
     if log_runs:
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8]
         bundle_name = f"run_{run_id}.zip"
-    
+
         # Scenario bytes + SHA (works for selected file, uploaded file, or inline)
         scen_bytes = None
         scen_sha = None
@@ -730,15 +669,13 @@ if run_now:
                 scen_bytes = p.read_bytes()
                 scen_filename = p.name
             else:
-                # No scenario file on disk—dump the in-memory dict so we have a record
                 scen_bytes = yaml.safe_dump(scenario or {}, sort_keys=True).encode("utf-8")
                 scen_filename = "scenario_from_session.yml"
             scen_sha = _sha256(scen_bytes) if scen_bytes is not None else None
         except Exception:
             pass
-    
-        # Build manifest with config + results metadata
-        # NOTE: keep only JSON-safe primitives
+
+        # Build manifest (JSON-safe primitives only)
         params_snapshot = _ns_to_dict(params)
         manifest = {
             "run_id": run_id,
@@ -765,43 +702,34 @@ if run_now:
                 "streamlit": getattr(st, "__version__", "unknown"),
                 "pandas": pd.__version__,
             },
-            "parameters_snapshot": params_snapshot,  # proof of knobs used
+            "parameters_snapshot": params_snapshot,
         }
-    
-        # Build the ZIP (and a file manifest with hashes for integrity)
+
         file_hashes = {}
         def _add_bytes(zf, arcname: str, b: bytes):
             zf.writestr(arcname, b)
             file_hashes[arcname] = {"sha256": _sha256(b), "bytes": len(b)}
-    
+
         bundle_buf = io.BytesIO()
         with zipfile.ZipFile(bundle_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            # Config
             if scen_bytes is not None:
                 _add_bytes(zf, f"scenario/{scen_filename}", scen_bytes)
             _add_bytes(zf, "manifest.json", json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8"))
-    
-            # Results (CSVs)
             _add_bytes(zf, "results/production_runs.csv", df_runs.to_csv().encode("utf-8"))
             _add_bytes(zf, "results/energy_balance.csv", energy_balance.to_csv().encode("utf-8"))
             if emissions is not None and not emissions.empty:
                 _add_bytes(zf, "results/emissions.csv", emissions.to_csv().encode("utf-8"))
-    
-            # Figures (HTML)
             for fname, html in html_files.items():
                 _add_bytes(zf, f"figures/{fname}", html.encode("utf-8"))
-    
-            # File integrity index
             _add_bytes(zf, "manifest_files.json", json.dumps(file_hashes, indent=2, sort_keys=True).encode("utf-8"))
-    
-        # Offer download and also persist locally
+
         st.download_button(
             label="Download run log bundle (ZIP)",
             data=bundle_buf.getvalue(),
             file_name=bundle_name,
             mime="application/zip",
         )
-    
+
         try:
             os.makedirs(log_folder, exist_ok=True)
             out_path = os.path.join(log_folder, bundle_name)
@@ -810,8 +738,8 @@ if run_now:
             st.caption(f"Saved: `{out_path}`")
         except Exception as e:
             st.warning(f"Could not save to disk: {e}")
-        
-    
+
+        # Also offer the Sankey-only HTMLs zipped (handy for emails)
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
             for fname, html in html_files.items():
@@ -822,8 +750,6 @@ if run_now:
             file_name="sankey_charts.zip",
             mime="application/zip",
         )
-    
-    
 
 # Footer note
 st.caption("© 2025 UNICAMP – Faculdade de Engenharia Mecânica. App v0.9 (beta)")

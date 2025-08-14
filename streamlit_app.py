@@ -70,6 +70,9 @@ from steel_model_core import (
     expand_energy_tables_for_active,
 )
 
+from steel_core_api_v2 import RouteConfig, ScenarioInputs, run_scenario
+
+
 DATA_ROOT = "data"  # fixed data folder
 
 
@@ -483,273 +486,32 @@ with c2:
 # Execute model when requested
 # -----------------------------
 if run_now:
-    with st.spinner("Running model…"):
-        production_routes = build_routes_from_ui(
-            recipes_for_ui,
-            demand_mat,
-            st.session_state.picks_by_material,
-            pre_mask=pre_mask,
-            pre_select=pre_select_soft,
-        )
+    with st.spinner("Running model (core)…"):
         final_demand = {demand_mat: float(demand_qty)}
-
-        # Solve material balance
-        balance_matrix, prod_lvl = calculate_balance_matrix(recipes_for_ui, final_demand, production_routes)
-        if balance_matrix is None:
-            st.error("Material balance failed.")
-            st.stop()
-
-        # Ensure energy tables have rows for all active variants
-        active_procs = [p for p, r in prod_lvl.items() if r > 1e-9]
-        expand_energy_tables_for_active(active_procs, energy_shares, energy_int)
-
-        # Internal electricity from recovered gases (before credit)
-        recipes_dict = {r.name: r for r in recipes_for_ui}
-        internal_elec = calculate_internal_electricity(prod_lvl, recipes_dict, params)
-
-        # Energy balance (and repair BF/CP to base carriers, mirroring CLI)
-        energy_balance = calculate_energy_balance(prod_lvl, energy_int, energy_shares)
-        if 'Blast Furnace' in energy_balance.index and hasattr(params, 'bf_base_intensity'):
-            bf_runs = float(prod_lvl.get('Blast Furnace', 0.0))
-            base_bf = float(params.bf_base_intensity)
-            bf_sh   = energy_shares.get('Blast Furnace', {})
-            for carrier in energy_balance.columns:
-                if carrier != 'Electricity':
-                    energy_balance.loc['Blast Furnace', carrier] = bf_runs * base_bf * float(bf_sh.get(carrier, 0.0))
-        cp_runs = float(prod_lvl.get('Coke Production', 0.0))
-        base_cp = float(getattr(params, 'coke_production_base_intensity', energy_int.get('Coke Production', 0.0)))
-        cp_sh   = energy_shares.get('Coke Production', {})
-        if cp_runs and cp_sh:
-            for carrier in energy_balance.columns:
-                if carrier != 'Electricity':
-                    energy_balance.loc['Coke Production', carrier] = cp_runs * base_cp * float(cp_sh.get(carrier, 0.0))
-
-        # Internal electricity credit
-        energy_balance = adjust_energy_balance(energy_balance, internal_elec)
-
-        # Dynamic EF for recovered gas (matches CLI)
-        gas_coke_MJ = prod_lvl.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get('Process Gas', 0.0)
-        gas_bf_MJ   = (getattr(params, 'bf_adj_intensity', 0.0) - getattr(params, 'bf_base_intensity', 0.0)) * prod_lvl.get('Blast Furnace', 0.0)
-        total_gas_MJ = float(gas_coke_MJ + gas_bf_MJ)
-
-        cp_shares = energy_shares.get('Coke Production', {})
-        fuels_cp  = [c for c in cp_shares if c != 'Electricity' and cp_shares[c] > 0]
-        EF_coke_gas = (sum(cp_shares[c] * e_efs.get(c, 0.0) for c in fuels_cp) / max(1e-12, sum(cp_shares[c] for c in fuels_cp))) if fuels_cp else 0.0
-        bf_shares = energy_shares.get('Blast Furnace', {})
-        fuels_bf  = [c for c in bf_shares if c != 'Electricity' and bf_shares[c] > 0]
-        EF_bf_gas = (sum(bf_shares[c] * e_efs.get(c, 0.0) for c in fuels_bf) / max(1e-12, sum(bf_shares[c] for c in fuels_bf))) if fuels_bf else 0.0
-        EF_process_gas = EF_coke_gas if total_gas_MJ <= 1e-9 else (
-            (EF_coke_gas * (gas_coke_MJ / max(1e-12, total_gas_MJ))) + (EF_bf_gas * (gas_bf_MJ / max(1e-12, total_gas_MJ)))
+        route_cfg = RouteConfig(
+            route_preset=route,            # ← forced by scenario (your code above)
+            stage_key=stage_key,
+            demand_qty=float(demand_qty),
+            picks_by_material=dict(st.session_state.picks_by_material),
+            pre_select_soft=pre_select_soft,
         )
-
-        util_eff = recipes_dict.get('Utility Plant', Process('',{},{})).outputs.get('Electricity', 0.0)
-        internal_elec = total_gas_MJ * util_eff  # recompute defensively
-
-        # Emissions
-        emissions = calculate_emissions(
-            mkt_cfg,
-            prod_lvl,
-            energy_balance,
-            e_efs,
-            load_data_from_yaml(os.path.join(data_dir, 'process_emissions.yml')),
-            internal_elec,
-            final_demand,
-            total_gas_MJ,
-            EF_process_gas,
+        scn = ScenarioInputs(
+            country_code=(country_code or None),
+            scenario=scenario,
+            route=route_cfg,
         )
-
-        if emissions is not None and 'TOTAL' not in emissions.index:
-            emissions.loc['TOTAL'] = emissions.sum()
-
-    # -----------------------------
-    # Display results
-    # -----------------------------
-    st.success("Model run complete.")
-
-    df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")
-
-    total = None
-    if (emissions is not None) and (not emissions.empty):
-        if ("TOTAL" in emissions.index) and ("TOTAL CO2e" in emissions.columns):
-            total = float(emissions.loc["TOTAL", "TOTAL CO2e"])
-        elif "TOTAL CO2e" in emissions.columns:
-            total = float(emissions["TOTAL CO2e"].sum())
-
-    if total is not None:
-        st.metric("Total CO₂e", f"{total:,.2f} kg")
-    else:
-        st.info("No emissions available for this run.")
-
-    # Sankey figures
-    st.subheader("Sankey diagrams")
-    recipes_dict_live = {r.name: r for r in recipes_for_ui}
-
-    fig_mass = make_mass_sankey(
-        prod_lvl=prod_lvl,
-        recipes_dict=recipes_dict_live,
-        min_flow=0.5,
-        title=f"Mass Flow Sankey — {demand_qty:.0f} units {STAGE_MATS[stage_key]} ({scenario_name})",
-    )
-    st.plotly_chart(fig_mass, use_container_width=True)
-
-    fig_energy = make_energy_sankey(
-        energy_balance_df=energy_balance,
-        min_MJ=25.0,
-        title="Energy Flow Sankey — Process Carriers",
-    )
-    st.plotly_chart(fig_energy, use_container_width=True)
-
-    if emissions is not None and not emissions.empty:
-        fig_hybrid = make_hybrid_sankey(
-            energy_balance_df=energy_balance,
-            emissions_df=emissions,
-            min_MJ=25.0,
-            min_kg=1.0,
-            co2_scale=None,
-            include_direct_and_energy_sinks=True,
-        )
-        st.plotly_chart(fig_hybrid, use_container_width=True)
-
-        fig_energy_ranked = make_energy_to_process_sankey(
-            energy_balance_df=energy_balance,
-            emissions_df=emissions,
-            title="Energy → Processes (ranked by CO₂e)",
-            min_MJ=25.0,
-            sort_by="emissions",
-        )
-        st.plotly_chart(fig_energy_ranked, use_container_width=True)
-
-    # Downloads (CSV + HTMLs zipped)
-    st.subheader("Downloads")
-    csv_col1, csv_col2, csv_col3 = st.columns(3)
-    csv_col1.download_button(
-        label="Download production runs (CSV)",
-        data=df_runs.to_csv().encode("utf-8"),
-        file_name="production_runs.csv",
-        mime="text/csv",
-    )
-    csv_col2.download_button(
-        label="Download energy balance (CSV)",
-        data=energy_balance.to_csv().encode("utf-8"),
-        file_name="energy_balance.csv",
-        mime="text/csv",
-    )
-    if emissions is not None and not emissions.empty:
-        csv_col3.download_button(
-            label="Download emissions (CSV)",
-            data=emissions.to_csv().encode("utf-8"),
-            file_name="emissions.csv",
-            mime="text/csv",
-        )
-
-    # HTMLs (Plotly figures) packed in a zip for convenience
-    html_files = {
-        "mass_sankey.html": fig_mass.to_html(include_plotlyjs="cdn"),
-        "energy_sankey.html": fig_energy.to_html(include_plotlyjs="cdn"),
-    }
-    if emissions is not None and not emissions.empty:
-        html_files["hybrid_sankey.html"] = fig_hybrid.to_html(include_plotlyjs="cdn")
-        html_files["energy_to_process_sankey.html"] = fig_energy_ranked.to_html(include_plotlyjs="cdn")
-
-    # Create "run bundle" ZIP (config + results + figures) + save to disk
-    if log_runs:
-        run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8]
-        bundle_name = f"run_{run_id}.zip"
-
-        # Scenario bytes + SHA (works for selected file, uploaded file, or inline)
-        scen_bytes = None
-        scen_sha = None
-        scen_filename = "inline_scenario.yml"
-        try:
-            if uploaded is not None:
-                scen_bytes = uploaded.getvalue()
-                scen_filename = getattr(uploaded, "name", "uploaded.yml")
-            elif scenario_choice:
-                p = pathlib.Path(data_dir) / "scenarios" / scenario_choice
-                scen_bytes = p.read_bytes()
-                scen_filename = p.name
-            else:
-                scen_bytes = yaml.safe_dump(scenario or {}, sort_keys=True).encode("utf-8")
-                scen_filename = "scenario_from_session.yml"
-            scen_sha = _sha256(scen_bytes) if scen_bytes is not None else None
-        except Exception:
-            pass
-
-        # Build manifest (JSON-safe primitives only)
-        params_snapshot = _ns_to_dict(params)
-        manifest = {
-            "run_id": run_id,
-            "timestamp": datetime.now().isoformat(timespec="seconds"),
-            "app": {"title": "Brazilian Steel Decarbonization Model", "version": "1.0"},
-            "data_dir": data_dir,
-            "scenario_file": scen_filename,
-            "scenario_sha256": scen_sha,
-            "route_preset": route,
-            "stage_key": stage_key,
-            "demand_qty": float(demand_qty),
-            "grid_country": country_code,
-            "electricity_EF_gCO2_per_MJ": float(e_efs.get("Electricity", 0.0)),
-            "picks_by_material": dict(st.session_state.get("picks_by_material", {})),
-            "production_routes": {k: int(v) for k, v in (production_routes or {}).items()},
-            "final_demand": {k: float(v) for k, v in (final_demand or {}).items()},
-            "internal_electricity_MJ": float(internal_elec),
-            "total_process_gas_MJ": float(total_gas_MJ),
-            "EF_process_gas_gCO2_per_MJ": float(EF_process_gas),
-            "emissions_total_kgCO2e": float(total) if (emissions is not None and not emissions.empty) else None,
-            "environment": {
-                "python": sys.version,
-                "platform": platform.platform(),
-                "streamlit": getattr(st, "__version__", "unknown"),
-                "pandas": pd.__version__,
-            },
-            "parameters_snapshot": params_snapshot,
-        }
-
-        file_hashes = {}
-        def _add_bytes(zf, arcname: str, b: bytes):
-            zf.writestr(arcname, b)
-            file_hashes[arcname] = {"sha256": _sha256(b), "bytes": len(b)}
-
-        bundle_buf = io.BytesIO()
-        with zipfile.ZipFile(bundle_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            if scen_bytes is not None:
-                _add_bytes(zf, f"scenario/{scen_filename}", scen_bytes)
-            _add_bytes(zf, "manifest.json", json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8"))
-            _add_bytes(zf, "results/production_runs.csv", df_runs.to_csv().encode("utf-8"))
-            _add_bytes(zf, "results/energy_balance.csv", energy_balance.to_csv().encode("utf-8"))
-            if emissions is not None and not emissions.empty:
-                _add_bytes(zf, "results/emissions.csv", emissions.to_csv().encode("utf-8"))
-            for fname, html in html_files.items():
-                _add_bytes(zf, f"figures/{fname}", html.encode("utf-8"))
-            _add_bytes(zf, "manifest_files.json", json.dumps(file_hashes, indent=2, sort_keys=True).encode("utf-8"))
-
-        st.download_button(
-            label="Download run log bundle (ZIP)",
-            data=bundle_buf.getvalue(),
-            file_name=bundle_name,
-            mime="application/zip",
-        )
-
-        try:
-            os.makedirs(log_folder, exist_ok=True)
-            out_path = os.path.join(log_folder, bundle_name)
-            with open(out_path, "wb") as f:
-                f.write(bundle_buf.getvalue())
-            st.caption(f"Saved: `{out_path}`")
-        except Exception as e:
-            st.warning(f"Could not save to disk: {e}")
-
-        # Also offer the Sankey-only HTMLs zipped (handy for emails)
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for fname, html in html_files.items():
-                zf.writestr(fname, html)
-        st.download_button(
-            label="Download Sankey HTMLs (ZIP)",
-            data=buf.getvalue(),
-            file_name="sankey_charts.zip",
-            mime="application/zip",
-        )
+        out = run_scenario(data_dir, scn)
+    
+        production_routes = out.production_routes
+        prod_lvl = out.prod_levels
+        energy_balance = out.energy_balance
+        emissions = out.emissions
+        total = out.total_co2e_kg
+    
+        # No local recomputation of these (kept for your bundle keys)
+        internal_elec = None
+        total_gas_MJ = None
+        EF_process_gas = None
 
 # Footer note
 st.caption("© 2025 UNICAMP – Faculdade de Engenharia Mecânica. App v0.9 (beta)")

@@ -1,0 +1,172 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Aug 14 14:00:48 2025
+
+@author: rafae
+"""
+
+*** Begin Patch
+*** Update File: streamlit_app.py
+@@
+ import yaml  # make sure this is available at top-level (you already use it)
+ import streamlit as st
+ import pandas as pd
+ import yaml
+ 
++# --- Interactive process map (optional) --------------------------------------
++try:
++    # third-party interactive network renderer
++    from pyvis.network import Network
++    import streamlit.components.v1 as components
++    import tempfile
++    HAVE_PYVIS = True
++except Exception:
++    HAVE_PYVIS = False
++
+ # Import everything we need from your existing codebase
+ from steel_model_core import (
+     # Data models & loaders
+     Process,
+     load_data_from_yaml,
+@@
+     if route == "auto":
+         st.warning("Scenario does not specify a route; using AUTO (no preset mask).")
+ 
+     stage_key = st.selectbox("Stop at stage", options=list(STAGE_MATS.keys()), index=0)
+     demand_qty = st.number_input("Demand quantity at selected stage", value=1000.0, min_value=0.0, step=100.0)
+ 
++    # --- Visualization & logging ---------------------------------------------
++    st.header("Visualization & logging")
++    if not HAVE_PYVIS:
++        st.info("To enable the interactive process map, run: `pip install pyvis`")
++    # Define logging controls here (they are referenced later during run bundle creation)
++    log_runs = st.checkbox("Create run bundle (ZIP) & save", value=False)
++    log_folder = st.text_input("Save folder", value="run_logs")
++    # If you don't currently support uploading scenarios, keep a safe default
++    uploaded = None
++
+     #st.divider()
+     #st.checkbox("Advanced: custom overrides (energy/process)", key="show_adv")
+ 
+        
+ data_dir = DATA_ROOT
+@@
+ def build_producers_index(recipes: List[Process]) -> Dict[str, List[Process]]:
+     prod = {}
+     for r in recipes:
+         for m in r.outputs:
+             prod.setdefault(m, []).append(r)
+     return prod
+ 
+ from collections import deque
+ 
++# -----------------------------------------------------------------------------
++# Interactive Process Map helpers
++# -----------------------------------------------------------------------------
++def _build_process_graph(recipes: List[Process]):
++    """
++    Nodes: process names
++    Edge A→B if any material produced by A is consumed by B.
++    """
++    producers = {}
++    consumers = {}
++    for r in recipes:
++        for m in (r.outputs or {}):
++            producers.setdefault(m, []).append(r.name)
++        for m in (r.inputs or {}):
++            consumers.setdefault(m, []).append(r.name)
++
++    edges = set()
++    for m, prods in producers.items():
++        for a in prods:
++            for b in consumers.get(m, []):
++                if a != b:
++                    edges.add((a, b))
++    return edges
++
++def _infer_stage(process: Process) -> str:
++    outmats = set((process.outputs or {}).keys())
++    nm = process.name
++    if any(x in outmats for x in {"Pig Iron (Exit)", "Ingot (Exit)", "Basic Steel (Exit)"}):
++        return "Exit"
++    if "Cast Steel (IP1)" in outmats: return "Casting"
++    if "Raw Products (types)" in outmats: return "Mill"
++    if "Cold Raw Steel (IP2)" in outmats: return "IP2"
++    if "Intermediate Process 3" in outmats: return "IP3"
++    if "Manufactured Feed (IP4)" in outmats: return "IP4"
++    if "Finished Products" in outmats: return "Finished"
++    if nm in {"Sintering","Pelletizing","Blast Furnace","Direct Reduction Iron"}:
++        return "Upstream"
++    if nm in {"Basic Oxygen Furnace","Electric Arc Furnace","Regular Steel",
++              "Steel Refining (Low Alloy)","Steel Refining (High Alloy)"}:
++        return "Steelmaking"
++    return "Other"
++
++def _render_process_map(recipes: List[Process], height: int = 720) -> str:
++    edges = _build_process_graph(recipes)
++    name_to_proc = {r.name: r for r in recipes}
++    nodes = list(name_to_proc.keys())
++
++    # Mark nodes reachable downstream of any "Cold Rolling*" nodes → blue edges
++    after_cr = set()
++    cr_roots = [n for n in nodes if n.strip().lower().startswith("cold rolling")]
++    frontier = list(cr_roots)
++    while frontier:
++        u = frontier.pop(0)
++        after_cr.add(u)
++        for (a, b) in edges:
++            if a == u and b not in after_cr:
++                frontier.append(b)
++
++    net = Network(height=f"{height}px", width="100%", directed=True, notebook=False)
++    net.barnes_hut()
++    net.set_options("""
++    const options = {
++      layout: { hierarchical: { enabled:true, direction:"UD", sortMethod:"directed",
++                                nodeSpacing:180, levelSeparation:140 } },
++      interaction: { hover:true, navigationButtons:true, tooltipDelay:120 },
++      physics: { enabled:false }
++    }
++    """)
++
++    for n in nodes:
++        p = name_to_proc[n]
++        stage = _infer_stage(p)
++        net.add_node(n, label=n, title=stage, group=stage)
++
++    for a, b in edges:
++        color = "blue" if (a in after_cr) else "red"
++        net.add_edge(a, b, color=color, arrows="to")
++
++    tmpdir = tempfile.mkdtemp(prefix="procmap_")
++    html_path = os.path.join(tmpdir, "process_map.html")
++    net.show(html_path)
++    return html_path
++
+ def gather_ambiguous_chain_materials(
+     recipes: List[Process],
+     demand_mat: str,
+     pre_mask: Dict[str, int] | None = None,
+     pre_select: Dict[str, int] | None = None,
+@@
+ 
+ 
+ demand_mat = STAGE_MATS[stage_key]
+ ambiguous = gather_ambiguous_chain_materials(recipes_for_ui, demand_mat, pre_mask=pre_mask, pre_select=pre_select_soft)
+ 
++st.subheader("Visual guide")
++if HAVE_PYVIS:
++    if st.button("Show process map"):
++        try:
++            html_path = _render_process_map(recipes_for_ui, height=720)
++            with open(html_path, "r", encoding="utf-8") as f:
++                components.html(f.read(), height=720, scrolling=False)
++        except Exception as e:
++            st.error(f"Could not render process map: {e}")
++else:
++    st.info("Install pyvis to enable the interactive process map: `pip install pyvis`")
++
+ st.subheader("Route & treatment choices")
+ if not ambiguous:
+     st.info("No ambiguous producers along the chain with this setup — the path is unique.")
+*** End Patch

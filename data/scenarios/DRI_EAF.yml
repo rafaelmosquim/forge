@@ -1,0 +1,25 @@
+route_overrides:
+  Blast Furnace: 0.0
+  Basic Oxygen Furnace: 0.0
+  Electric Arc Furnace: 1
+  Direct Reduction Iron: 1
+  Charcoal from Market: 0.0   # optional, to force Wood → kiln path
+  Charcoal Production: 0
+  Coke Production: 0
+  Sintering: 0
+
+recipe_overrides:
+  Electric Arc Furnace:
+    inputs:
+      Pig Iron: 0.9 - 0.0072     # replace original 1.0
+      Scrap:   0.1      # add scrap feed
+
+param_overrides:
+  blend:
+    sinter: 0.0
+    pellet: 0.9
+    lump:   0.1
+  iron_content_pig_iron: 0.69
+  feo3_sinter: 0.80
+  feo3_pellet: 0.90
+  feo3_lump:   0.987

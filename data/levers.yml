@@ -1,0 +1,70 @@
+levers:
+  - name: "BF intensity"
+    family: "energy_int"
+    key: "Blast Furnace"
+    type: "scale"   # lo/hi are multipliers
+    lo: 0.80
+    hi: 1.20
+
+  - name: "Coke-oven intensity"
+    family: "energy_int"
+    key: "Coke Production"
+    type: "scale"
+    lo: 0.85
+    hi: 1.15
+
+  - name: "Grid EF (Electricity)"
+    family: "e_efs"
+    key: "Electricity"
+    type: "scale"
+    lo: 0.70
+    hi: 1.30
+
+  - name: "Coal EF"
+    family: "e_efs"
+    key: "Coal"
+    type: "scale"
+    lo: 0.9
+    hi: 1.1
+
+  - name: "Process gas recovery (BF)"
+    family: "params"
+    key: "params.process_gas"
+    type: "abs"     # absolute range (fraction)
+    lo: 0.00
+    hi: 0.50
+
+  - name: "Process gas recovery (Coke)"
+    family: "params"
+    key: "params.process_gas_coke"
+    type: "abs"
+    lo: 0.00
+    hi: 0.50
+
+  - name: "EAF intensity"
+    family: "energy_int"
+    key: "Electric Arc Furnace"
+    type: "scale"
+    lo: 0.9
+    hi: 1.1
+
+  - name: "BOF direct emissions"
+    family: "p_efs"
+    key: "Basic Oxygen Furnace"
+    type: "scale"
+    lo: 0.8
+    hi: 1.2
+
+  - name: "BF direct emissions"
+    family: "p_efs"
+    key: "Blast Furnace"
+    type: "scale"
+    lo: 0.8
+    hi: 1.2
+
+  - name: "Natural gas EF"
+    family: "e_efs"
+    key: "Gas"
+    type: "scale"
+    lo: 0.9
+    hi: 1.1

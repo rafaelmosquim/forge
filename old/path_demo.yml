@@ -1,0 +1,9 @@
+description: "Path-mode sanity check — Rod/bar -> direct use -> no coating"
+path_mode: true
+path:
+  grade: "R"  # R=Regular, L=Low Alloy (HSLA), H=High Alloy (SS)
+  raw_shaping: "Rod/bar/section Mill"
+  cold_roll: null
+  treatment: null
+  manufacturing: "Direct use of Basic Steel Products (IP4)"
+  final_coat: "No Coating"

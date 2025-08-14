@@ -1,0 +1,48 @@
+id: benchmark_hasanbeigi
+title: "Full-chain site EF — average grid + BF band"
+citation: "Steel Climate Impact, 2022"
+unit: "t CO₂e / t shipped steel"
+
+boundary:
+  include_coke: true
+  include_pelletizing: true
+  include_sintering: true
+  include_ironmaking: true
+  include_steelmaking: true
+  include_casting: false
+  include_hot_rolling: false
+  include_cold_rolling: false
+  include_processing: false       # galvanizing / coating if you want it in
+  internal_power_credit: true
+  exported_products_excluded: false
+
+# Use a single average grid factor (overrides the country map)
+electricity:
+  value_gCO2_per_MJ:  110    # e.g., 100 => 360 g/kWh / 3.6
+
+model_projection:
+  route_preset: "BF-BOF"          # let the engine ban EAF/DRI
+  demand: { stage_key: "Finished", quantity_kg: 1000 }
+  rolling_block: "NONE"       # or plate/long
+  include_cold_rolling: "NONE" 
+  coating_type: "NONE"             # pick ONE; engine clamps Finish accordingly
+  cc_variant: "R"
+  ip3_treatment: "BYPASS"
+  ip4_process: "DIRECT_USE"
+  sourcing:
+    nitrogen: market
+    oxygen: market
+    dolomite: market
+    burnt_lime: market
+    natural_gas: market
+    coal: market
+    coke: onsite
+
+  # NEW: sweep BF base intensity (MJ/t) and report band
+  sweep:
+    bf_base_mj_per_t: [11, 13, 15]   # min / median (as-is) / max
+
+expected_result:
+  # Pass rule: just report the band (no single target)
+  band_tCO2_per_t: { low: 1.50, high: 2.50 }
+  pass_rule: "report min/median/max over BF sweep"

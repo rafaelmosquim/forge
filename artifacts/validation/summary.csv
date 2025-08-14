@@ -1,0 +1,2 @@
+card_id,reported_tCO2_per_t,model_tCO2_per_t,diff_tCO2_per_t,pct_diff,pass_rule,pass,total_kg_CO2e,demand_kg
+benchmark_hasanbeigi,,3.1776386873609925,,,report min/median/max over BF sweep,,0.0,1000.0

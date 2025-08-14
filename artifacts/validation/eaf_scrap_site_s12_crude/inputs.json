@@ -1,0 +1,100 @@
+{
+  "card": {
+    "id": "eaf_scrap_site_s12_crude",
+    "title": "EAF\u2013Scrap (site, Scope 1+2, crude steel)",
+    "citation": "TBD \u2013 fill with the specific paper/report you want to match",
+    "unit": "t CO2e / t crude steel",
+    "reported_ef": 0.67,
+    "boundary": {
+      "scope12_site": true,
+      "functional_unit": "1 t crude steel (Liquid Steel)",
+      "stop_stage": "Liquid",
+      "include_upstream_mining": false,
+      "include_pelletizing": false,
+      "include_sintering": false,
+      "include_lime_calcination": false,
+      "include_oxygen_plant": false,
+      "internal_power_credit": false,
+      "scrap_credit": false
+    },
+    "electricity": {
+      "country_code": "CHN",
+      "source": "electricity_intensity.yml",
+      "value_gCO2_per_MJ": null,
+      "year": null
+    },
+    "energy_carriers": {
+      "use_energy_matrix": true,
+      "force_eaf_electricity_only": false
+    },
+    "unknowns": {
+      "eaf_yield": {
+        "low": 0.95,
+        "mid": 0.97,
+        "high": 0.99
+      },
+      "eaf_ng_share": {
+        "low": 0.0,
+        "mid": 0.05,
+        "high": 0.1
+      },
+      "carbon_injection_kg_per_t": {
+        "low": 5,
+        "mid": 10,
+        "high": 15
+      }
+    },
+    "model_projection": {
+      "route_preset": "EAF-Scrap",
+      "demand": {
+        "stage_key": "Liquid",
+        "material": "Liquid Steel",
+        "quantity_kg": 1000
+      },
+      "production_routes_forced_off": [
+        "Blast Furnace",
+        "Basic Oxygen Furnace",
+        "Direct Reduction Iron",
+        "Coke Production",
+        "Sintering",
+        "Pelletizing"
+      ],
+      "recipe_overrides": {
+        "Electric Arc Furnace": {
+          "inputs": {
+            "Scrap": 1.0,
+            "Pig Iron": 0.0,
+            "Direct Reduced Iron": 0.0,
+            "DRI": 0.0,
+            "HBI": 0.0
+          }
+        }
+      }
+    },
+    "path_map": [
+      {
+        "material": "Liquid Steel",
+        "producer": "Electric Arc Furnace",
+        "inputs": [
+          "Scrap (external purchase)",
+          "Electricity",
+          "Oxygen (if modeled)",
+          "Carbon injection (if modeled)"
+        ]
+      }
+    ],
+    "expected_result": {
+      "band_tCO2_per_t": {
+        "low": 0.2,
+        "high": 0.6
+      },
+      "pass_rule": "within \u00b115% of reported_ef OR inside band"
+    },
+    "notes": "Compare at site (Scope 1+2). Outside-mill units (IP4, coatings) are excluded by\nthe model's OUTSIDE_MILL_PROCS. Internal power credit is zero in this route by\nconstruction (no BF/CP gas). For OECD averages, either set country_code to an\nOECD-AVG entry in your electricity map or override Electricity directly here.\n"
+  },
+  "resolved": {
+    "stage_key": "Liquid",
+    "demand_kg": 1000.0,
+    "electricity_gCO2_per_MJ": 155.43
+  }
+}

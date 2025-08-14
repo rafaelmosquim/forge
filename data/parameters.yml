@@ -1,0 +1,21 @@
+# -----------------------------------------------------------------
+# Base parameters for the production model (Materials Only)
+# -----------------------------------------------------------------
+
+# Material composition
+iron_content_pig_iron: 0.615
+feo3_sinter: 0.80
+feo3_pellet: 0.90
+feo3_lump: 0.879
+
+# Blend proportions for Blast Furnace
+blend:
+  sinter: 0.80
+  pellet: 0.10
+  lump: 0.10
+
+# Blast Furnace gas config
+process_gas: 0.275
+process_gas_coke: 0.085  # your coke-oven value
+
+

@@ -1,0 +1,78 @@
+﻿process;Electricity;FLF;RLF;Gas;Wood;Coal;Charcoal;Coke
+Manganese from Market;;;;;;;;
+Chromium from Market;;;;;;;;
+Nickel from Market;;;;;;;;
+Molibdenium from Market;;;;;;;;
+Copper from Market;;;;;;;;
+Silicon from market;;;;;;;;
+Vanadium from market;;;;;;;;
+Titanium from market;;;;;;;;
+Niobium from market;;;;;;;;
+Aluminium from market;;;;;;;;
+Zinc from Market;;;;;;;;
+Limestone from Market;;;;;;;;
+Process Gas;;;;;;;;
+Fuel Oil from Market;;;;;;;;
+Diesel from Market;;;;;;;;
+Ethanol from Market;;;;;;;;
+Biodiesel from Market;;;;;;;;
+Natural gas from Market;;;;;;;;
+LPG from Market;;;;;;;;
+Biomethane from Market;;;;;;;;
+Hydrogen (Electrolysis) from Market;;;;;;;;
+Hydrogen (Methane reforming) from Market;;;;;;;;
+Wood from Market;;;;;;;;
+Charcoal from Market;;;;;;;;
+Coal from Market;;;;;;;;
+Anthracite Coal from Market;;;;;;;;
+PCI Coal from Market;;;;;;;;
+Coke Petroleum from Market;;;;;;;;
+Coke Mineral  from Market;;;;;;;;
+Electricity from Market;;;;;;;;
+Electricity Hydro from Market;;;;;;;;
+Electricity Eolic from Market;;;;;;;;
+Electricity Solar from Market;;;;;;;;
+Electricity Biomass from Market;;;;;;;;
+Electricity Production;0;0;0;1;0;0;0;0
+Charcoal Production;0,01;0;0;0;1;0;0;0
+Coke Production;0,01;0;0;0;0;1;0;0
+Steam Production;0,01;0;0;1;0;0;0;0
+Nitrogen from Market;;;;;;;;
+Nitrogen Production;1;0;0;0;0;0;0;0
+Oxigen from Market;;;;;;;;
+Oxigen Production;1;0;0;0;0;0;0;0
+Burnt Lime from Market;;;;;;;;
+Burnt Lime Production;0,02;0;0;0,98;0;0;0;0
+Dolomite from Market;;;;;;;;
+Dolomite Production;0,02;0;0;0,98;0;0;0;0
+LAS;;;;;;;;
+HAS;;;;;;;;
+Scrap Purchase;;;;;;;;
+Iron Ore from Market;;;;;;;;
+Direct Iron ore;;;;;;;;
+Sintering;0,23;0;0;0;0;0;0;0,77
+Pelletizing;0,1;0;0;0,9;0;0;0;0
+Blast Furnace;0,04;0;0;;0;;;
+Direct Reduction Iron;0,06;0;0;0,94;0;0;0;0
+Iron Foundry;1;0;0;0;0;0;0;0
+Electric Arc Furnace;0,77;0;0;0,24;0;0;0;0
+Basic Oxygen Furnace;1;0;0;0;0;0;0;0
+Regular Steel;;;;;;;;
+Steel Refining (Low Alloy);0,01;0;0;0,99;0;0;0;0
+Steel Refining (High Alloy);0,1;0;0;0,9;0;0;0;0
+Continuous Casting;0,98;0;0;0,02;0;0;0;0
+Ingot Casting;1;0;0;0;0;0;0;0
+Hot Rolling;0,2;0;0;0,8;0;0;0;0
+Cold Rolling;0,4;0;0;0,6;0;0;0;0
+Rod/bar/section Mill;0,2;0;0;0,8;0;0;0;0
+Steel Thermal Treatment;0,2;0;0;0,8;0;0;0;0
+Hot Dip Metal Coating;0,2;0;0;0,8;0;0;0;0
+Electrolytic Metal Coating;0,2;0;0;0,8;0;0;0;0
+Direct use of Basic Steel Products;;;;;;;;
+Casting/Extrusion/Conformation;0;0;0;1;0;0;0;0
+Stamping/calendering/lamination;1;0;0;0;0;0;0;0
+Machining;1;0;0;0;0;0;0;0
+No Coating;;;;;;;;
+Hot Dip Metal Coating FP;0,2;0;0;0,8;0;0;0;0
+Electrolytic Metal Coating FP;0,2;0;0;0,8;0;0;0;0
+Organic or Sintetic Coating (painting);0,5;0;0;0,5;0;0;0;0

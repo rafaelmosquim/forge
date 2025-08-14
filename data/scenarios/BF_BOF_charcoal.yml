@@ -1,0 +1,40 @@
+description: "BF-BOF route, solid fuels switched to charcoal – Avg case"
+
+route_overrides:
+  Blast Furnace: 1.0
+  Basic Oxygen Furnace: 1.0
+  Electric Arc Furnace: 0.0
+  Direct Reduction Iron: 0.0
+  Charcoal from Market: 0.0   # optional, to force Wood → kiln path
+  Charcoal Production: 1.0
+  Coke Production: 1.0
+
+fuel_substitutions:
+  Coal: Charcoal
+  Coke: Charcoal
+  PCI Coal from Market: Charcoal
+
+energy_int:                # only lines that differ from base
+  Blast Furnace: 14.95       # +15 % vs coal BF
+
+recipe_overrides:
+  Charcoal Production:
+    inputs: { Wood: 2.5226 }
+    outputs: { Charcoal (raw): 1.0 }
+
+  Coke Production:
+    inputs:
+      Nitrogen: 0.02
+      Charcoal (raw): 1.25
+    outputs:
+      Charcoal (BF): 1.0
+      Process Gas: "process_gas_coke * (inputs['Charcoal (raw)'] * energy_content['Charcoal'])"
+
+  Sintering:
+    inputs:
+      Iron Ore: "feo3_sinter / feo3_lump"
+      Limestone: 0.140
+      Charcoal (BF): >
+        energy_int['Sintering'] * energy_shares['Sintering']['Charcoal'] / energy_content['Charcoal']
+    outputs: { Sinter: 1.0 }
+

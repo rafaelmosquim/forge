@@ -11,6 +11,10 @@ route_overrides:
 recipe_overrides:
   Electric Arc Furnace:
     inputs:
+      Nitrogen: 0.1130
+      Oxygen: 0.0250
+      Dolomite: 0.0120
+      Burnt Lime: 0.0410
       Pig Iron: 0.0
       Scrap: 1.0
       Gas: >

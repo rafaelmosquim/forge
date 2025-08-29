@@ -257,13 +257,29 @@
   outputs:
     Dolomite: 1.0
 
-- process: Alloys Mix for Low Alloy Steel (LAS)
-  inputs: {}
-  outputs: {}
+- process: Alloys Mix for Low Alloy Steel (HAS)
+  inputs:
+    Manganese: 0.061
+    Chromium: 0.545
+    Nickel: 0.303
+    Molibdenium: 0.061
+    Silicon: 0.030
+  outputs:
+    HAS: 1.0
 
-- process: Alloys Mix for High Alloy Steel (HAS)
-  inputs: {}
-  outputs: {}
+- process: Alloys Mix for High Alloy Steel (LAS)
+  inputs:
+    Manganese: 0.414
+    Chromium: 0.083
+    Nickel: 0.221
+    Molibdenium: 0.055
+    Silicon: 0.166
+    Vanadium: 0.028
+    Titanium: 0.014
+    Niobium: 0.014
+    Aluminium: 0.006
+  outputs:
+    LAS: 1.0
 
 - process: Scrap Purchase
   inputs: {}
@@ -304,9 +320,9 @@
     Sinter: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.sinter"
     Pellet: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.pellet"
     Iron Ore: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.lump"
-    Nitrogen: 0.0750 * 1.0
-    Oxygen: 0.0800 * 1.0
-    Limestone: 0.0400 * 1.0
+    Nitrogen: 0.0750
+    Oxygen: 0.0800
+    Limestone: 0.0400
     Coke: >
       energy_int['Blast Furnace']
       * energy_shares['Blast Furnace']['Coke']
@@ -315,6 +331,10 @@
       energy_int['Blast Furnace']
       * energy_shares['Blast Furnace']['Coal']
       / energy_content['Coal']
+    Charcoal: >
+      energy_int['Blast Furnace']
+      * energy_shares['Blast Furnace']['Charcoal']
+      / energy_content['Charcoal']
   outputs:
     Pig Iron: 1.0
     #Process Gas: "0.275 * (inputs['Coal'] * energy_content['Coal'] + inputs['Coke'] * energy_content['Coke'])"
@@ -360,7 +380,7 @@
     Oxygen: 0.0900
     Dolomite: 0.0050
     Burnt Lime: 0.0450
-    Pig Iron:   0.9 - 0.0072
+    Pig Iron:   0.9
     Scrap:      0.1
   outputs:
     Liquid Steel: 1.0
@@ -371,8 +391,8 @@
 
 - process: Steel Refining (Low Alloy)
   inputs:
-    Liquid Steel: 1.0 - 0.035
-    Alloys Mix for Low Alloy Steel (LAS): 0.035
+    Liquid Steel: 0.9638
+    LAS: 0.0362
     Nitrogen: 0.0070
     Oxygen: 0.0250
     Dolomite: 0.0050
@@ -382,8 +402,8 @@
 
 - process: Steel Refining (High Alloy)
   inputs:
-    Liquid Steel: 1.0 - 0.335
-    Alloys Mix for High Alloy Steel (HAS): 0.33
+    Liquid Steel: 0.67
+    HAS: 0.33
     Nitrogen: 0.0070
     Oxygen: 0.0250
     Dolomite: 0.0050
@@ -449,36 +469,6 @@
   outputs: { Basic Steel (Exit): 1.0 }
 
 # -------------------------
-# IP3 producers FROM RAW (no CR)
-# -------------------------
-- process: Steel Thermal Treatment
-  inputs:  { Raw Products (types): 1.0 }
-  outputs: { Intermediate Process 3: 1.0 }
-
-- process: Hot Dip Metal Coating
-  inputs:  { Raw Products (types): 1.0 }
-  outputs: { Intermediate Process 3: 1.0 }
-
-- process: Electrolytic Metal Coating
-  inputs:  { Raw Products (types): 1.0 }
-  outputs: { Intermediate Process 3: 1.0 }
-
-# -------------------------
-# IP3 producers FROM IP2 (after CR)
-# -------------------------
-- process: Steel Thermal Treatment (CR)
-  inputs:  { Cold Raw Steel (IP2): 1.0 }
-  outputs: { Intermediate Process 3: 1.0 }
-
-- process: Hot Dip Metal Coating (CR)
-  inputs:  { Cold Raw Steel (IP2): 1.0 }
-  outputs: { Intermediate Process 3: 1.0 }
-
-- process: Electrolytic Metal Coating (CR)
-  inputs:  { Cold Raw Steel (IP2): 1.0 }
-  outputs: { Intermediate Process 3: 1.0 }
-
-# -------------------------
 # Pass-throughs (no-treat options)
 # -------------------------
 - process: Bypass Raw→IP3
@@ -492,7 +482,10 @@
 # -------------------------
 # IP4: Manufactured feed (inside mill)
 # -------------------------
-# (REMOVED) ❌ Direct use of Basic Steel Products (IP4) — direct use is an exit, not IP4.
+
+- process: Bypass IP3→IP4 (No shaping)
+  inputs:  { Intermediate Process 3: 1.0 }
+  outputs: { Manufactured Feed (IP4): 1.0 }
 
 - process: Casting/Extrusion/Conformation
   inputs:  { Intermediate Process 3: 1.0 }

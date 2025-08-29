@@ -3,7 +3,11 @@ emission_factors:
   FLF: 94.11850817
   RLF: 23.58045034
   Gas: 72.72788705
+  Biomethane: 5.55
+  Hydrogen (Electrolysis): 21.47
+  Hydrogen (Methane reforming): 89.88
   Wood: 9.823188667
   Coal: 111.9508768
   Charcoal: 20.43228169
   Coke: 135.8112848
+  Recovered Gas (thermal): 0.0

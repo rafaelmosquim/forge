@@ -68,6 +68,7 @@ DATA_ROOT = "data"  # fixed data folder
 # Helpers
 # -----------------------------
 
+
 # ===== Sidebar logos (very small, side by side) =====================
 from pathlib import Path
 
@@ -120,6 +121,13 @@ def render_sidebar_logos(
             if right_path.exists():
                 st.image(str(right_path), width=width_px)
         st.markdown("")  # small spacer
+
+# ====================================================================
+
+
+
+
+
 
 # -----------------------------
 # Sweep helpers (self‑contained)
@@ -432,14 +440,11 @@ with st.sidebar:
         return sorted([p.name for p in sc_dir.glob("*.yml")])
 
     available = list_scenarios(DATA_ROOT)
-    PREFERRED = "BF_BOF_coal.yml"
-    default_idx = available.index(PREFERRED) if PREFERRED in available else 0
-
     if available:
         scenario_choice = st.selectbox(
             "Route",
             options=available,
-            index=default_idx
+            index=0
         )
         scenario_path = pathlib.Path(DATA_ROOT) / "scenarios" / scenario_choice
         scenario = load_data_from_yaml(str(scenario_path), default_value=None, unwrap_single_key=False)
@@ -492,11 +497,208 @@ with st.sidebar:
     elec_map = load_electricity_intensity(os.path.join(DATA_ROOT, "electricity_intensity.yml")) or {}
     country_opts = sorted(elec_map.keys()) if elec_map else []
     country_code = st.selectbox("Grid electricity country (for Electricity EF)", options=[""] + country_opts, index=0)
+    # st.divider()
+    # st.header("Advanced Fuel and Energy Options")
+    
+
+    
+
+
+    # # ---- Route-locked process energy intensity override --------------------
+    # # Only allow one process to be overridden, depending on the scenario-locked route.
+    # allowed_proc_by_route = {
+    #     "BF-BOF":   ("Blast Furnace",        "BF base energy intensity (MJ/kg hot metal)"),
+    #     "DRI-EAF":  ("Direct Reduction Iron","DRI base energy intensity (MJ/kg DRI)"),
+    #     "EAF-Scrap":("Electric Arc Furnace","EAF base energy intensity (MJ/kg liquid steel)"),
+    # }
+    # allowed = allowed_proc_by_route.get(route)
+
+    # if allowed:
+    #     proc_name, friendly_label = allowed
+
+    #     # Hard lock: keep *only* this process in scenario['energy_int'] (drop any others)
+    #     existing_ei = (scenario.get('energy_int') or {})
+    #     scenario['energy_int'] = {proc_name: existing_ei.get(proc_name)} if proc_name in existing_ei else {}
+
+    #     with st.expander("Process energy intensity override", expanded=False):
+    #         enable_override = st.checkbox(f"{proc_name}", value=proc_name in (scenario.get('energy_int') or {}))
+
+    #         if enable_override:
+    #             # Default value: prefer scenario override if present; else the base table
+    #             default_val = None
+    #             try:
+    #                 default_val = float((scenario.get('energy_int') or {}).get(proc_name))
+    #             except Exception:
+    #                 default_val = None
+    #             if default_val is None:
+    #                 try:
+    #                     base_energy_int = load_data_from_yaml(os.path.join(DATA_ROOT, 'energy_int.yml')) or {}
+    #                     default_val = float(base_energy_int.get(proc_name, 0.0))
+    #                 except Exception:
+    #                     default_val = 0.0
+
+    #             val = st.number_input(
+    #                 friendly_label,
+    #                 value=float(default_val),
+    #                 min_value=0.0,
+    #                 step=0.1
+    #             )
+    #             scenario['energy_int'][proc_name] = float(val)
+    #         else:
+    #             # User turned it off → remove any override entirely
+    #             scenario['energy_int'] = {}
+    # else:
+    #     # For 'External' or 'auto' routes, do not expose any override
+    #     scenario['energy_int'] = {}
+
+    # # ---- Blast Furnace fuel split (Coke vs PCI) ----------------------------
+    # # Visible only for BF-BOF; sets BF energy shares and allows PCI→Charcoal.
+    # if route == "BF-BOF":
+    #     with st.expander("Blast Furnace — fuel split", expanded=False):
+    #         # Defaults: try scenario → base shares file → fall back to 0.6/0.4/0.0
+    #         def _get_default_shares():
+    #             # scenario override (energy_matrix) if present
+    #             bf_mx = (scenario.get('energy_matrix') or {}).get('Blast Furnace', {})
+    #             coke0 = float(bf_mx.get('Coke', None)) if bf_mx else None
+    #             coal0 = float(bf_mx.get('Coal', None)) if bf_mx else None
+    #             char0 = float(bf_mx.get('Charcoal', None)) if bf_mx else None
+    #             if coke0 is not None and (coal0 is not None or char0 is not None):
+    #                 return coke0, (coal0 or 0.0), (char0 or 0.0)
+    #             # base table (if you have one)
+    #             try:
+    #                 base_sh = load_data_from_yaml(os.path.join(DATA_ROOT, 'energy_matrix.yml')) or {}
+    #                 bf = base_sh.get('Blast Furnace', {})
+    #                 return float(bf.get('Coke', 0.6)), float(bf.get('Coal', 0.4)), float(bf.get('Charcoal', 0.0))
+    #             except Exception:
+    #                 return 0.6, 0.4, 0.0
+
+    #         coke0, coal0, char0 = _get_default_shares()
+    #         pci0 = max(0.0, min(1.0, coal0 + char0))
+    #         coke0 = max(0.0, min(1.0, coke0))
+
+    #         coke_share = st.slider(
+    #             "Coke share of BF thermal input (non-electric)",
+    #             min_value=0.0, max_value=1.0, value=float(coke0), step=0.01
+    #         )
+    #         # Share of CHARCOAL *inside* PCI (0 = all Coal, 1 = all Charcoal)
+    #         pci_charcoal_frac = st.slider(
+    #             "Charcoal fraction inside PCI",
+    #             min_value=0.0, max_value=1.0,
+    #             value=float(0.0 if pci0 <= 1e-9 else char0 / max(pci0, 1e-9)),
+    #             step=0.01,
+    #             help="0 → PCI is 100% Coal; 1 → PCI is 100% Charcoal. Coke is unchanged."
+    #         )
+
+    #         pci_share = 1.0 - coke_share
+    #         coal_share = pci_share * (1.0 - pci_charcoal_frac)
+    #         char_share = pci_share * pci_charcoal_frac
+
+    #         # Write into scenario (energy_matrix → used by core to build energy_shares)
+    #         scenario.setdefault('energy_matrix', {})
+    #         scenario['energy_matrix']['Blast Furnace'] = {
+    #             'Coke':      float(coke_share),
+    #             'Coal':      float(coal_share),
+    #             'Charcoal':  float(char_share),
+    #         }
+
+    #         # Optional: normalize for safety (sum to 1.0)
+    #         S = max(1e-9, coke_share + coal_share + char_share)
+    #         scenario['energy_matrix']['Blast Furnace'] = {
+    #             'Coke':     float(coke_share / S),
+    #             'Coal':     float(coal_share / S),
+    #             'Charcoal': float(char_share / S),
+    #         }
+
+    #         st.caption("PCI fuel replacement only affects the PCI slice; Coke remains as set.")
+    
+    # # ---- Gas blend (NG / biomethane / Green H2 / Blue H2)
+    # # Applies globally to the carrier "Gas" (used by DRI, EAF, reheating, etc.).
+    
+    # with st.expander("Gas blend (sets EF for 'gas')", expanded=False):
+    #     st.caption("Final EF for **Gas** = Σ shareᵢ × EFᵢ (gCO₂/MJ).")
+        
+    #     # Shares
+    #     c1, c2 = st.columns(2)
+    #     with c1:
+    #         sh_ng = st.number_input("Natural gas share", min_value=0.0, max_value=1.0, value=1.0, step=0.01)
+    #         sh_bio = st.number_input("Biomethane share", min_value=0.0, max_value=1.0, value=0.0, step=0.01)
+    #     with c2:
+    #         sh_h2g = st.number_input("Green H₂ share", min_value=0.0, max_value=1.0, value=0.0, step=0.01)
+    #         sh_h2b = st.number_input("Blue H₂ share", min_value=0.0, max_value=1.0, value=0.0, step=0.01)
+
+    #     S = max(1e-9, sh_ng + sh_bio + sh_h2g + sh_h2b) 
+    #     w_ng, w_bio, w_h2g, w_h2b = (sh_ng/S, sh_bio/S, sh_h2g/S, sh_h2b/S)
+
+    #     # Default values
+    #     try:
+    #         base_efs = load_data_from_yaml(os.path.join(DATA_ROOT, 'emission_factors.yml')) or {}
+    #     except Exception:
+    #         base_efs = {}                                   
+        
+    #     def find_ef(d: dict, keys: list[str]) -> float | None:
+    #         for k in keys:
+    #             v = d.get(k)
+    #             if v is not None:
+    #                 try:
+    #                     return float(v)
+    #                 except Exception:
+    #                     continue
+    #         return None
+        
+                
+    #     # Aliases to match common label variants in your EF file
+    #     ef_ng   = find_ef(base_efs, ["Natural gas", "Natural Gas", "Gas"])
+    #     ef_bio  = find_ef(base_efs, ["Biomethane", "Bio-methane", "Upgraded biogas"])
+    #     ef_h2g  = find_ef(base_efs, ["Hydrogen (Electrolysis)", "Green hydrogen", "H2 - Electrolysis"])
+    #     ef_h2b  = find_ef(base_efs, ["Hydrogen (Methane reforming + CCS)", "Hydrogen (Methane reforming)", "Blue hydrogen", "H2 - SMR+CCS", "H2 - ATR+CCS"])
+    
+    #     # If all are missing, fall back to whatever 'Gas' is in the base file (or 0.0)
+    #     all_missing = all(x is None for x in [ef_ng, ef_bio, ef_h2g, ef_h2b])
+    #     if all_missing:
+    #         ef_gas = float(base_efs.get("Gas", 0.0))
+    #     else:
+    #         # Treat missing components as 0.0 (conservative) and blend
+    #         ef_gas = (
+    #             w_ng  * (ef_ng  or 0.0) +
+    #             w_bio * (ef_bio or 0.0) +
+    #             w_h2g * (ef_h2g or 0.0) +
+    #             w_h2b * (ef_h2b or 0.0)
+    #         )
+
+
+    #     st.metric("Effective EF for Gas", f"{ef_gas:.2f} gCO₂/MJ")  
+        
+    #     # Push into the scenario core
+    #     scenario.setdefault('emission_factors', {})
+    #     scenario['emission_factors']['Gas'] = float(ef_gas)
+        
+    #     # Json store
+    #     # (Optional) keep shares for the run log
+    #     scenario['gas_blend'] = {
+    #         "shares": {"NG": w_ng, "Biomethane": w_bio, "H2_green": w_h2g, "H2_blue": w_h2b},
+    #         "effective_gas_ef_gco2_per_MJ": ef_gas,
+    #     }
+            
+    # # --- Material yield (Reporting only) -------------
+    # with st.expander("Material yield (reporting)", expanded=False):
+    #     use_yield = st.checkbox(
+    #         "Apply yield to emission factor",
+    #         value=False,
+    #         help = "Final EF = (total emission / demand) ÷ yield ")
+    #     yield_frac = st.number_input(
+    #         "Yield (fraction 0-1)",
+    #         value=1.00,
+    #         min_value=0.0,
+    #         max_value=1.0,
+    #         step=0.01
+    #         )
+    
                 
     # Logging
     st.header("Logging")
     do_log = st.checkbox("Write JSON log (config + CO₂)", value=False)
     log_dir = st.text_input("Log folder", value="run_logs")
+
 
 # -----------------------------
 # Build UI graph (for picks)
@@ -505,7 +707,7 @@ with tab_main:
     recipes_for_ui, pre_mask, demand_mat = _load_for_picks(DATA_ROOT, route, stage_key, scenario)
     
     
-    #pre_mask.pop("Coke", None)  # allow both "Coke Production" and "Coke from market"
+    pre_mask.pop("Coke", None)  # allow both "Coke Production" and "Coke from market"
 
     # ---------------------------------
     # Read Post-CC values (no UI here)
@@ -1487,7 +1689,7 @@ if run_now:
     with top_metrics.container():
         st.metric("Total CO₂e", f"{(total or 0):,.0f} kg CO₂e per ton of final product")
 
-    
+
     # ---- Simple downloads ----
     df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")
     d1, d2, d3 = st.columns(3)
@@ -1510,8 +1712,7 @@ if run_now:
             file_name="emissions.csv",
             mime="text/csv",
         )
-    st.dataframe(emissions)
-    st.dataframe(energy_balance)
+
     # ---- JSON run log (config + total CO₂e) ----
     if do_log:
         try:

@@ -638,6 +638,10 @@ processes:
     Coal: ~
     Charcoal: ~
     Coke: ~
+  "Bypass IP3→IP4 (No shaping)":
+    Electricity: 0
+    Gas: 0
+    Coal: 0
   "Casting/Extrusion/Conformation":
     Electricity: 0
     FLF: 0

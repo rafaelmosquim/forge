@@ -7,6 +7,7 @@ Route selection is interactive: whenever a material has multiple producers,
 the user picks exactly one. No route_config.yml is used.
 """
 
+import copy
 import os
 import argparse
 import pathlib
@@ -342,6 +343,85 @@ def make_hybrid_sankey(energy_balance_df, emissions_df, title="Hybrid Sankey: En
 # ===================================================================
 #                   Scenario-helper utilities
 # ===================================================================
+def compute_inside_elec_reference_for_share(
+    recipes, energy_int, energy_shares, energy_content, params,
+    route_key: str, demand_qty: float, stage_ref: str = "IP3"
+) -> float:
+    inside_elec_ref, _f_internal, _ef_internal = compute_fixed_plant_elec_model(
+        recipes, energy_int, energy_shares, energy_content, params,
+        route_key=route_key, demand_qty=demand_qty, stage_ref=stage_ref
+    )
+    return float(inside_elec_ref)
+# --------------------------------------------------------------
+# Force in-house producers (nitrogen, oxygen, dolomite, burnt lime, coke)
+# --------------------------------------------------------------
+INHOUSE_FORCE = {
+    "Nitrogen Production":     "Nitrogen from market",
+    "Oxygen Production":       "Oxygen from market",
+    "Dolomite Production":     "Dolomite from market",
+    "Burnt Lime Production":   "Burnt Lime from market",
+    "Coke Production":         "Coke from market",
+}
+
+
+def apply_inhouse_clamp(pre_select: dict | None, pre_mask: dict | None):
+    """Prefer in-house 'XX Production' and ban 'XX from market' (harmless if missing)."""
+    ps = dict(pre_select or {})
+    pm = dict(pre_mask   or {})
+    for prod_proc, market_proc in INHOUSE_FORCE.items():
+        ps[prod_proc] = 1  # prefer production
+        pm[market_proc] = 0  # ban market
+    return ps, pm
+
+def build_pre_for_route(route_key):
+    """Unique path to IP3 AFTER Cold Rolling (CC-R → HR → CR ON)."""
+    route = route_key.upper()
+
+    # Downstream backbone (deterministic; CC Regular → Hot Rolling → Cold Rolling)
+    pre_select = {
+        "Continuous Casting (R)": 1,   # CC Regular
+        "Continuous Casting (L)": 0,
+        "Continuous Casting (H)": 0,
+        "Hot Rolling": 1,
+        "Rod/bar/section Mill": 0,
+        "Cold Rolling": 1,             # ← after CR (your fixed plant boundary)
+        # No bypasses into IP3
+        "Bypass Raw→IP3": 0,
+        "Bypass CR→IP3": 0,
+        # Keep treatments/coating off in the reference (outside-mill anyway)
+        "Steel Thermal Treatment": 0,
+        "Hot Dip Metal Coating": 0,
+        "Electrolytic Metal Coating": 0,
+        "Casting/Extrusion/Conformation": 0,
+        "Stamping/calendering/lamination": 0,
+        "Machining": 0,
+        "No Coating": 1,
+        "Direct use of Basic Steel Products (IP4)": 0,
+    }
+    pre_mask = {}
+    recipe_overrides = {}
+
+    # Clamp upstream route
+    if route == "BF-BOF":
+        pre_mask.update({"Direct Reduction Iron": 0, "Electric Arc Furnace": 0})
+    elif route == "DRI-EAF":
+        pre_mask.update({"Blast Furnace": 0, "Basic Oxygen Furnace": 0})
+        recipe_overrides["Electric Arc Furnace"] = {"inputs": {"Pig Iron": 1.0, "Scrap": 0.0}}
+    elif route == "EAF-SCRAP":
+        pre_mask.update({"Blast Furnace": 0, "Basic Oxygen Furnace": 0, "Direct Reduction Iron": 0})
+        recipe_overrides["Electric Arc Furnace"] = {"inputs": {"Pig Iron": 0.0, "Scrap": 1.0}}
+    else:
+        raise ValueError(f"Unknown route '{route_key}'")
+
+    # Force in-house basic auxiliaries (N2/O2/Dolomite/Burnt Lime/Coke)
+    pre_select, pre_mask = apply_inhouse_clamp(pre_select, pre_mask)
+
+    # CC (R) upstream implies 'regular' grade chain into IP1 → matches your requirement
+    return pre_select, pre_mask, recipe_overrides
+
+
+
+
 def apply_fuel_substitutions(sub_map, energy_shares, energy_int,
                              energy_content, emission_factors, recipes=None):
     """Re-map energy shares (and optionally rename recipe inputs/outputs) for carriers."""
@@ -572,108 +652,235 @@ def calculate_emissions(
     energy_df,
     energy_efs,
     process_efs,
-    internal_elec,
+    internal_elec,          # kept for signature compatibility (not used here)
     final_demand,
     total_gas_MJ,
-    EF_process_gas
+    EF_process_gas,
+    internal_fraction_plant=None,
+    ef_internal_electricity=None,
 ):
     """
-    Calculates total emissions. Electricity from Utility Plant is only
-    credited to in-mill processes (≤ IP3). IP4 + final coating are grid-only.
+    Enforces mutual exclusivity:
+    - Onsite production  -> Energy Emissions only  (Direct=0), except optional chemistry whitelist.
+    - Market/outside     -> Direct Emissions only (Energy=0).
+
+    Electricity (inside-mill) uses the plant-wide split:
+        ef_elec_mix = f_internal * ef_int + (1 - f_internal) * EF_grid
+    Electricity for outside-mill rows is grid-only (but those rows are treated as market/direct anyway).
     """
+    import re
+    import pandas as pd
 
-    if energy_df is None or energy_df.empty:
-        return None
+    # ---- Helpers ------------------------------------------------------------
+    def _is_market_process(name: str) -> bool:
+        n = name.lower()
+        # Common naming you use for purchases
+        return (" from market" in n) or (" purchase" in n)
 
-    # ---------------------------
-    # 1) Split: inside vs outside
-    # ---------------------------
-    idx_all = [r for r in energy_df.index if r not in ("TOTAL",)]
-    idx_inside  = [p for p in idx_all if p not in ("Utility Plant",) and p not in OUTSIDE_MILL_PROCS]
-    idx_outside = [p for p in idx_all if p in OUTSIDE_MILL_PROCS]
+    # If your code defines OUTSIDE_MILL_PROCS elsewhere, we reuse it.
+    # If not present for any reason, fall back to empty set.
+    try:
+        outside_set = OUTSIDE_MILL_PROCS
+    except NameError:
+        outside_set = set()
 
-    # Sum ONLY inside-mill electricity for the internal share
-    if "Electricity" in energy_df.columns and idx_inside:
-        inside_elec_MJ = float(energy_df.loc[idx_inside, "Electricity"].clip(lower=0).sum())
-    else:
-        inside_elec_MJ = 0.0
+    # Allow a *very small* whitelist of onsite processes you truly want to keep as direct
+    # (e.g., real process chemistry). Keep empty to make onsite = energy-only everywhere.
+    ALLOW_DIRECT_ONSITE = set()  # e.g., {"Burnt Lime Production"} if you decide so.
 
-    # Internal electricity EF (from recovered gas)
-    if total_gas_MJ > 1e-9:
-        util_eff      = internal_elec / total_gas_MJ if total_gas_MJ > 0 else 0.0
-        ef_internal_e = (EF_process_gas / util_eff) if util_eff > 0 else 0.0
-    else:
-        ef_internal_e = 0.0
+    f_internal = float(internal_fraction_plant or 0.0)
+    ef_grid    = float(energy_efs.get("Electricity", 0.0))
+    ef_int_e   = float(ef_internal_electricity or 0.0)
+    ef_elec_mix = f_internal * ef_int_e + (1.0 - f_internal) * ef_grid
 
-    ef_grid = energy_efs.get("Electricity", 0.0)
-
-    # Internal share applies ONLY to inside-mill electricity use
-    if inside_elec_MJ > 1e-9:
-        internal_share_inside = min(internal_elec / inside_elec_MJ, 1.0)
-    else:
-        internal_share_inside = 0.0
-    grid_share_inside = 1.0 - internal_share_inside
-
-    # --- DEBUG ---
-    print(f"[DBG] total_gas_MJ       = {total_gas_MJ:.2f} MJ")
-    print(f"[DBG] EF_process_gas     = {EF_process_gas:.2f} gCO2/MJ_gas")
-    if total_gas_MJ > 1e-9:
-        util_eff = internal_elec / total_gas_MJ
-        print(f"[DBG] util_efficiency    = {util_eff:.3f}")
-        print(f"[DBG] ef_internal_e      = {ef_internal_e:.2f} gCO2/MJ_elec")
-    else:
-        print("[DBG] No gas recovered, ef_internal_e = 0")
-    print(f"[DBG] ef_grid            = {ef_grid:.2f} gCO2/MJ_elec")
-    print(f"[DBG] inside_elec_MJ     = {inside_elec_MJ:.2f} MJ")
-    print(f"[DBG] internal_share_in  = {internal_share_inside:.1%}")
-    print(f"[DBG] grid_share_in      = {grid_share_inside:.1%}")
-    print("— end DBG —\n")
-    # -----------
-
-    # 3) Per-process emissions
     rows = []
-    for proc_name, runs in prod_level.items():
-        if runs <= 1e-9 or proc_name not in energy_df.index:
-            continue
+    # Ensure we iterate only over processes that appear in either table
+    proc_index = list({*energy_df.index.tolist(), *process_efs.keys(), *prod_level.keys()})
 
+    for proc_name in proc_index:
+        runs = float(prod_level.get(proc_name, 0.0))
+        if runs <= 1e-12:
+            continue  # inactive
+
+        # PURCHASE ONLY: "... from market", "... purchase"
+        is_purchase = _is_market_process(proc_name)
+        is_outside  = proc_name in outside_set
+        
         row = {"Process": proc_name, "Energy Emissions": 0.0, "Direct Emissions": 0.0}
-        is_outside = proc_name in OUTSIDE_MILL_PROCS
 
-        for carrier, cons in energy_df.loc[proc_name].items():
-            cons = float(cons)
-            if cons <= 0:
-                continue
+        if is_purchase:
+            # Direct-only (market purchases)
+            row["Direct Emissions"] = runs * 1000 * float(process_efs.get(proc_name, 0.0))
+            row["Energy Emissions"] = 0.0
 
-            if carrier == "Electricity":
-                if is_outside:
-                    # Outside the mill: ALWAYS grid
-                    row["Energy Emissions"] += cons * ef_grid
-                else:
-                    # Inside the mill: split internal vs grid by inside-only share
-                    row["Energy Emissions"] += cons * (
-                        internal_share_inside * ef_internal_e
-                        + grid_share_inside     * ef_grid
-                    )
+        else:
+            elec_ef_for_proc = ef_grid if is_outside else ef_elec_mix
+            
+            if proc_name in energy_df.index:
+                for carrier, cons in energy_df.loc[proc_name].items():
+                    if carrier == "Electricity":
+                        row["Energy Emissions"] += cons * elec_ef_for_proc   # CHANGED
+                    else:
+                        row["Energy Emissions"] += cons * float(energy_efs.get(carrier, 0.0))
+    
+            # keep onsite direct as 0 unless whitelisted chemistry
+            row["Direct Emissions"] = runs * 1000 * float(process_efs.get(proc_name, 0.0)) \
+                                      if proc_name in ALLOW_DIRECT_ONSITE else 0.0
+
+            if proc_name in ALLOW_DIRECT_ONSITE:
+                row["Direct Emissions"] = runs * 1000 * float(process_efs.get(proc_name, 0.0))
             else:
-                row["Energy Emissions"] += cons * energy_efs.get(carrier, 0.0)
+                row["Direct Emissions"] = 0.0
 
-        # Direct process emissions
-        row["Direct Emissions"] += runs * process_efs.get(proc_name, 0.0)
         rows.append(row)
 
     if not rows:
         return None
 
-    emissions_df = pd.DataFrame(rows).set_index("Process") / 1000.0
+    emissions_df = pd.DataFrame(rows).set_index("Process") / 1000.0  # kg -> t
     emissions_df["TOTAL CO2e"] = emissions_df["Energy Emissions"] + emissions_df["Direct Emissions"]
 
-    # Zero Coke Production totals (if you keep that rule)
+    # (Optional) Zero Coke Production totals if you keep that convention
     if "Coke Production" in emissions_df.index:
         emissions_df.loc["Coke Production", ["Energy Emissions", "Direct Emissions", "TOTAL CO2e"]] = 0.0
 
     emissions_df.loc["TOTAL"] = emissions_df.sum()
     return emissions_df
 
+
+def compute_inside_elec_reference_for_share(
+    recipes, energy_int, energy_shares, energy_content, params,
+    route_key: str, demand_qty: float, stage_ref: str = "IP3"
+) -> float:
+    """
+    Shim for API: return the fixed plant-level in-mill electricity (MJ)
+    for the deterministic reference chain at IP3.
+    """
+    inside_elec_ref, _f_internal, _ef_internal = compute_fixed_plant_elec_model(
+        recipes, energy_int, energy_shares, energy_content, params,
+        route_key=route_key, demand_qty=demand_qty, stage_ref=stage_ref
+    )
+    return float(inside_elec_ref)
+
+def compute_fixed_plant_elec_model(
+    recipes,
+    energy_int,
+    energy_shares,
+    energy_content,
+    params,
+    route_key: str,
+    demand_qty: float,
+    stage_ref: str = "IP3",
+):
+    """
+    Build a deterministic reference chain up to (and including) Cold Rolling,
+    then compute:
+      - inside_elec_ref     : total in-mill electricity (MJ) for that fixed chain
+      - f_internal          : fixed plant internal share = internal_elec_potential / inside_elec_ref
+      - ef_internal_electricity : fixed gCO2/MJ for internal electricity (gas EF / utility eff)
+
+    This is 100% independent of the user's chosen boundary.
+    """
+    # Deep copies so we don't mutate live objects
+    recipes_ref = copy.deepcopy(recipes)
+    energy_int_ref = dict(energy_int)
+    energy_shares_ref = {k: dict(v) for k, v in energy_shares.items()}
+
+    # Upstream route bans + EAF feed enforcement
+    pre_mask_ref = build_route_mask(route_key, recipes_ref)
+    enforce_eaf_feed(recipes_ref, ROUTE_DEFAULT_FEEDS.get(route_key, None))
+
+    # Deterministic downstream picks (Regular → HR → CR ON), plus route clamps
+    try:
+        pre_select_ref, pre_mask_from_prebuilder, recipe_overrides_ref = build_pre_for_route(route_key)
+        if pre_mask_from_prebuilder:
+            pre_mask_ref.update(pre_mask_from_prebuilder)  # merge hard bans
+    except Exception:
+        pre_select_ref, recipe_overrides_ref = {}, {}
+
+    # Force in-house auxiliaries (N2/O2/Dolomite/Burnt Lime/Coke)
+    pre_select_ref, pre_mask_ref = apply_inhouse_clamp(pre_select_ref, pre_mask_ref)
+
+    if recipe_overrides_ref:
+        recipes_ref = apply_recipe_overrides(
+            recipes_ref, recipe_overrides_ref, params, energy_int_ref, energy_shares_ref, energy_content
+        )
+
+    demand_mat_ref = STAGE_MATS[stage_ref]
+    final_demand_ref = {demand_mat_ref: float(demand_qty)}
+
+    # Unique path without prompts
+    production_routes_ref = build_routes_interactive(
+        recipes_ref, demand_mat_ref, pre_select=pre_select_ref, pre_mask=pre_mask_ref, interactive=False
+    )
+
+    # Solve and compute energy
+    balance_ref, prod_ref = calculate_balance_matrix(recipes_ref, final_demand_ref, production_routes_ref)
+    if balance_ref is None:
+        return 0.0, 0.0, 0.0
+
+    active_procs_ref = [p for p, r in prod_ref.items() if r > 1e-9]
+    expand_energy_tables_for_active(active_procs_ref, energy_shares_ref, energy_int_ref)
+
+    energy_ref = calculate_energy_balance(prod_ref, energy_int_ref, energy_shares_ref)
+
+    # inside_mill electricity (MJ) for the fixed chain
+    if "Electricity" not in energy_ref.columns:
+        inside_elec_ref = 0.0
+    else:
+        idx_all = [r for r in energy_ref.index if r not in ("TOTAL",)]
+        idx_inside = [p for p in idx_all if p not in ("Utility Plant",) and p not in OUTSIDE_MILL_PROCS]
+        inside_elec_ref = float(energy_ref.loc[idx_inside, "Electricity"].clip(lower=0).sum())
+
+    # ---- fixed gas mix and internal electricity potential (based on reference runs) ----
+    recipes_dict_ref = {r.name: r for r in recipes_ref}
+    util_eff = recipes_dict_ref.get('Utility Plant', Process('', {}, {})).outputs.get('Electricity', 0.0)
+
+    # Coke-oven gas MJ from reference runs
+    gas_coke_MJ = float(prod_ref.get('Coke Production', 0.0)) * \
+                  float(recipes_dict_ref.get('Coke Production', Process('', {}, {})).outputs.get('Process Gas', 0.0))
+
+    # BF top-gas MJ from reference runs (delta intensity)
+    bf_runs_ref = float(prod_ref.get('Blast Furnace', 0.0))
+    if bf_runs_ref > 0 and hasattr(params, 'bf_adj_intensity') and hasattr(params, 'bf_base_intensity'):
+        gas_bf_MJ = (float(params.bf_adj_intensity) - float(params.bf_base_intensity)) * bf_runs_ref
+    else:
+        gas_bf_MJ = 0.0
+
+    total_gas_MJ_ref = gas_coke_MJ + gas_bf_MJ
+    internal_elec_potential = total_gas_MJ_ref * float(util_eff)
+
+    # EF of coke-oven gas (exclude 'Electricity' share)
+    cp_shares = energy_shares_ref.get('Coke Production', {})
+    fuels_cp = [c for c in cp_shares if c != 'Electricity' and cp_shares[c] > 0]
+    e_efs_local = load_data_from_yaml(os.path.join('data', 'emission_factors.yml'))  # local read
+    EF_coke_gas = (sum(cp_shares[c] * e_efs_local.get(c, 0.0) for c in fuels_cp) /
+                   max(1e-12, sum(cp_shares[c] for c in fuels_cp))) if fuels_cp else 0.0
+
+    # EF of BF top-gas (exclude 'Electricity' share)
+    bf_shares = energy_shares_ref.get('Blast Furnace', {})
+    fuels_bf = [c for c in bf_shares if c != 'Electricity' and bf_shares[c] > 0]
+    EF_bf_gas = (sum(bf_shares[c] * e_efs_local.get(c, 0.0) for c in fuels_bf) /
+                 max(1e-12, sum(bf_shares[c] for c in fuels_bf))) if fuels_bf else 0.0
+
+    # Reference gas EF weighted by reference gas volumes
+    if total_gas_MJ_ref <= 1e-9:
+        EF_process_gas_ref = 0.0
+    else:
+        EF_process_gas_ref = (
+            (EF_coke_gas * (gas_coke_MJ / total_gas_MJ_ref)) +
+            (EF_bf_gas   * (gas_bf_MJ   / total_gas_MJ_ref))
+        )
+
+    ef_internal_electricity = (EF_process_gas_ref / util_eff) if util_eff > 0 and total_gas_MJ_ref > 0 else 0.0
+
+    # Fixed internal share
+    if inside_elec_ref <= 1e-9:
+        f_internal = 0.0
+    else:
+        f_internal = min(1.0, internal_elec_potential / inside_elec_ref)
+
+    return inside_elec_ref, f_internal, ef_internal_electricity
 
 def derive_energy_shares(recipes, energy_content):
     """
@@ -805,21 +1012,38 @@ def build_routes_interactive(recipes, demand_mat, pre_select=None, pre_mask=None
             pick = active[0]
         elif len(active) > 1:
             if not interactive:
-                raise ValueError(
-                    f"Ambiguous producers for '{mat}': {[r.name for r in active]}. "
-                    f"Provide pre_select/pre_mask to make it unique."
+                # Deterministic, prompt-free tie-breaker for reference runs
+                priority = (
+                    "Continuous Casting (R)",
+                    "Hot Rolling",
+                    "Cold Rolling",
+                    "Basic Oxygen Furnace",
+                    "Electric Arc Furnace",
                 )
-            print(f"\nChoose ONE producer for '{mat}':")
-            for i, r in enumerate(active, 1):
-                ins = ", ".join(r.inputs.keys()) or "(no inputs)"
-                outs = ", ".join(r.outputs.keys())
-                print(f"  [{i}] {r.name}    inputs: {ins}    outputs: {outs}")
-            while True:
-                sel = input("Enter number: ").strip()
-                if sel.isdigit() and 1 <= int(sel) <= len(active):
-                    pick = active[int(sel) - 1]
-                    break
-                print("Invalid selection, try again.")
+        
+                def score(proc):
+                    # Always return a tuple so all keys are comparable
+                    try:
+                        idx = priority.index(proc.name)
+                        return (0, idx, proc.name)   # preferred names rank first by list order
+                    except ValueError:
+                        return (1, 0, proc.name)     # others rank after, alphabetically by name
+        
+                # pick the best producer deterministically
+                pick = min(active, key=score)
+            else:
+                print(f"\nChoose ONE producer for '{mat}':")
+                for i, r in enumerate(active, 1):
+                    ins = ", ".join(r.inputs.keys()) or "(no inputs)"
+                    outs = ", ".join(r.outputs.keys())
+                    print(f"  [{i}] {r.name}    inputs: {ins}    outputs: {outs}")
+                while True:
+                    sel = input("Enter number: ").strip()
+                    if sel.isdigit() and 1 <= int(sel) <= len(active):
+                        pick = active[int(sel) - 1]
+                        break
+                    print("Invalid selection, try again.")
+
         else:
             # all disabled -> external
             continue
@@ -930,56 +1154,56 @@ def enforce_eaf_feed(recipes, mode: str | None):
     eaf.inputs = {**non_feed, want: 1.0}
     print(f"[INFO] EAF feed forced to '{want}' ({mode})")
     
-def build_pre_for_route(route_key):
-    """Return (pre_select, pre_mask, recipe_overrides) for a clean, unique path."""
-    route = route_key.upper()
-    pre_select = {
-        # lock one CC variant and a simple downstream
-        "Continuous Casting (R)": 1,
-        "Hot Rolling": 0,                    # prefer rods for this sweep; flip if you want
-        "Rod/bar/section Mill": 1,
-        "Ingot Casting": 0,
-        "Direct use of Basic Steel Products (IP4)": 1,
-        "No Coating": 1,
-        # keep treatments OFF for the simple baseline
-        "Cold Rolling": 0,
-        "Steel Thermal Treatment": 0,
-        "Hot Dip Metal Coating": 0,
-        "Electrolytic Metal Coating": 0,
-        "Casting/Extrusion/Conformation": 0,
-        "Stamping/calendering/lamination": 0,
-        "Machining": 0,
-        "Bypass Raw→IP3": 0,
-        "Bypass CR→IP3": 0,
-    }
-    pre_mask = {}
-    recipe_overrides = {}
+# def build_pre_for_route(route_key):
+#     """Return (pre_select, pre_mask, recipe_overrides) for a clean, unique path."""
+#     route = route_key.upper()
+#     pre_select = {
+#         # lock one CC variant and a simple downstream
+#         "Continuous Casting (R)": 1,
+#         #"Hot Rolling": 0,                    # prefer rods for this sweep; flip if you want
+#         #"Rod/bar/section Mill": 1,
+#         "Ingot Casting": 0,
+#         "Direct use of Basic Steel Products (IP4)": 1,
+#         "No Coating": 1,
+#         # keep treatments OFF for the simple baseline
+#         #"Cold Rolling": 0,
+#         "Steel Thermal Treatment": 0,
+#         "Hot Dip Metal Coating": 0,
+#         "Electrolytic Metal Coating": 0,
+#         "Casting/Extrusion/Conformation": 0,
+#         "Stamping/calendering/lamination": 0,
+#         "Machining": 0,
+#         "Bypass Raw→IP3": 0,
+#         "Bypass CR→IP3": 0,
+#     }
+#     pre_mask = {}
+#     recipe_overrides = {}
 
-    if route == "BF-BOF":
-        # Liquid Steel → BOF; Pig Iron → BF
-        pre_mask.update({
-            "Direct Reduction Iron": 0,
-            "Electric Arc Furnace": 0,
-        })
-    elif route == "DRI-EAF":
-        # Liquid Steel → EAF; Pig Iron → DRI; ensure EAF uses Pig Iron (not Scrap)
-        pre_mask.update({
-            "Blast Furnace": 0,
-            "Basic Oxygen Furnace": 0,
-        })
-        recipe_overrides["Electric Arc Furnace"] = {"inputs": {"Pig Iron": 1.0, "Scrap": 0.0}}
-    elif route == "EAF-SCRAP":
-        # Liquid Steel → EAF; NO pig-iron path; force scrap mode
-        pre_mask.update({
-            "Blast Furnace": 0,
-            "Basic Oxygen Furnace": 0,
-            "Direct Reduction Iron": 0,
-        })
-        recipe_overrides["Electric Arc Furnace"] = {"inputs": {"Pig Iron": 0.0, "Scrap": 1.0}}
-    else:
-        raise ValueError(f"Unknown route '{route_key}'")
+#     if route == "BF-BOF":
+#         # Liquid Steel → BOF; Pig Iron → BF
+#         pre_mask.update({
+#             "Direct Reduction Iron": 0,
+#             "Electric Arc Furnace": 0,
+#         })
+#     elif route == "DRI-EAF":
+#         # Liquid Steel → EAF; Pig Iron → DRI; ensure EAF uses Pig Iron (not Scrap)
+#         pre_mask.update({
+#             "Blast Furnace": 0,
+#             "Basic Oxygen Furnace": 0,
+#         })
+#         recipe_overrides["Electric Arc Furnace"] = {"inputs": {"Pig Iron": 1.0, "Scrap": 0.0}}
+#     elif route == "EAF-SCRAP":
+#         # Liquid Steel → EAF; NO pig-iron path; force scrap mode
+#         pre_mask.update({
+#             "Blast Furnace": 0,
+#             "Basic Oxygen Furnace": 0,
+#             "Direct Reduction Iron": 0,
+#         })
+#         recipe_overrides["Electric Arc Furnace"] = {"inputs": {"Pig Iron": 0.0, "Scrap": 1.0}}
+#     else:
+#         raise ValueError(f"Unknown route '{route_key}'")
 
-    return pre_select, pre_mask, recipe_overrides
+#     return pre_select, pre_mask, recipe_overrides
     
 
 # ===================================================================
@@ -989,7 +1213,7 @@ if __name__ == '__main__':
 
     # ---------- scenario / args ----------
     p = argparse.ArgumentParser()
-    
+
     p.add_argument('-s', '--scenario', default='DRI_EAF.yml',
                    help='file name inside data/scenarios (or a full path)')
     p.add_argument('--stage', choices=list(STAGE_MATS.keys()), default='Finished',
@@ -997,10 +1221,10 @@ if __name__ == '__main__':
     p.add_argument('--demand', type=float, default=1000.0,
                    help='Demand quantity at the selected stage (default: 1000)')
     p.add_argument(
-    '--route',
-    choices=['auto', 'BF-BOF', 'DRI-EAF', 'EAF-Scrap', 'External'],
-    default='auto',
-    help='Upstream route preset to constrain producer choices (default: auto)'
+        '--route',
+        choices=['auto', 'BF-BOF', 'DRI-EAF', 'EAF-Scrap', 'External'],
+        default='auto',
+        help='Upstream route preset to constrain producer choices (default: auto)'
     )
     args = p.parse_args()
 
@@ -1022,13 +1246,13 @@ if __name__ == '__main__':
     energy_content  = load_data_from_yaml(os.path.join(base,'energy_content.yml'))
     e_efs           = load_data_from_yaml(os.path.join(base,'emission_factors.yml'))
     params          = load_parameters      (os.path.join(base,'parameters.yml'))
-    
+
     # ---- country → electricity EF selection (first prompt) ----
     elec_map = load_electricity_intensity(os.path.join(base, 'electricity_intensity.yml'))
-    
+
     # optional pre-selection from scenario.yml (grid_country: BRA, etc.)
     pre_code = (scenario.get('grid_country') or scenario.get('country') or '').upper()
-    
+
     def _pick_country_code(elec_map, pre_code=None, default_code='USA'):
         if pre_code and pre_code in elec_map:
             return pre_code
@@ -1051,16 +1275,15 @@ if __name__ == '__main__':
             if sel in elec_map:
                 return sel
             print("Invalid selection, try again.")
-    
+
     country_code = _pick_country_code(elec_map, pre_code=pre_code, default_code='USA')
-    
+
     if country_code:
         e_efs['Electricity'] = elec_map[country_code]
         params.grid_country = country_code
         print(f"[INFO] Electricity EF set by country {country_code}: {e_efs['Electricity']:.2f} gCO₂/MJ")
     else:
         print("[WARN] Using default Electricity EF from emission_factors.yml (no country map found).")
-
 
     # ---------- scenario-level overrides ----------
     apply_fuel_substitutions(scenario.get('fuel_substitutions', {}),
@@ -1137,18 +1360,17 @@ if __name__ == '__main__':
     final_demand = {demand_mat: float(args.demand)}
 
     print(f"\n=== Interactive path selection for demand: {demand_mat} ({args.demand}) ===")
-    
+
     # Build the route pre-mask once
     pre_mask = build_route_mask(args.route, recipes)
-    
-    print(f"\n=== Interactive path selection for demand: {demand_mat} ({args.demand}) ===")
+
     if args.route != 'auto':
         print(f"[INFO] Route preset: {args.route} (incompatible upstream units disabled)")
-    
+
     # Enforce EAF feed from route (scrap vs pig iron/DRI)
     feed_mode = ROUTE_DEFAULT_FEEDS.get(args.route)
     enforce_eaf_feed(recipes, feed_mode)
-    
+
     # Also pre-disable conflicting upstream cores (soft – user can still choose where allowed)
     UPSTREAM_CORE = {
         "Blast Furnace", "Basic Oxygen Furnace", "Direct Reduction Iron",
@@ -1161,11 +1383,14 @@ if __name__ == '__main__':
         "External":  set(),
     }.get(args.route, set())
     pre_select = {p: 0 for p in route_disable if p in UPSTREAM_CORE}
-    
+
     print(f"[INFO] Route preset: {args.route}")
     print(f"[INFO] Demand: {args.demand} at stage {args.stage} → {STAGE_MATS[args.stage]}")
-    
-    # ✅ Correct call: pass both pre_select and pre_mask
+
+    # Force in-house auxiliaries (N2/O2/Dolomite/Burnt Lime/Coke)
+    pre_select, pre_mask = apply_inhouse_clamp(pre_select, pre_mask)
+
+    # Build the route mask interactively with these clamps in place
     production_routes = build_routes_interactive(
         recipes,
         STAGE_MATS[args.stage],
@@ -1174,7 +1399,7 @@ if __name__ == '__main__':
         interactive=True
     )
 
-    # Solve material balance
+    # ---------- solve material balance ----------
     balance_matrix, prod_lvl = calculate_balance_matrix(recipes, final_demand, production_routes)
     if balance_matrix is None:
         print("Material balance failed")
@@ -1184,11 +1409,29 @@ if __name__ == '__main__':
     active_procs = [p for p, r in prod_lvl.items() if r > 1e-9]
     expand_energy_tables_for_active(active_procs, energy_shares, energy_int)
 
-    # ---------- internal electricity (before energy credit) ----------
-    internal_elec = calculate_internal_electricity(prod_lvl, recipes_dict, params)
-
-    # ---------- energy balance ----------
+    # ---------- PRESENT energy balance ----------
     energy_balance = calculate_energy_balance(prod_lvl, energy_int, energy_shares)
+
+    # Present in-mill electricity (MJ) — scales with the user's current boundary
+    inside_idx_present = [p for p in energy_balance.index
+                          if p not in ("TOTAL","Utility Plant") and p not in OUTSIDE_MILL_PROCS]
+    inside_elec_present = float(energy_balance.loc[inside_idx_present, "Electricity"].clip(lower=0).sum()) \
+                          if "Electricity" in energy_balance.columns else 0.0
+
+    # ---------- FIXED plant electricity model (reference chain after Cold Rolling) ----------
+    inside_elec_ref, f_internal, ef_internal_electricity = compute_fixed_plant_elec_model(
+        recipes=recipes,
+        energy_int=energy_int,
+        energy_shares=energy_shares,
+        energy_content=energy_content,
+        params=params,
+        route_key=args.route,
+        demand_qty=args.demand,
+        stage_ref="IP3",
+    )
+
+    # internal electricity *used* for the present boundary
+    internal_used_present = f_internal * inside_elec_present
 
     # Optional: repair BF/CP reporting to base thermal carriers (kept as in your flow)
     if 'Blast Furnace' in energy_balance.index and hasattr(params, 'bf_base_intensity'):
@@ -1208,37 +1451,17 @@ if __name__ == '__main__':
             if carrier != 'Electricity':
                 energy_balance.loc['Coke Production', carrier] = cp_runs * base_cp * float(cp_sh.get(carrier, 0.0))
 
-    # Apply internal electricity credit
-    energy_balance = adjust_energy_balance(energy_balance, internal_elec)
+    # Apply internal electricity credit (accounting only)
+    energy_balance = adjust_energy_balance(energy_balance, internal_used_present)
 
-    # ---------- recovered-gas EF (dynamic) ----------
-    gas_coke_MJ = prod_lvl.get('Coke Production', 0.0) * \
-                  recipes_dict.get('Coke Production', Process('',{},{})).outputs.get('Process Gas', 0.0)
-    gas_bf_MJ   = (getattr(params, 'bf_adj_intensity', 0.0) - getattr(params, 'bf_base_intensity', 0.0)) * \
-                  prod_lvl.get('Blast Furnace', 0.0)
-    total_gas_MJ = float(gas_coke_MJ + gas_bf_MJ)
-
-    # dynamic EF for Coke-oven gas (exclude Electricity share)
-    cp_shares = energy_shares.get('Coke Production', {})
-    fuels_cp  = [c for c in cp_shares if c != 'Electricity' and cp_shares[c] > 0]
-    EF_coke_gas = (sum(cp_shares[c] * e_efs.get(c, 0.0) for c in fuels_cp) /
-                   max(1e-12, sum(cp_shares[c] for c in fuels_cp))) if fuels_cp else 0.0
-    avoided_coke_CO2 = total_gas_MJ * 0.0  # accounted via internal electricity path; keep placeholder
-
-    # dynamic EF for BF top-gas (exclude Electricity share)
-    bf_shares = energy_shares.get('Blast Furnace', {})
-    fuels_bf  = [c for c in bf_shares if c != 'Electricity' and bf_shares[c] > 0]
-    EF_bf_gas = (sum(bf_shares[c] * e_efs.get(c, 0.0) for c in fuels_bf) /
-                 max(1e-12, sum(bf_shares[c] for c in fuels_bf))) if fuels_bf else 0.0
-
-    # Average EF for process gas burned at the utility
-    EF_process_gas = EF_coke_gas if total_gas_MJ <= 1e-9 else (
-        (EF_coke_gas * (gas_coke_MJ / max(1e-12, total_gas_MJ))) +
-        (EF_bf_gas   * (gas_bf_MJ   / max(1e-12, total_gas_MJ)))
-    )
-
-    util_eff      = recipes_dict.get('Utility Plant', Process('',{},{})).outputs.get('Electricity', 0.0)
-    internal_elec = total_gas_MJ * util_eff  # recompute from total gas and efficiency (defensive)
+    # ---------- visibility ----------
+    ef_grid = e_efs.get('Electricity', 0.0)
+    ef_elec_plant = f_internal * ef_internal_electricity + (1.0 - f_internal) * ef_grid
+    print(f"[INFO] Plant electricity split (fixed after CR): f_internal={f_internal:.3f}")
+    print(f"[INFO] Derived EF_elec,plant = {ef_elec_plant:.2f} gCO2/MJ  "
+          f"(internal {ef_internal_electricity:.2f}, grid {ef_grid:.2f})")
+    print("[DBG] inside_elec_present =", inside_elec_present)
+    print("[DBG] inside_elec_ref (fixed) =", inside_elec_ref)
 
     # ---------- emissions ----------
     emissions = calculate_emissions(
@@ -1247,10 +1470,12 @@ if __name__ == '__main__':
         energy_balance,
         e_efs,
         p_efs,
-        internal_elec,
+        internal_used_present,   # amount actually credited in this boundary
         final_demand,
-        total_gas_MJ,
-        EF_process_gas
+        total_gas_MJ=0.0,        # decoupled; fixed EF supplied explicitly
+        EF_process_gas=0.0,      # decoupled; fixed EF supplied explicitly
+        internal_fraction_plant=f_internal,                 # fixed plant fraction
+        ef_internal_electricity=ef_internal_electricity,    # fixed gCO2/MJ for internal elec
     )
 
     if emissions is not None and 'TOTAL' not in emissions.index:
@@ -1272,7 +1497,7 @@ if __name__ == '__main__':
         prod_lvl=prod_lvl,
         recipes_dict=recipes_dict,
         min_flow=0.5,
-        title=f"Mass Flow Sankey — 1000 kg Finished Steel ({sc_name})"
+        title=f"Mass Flow Sankey — {args.demand:.0f} kg Finished Steel ({sc_name})"
     )
     fig_mass.write_html(outdir / "mass_sankey.html", include_plotlyjs="cdn")
 
@@ -1306,3 +1531,4 @@ if __name__ == '__main__':
         fig_energy_ranked.write_html(outdir / "energy_to_process_sankey.html", include_plotlyjs="cdn")
 
     print("Saved Sankey diagrams to:", outdir.resolve())
+

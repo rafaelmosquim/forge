@@ -68,6 +68,7 @@ processes:
   "Steel Thermal Treatment": 2.0
   "Hot Dip Metal Coating": 2.5
   "Electrolytic Metal Coating": 4.601907399
+  "Bypass IP3→IP4 (No shaping)": 0.0
   "Direct use of Basic Steel Products": ~
   "Casting/Extrusion/Conformation": 1.0
   "Stamping/calendering/lamination": 1.839329388

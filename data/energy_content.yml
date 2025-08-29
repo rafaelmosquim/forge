@@ -1,6 +1,6 @@
 energy_content:
-  Coal: 30.96  # MJ/kg (example value)
+  Coal: 30.96  # MJ/kg
   Coke: 28.87  # MJ/kg
-  Gas: 49.76   # MJ/kg (natural gas equivalent)
+  Gas: 49.76   # MJ/kg
   Wood: 12.97  # MJ/kg
   Charcoal: 28.40  # MJ/kg

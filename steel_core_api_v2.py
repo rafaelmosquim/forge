@@ -1,100 +1,115 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Aug 14 15:39:43 2025
+steel_core_api_v2.py
+Central API between the Streamlit app and the core model.
 
-@author: rafae
+- RouteConfig / ScenarioInputs / RunOutputs dataclasses
+- run_scenario(...) loads data, applies scenario overrides, locks route,
+  builds production route from UI picks, runs balances & emissions
+- Optional gating for BF process-gas → electricity credits driven by scenario
+- Robust call to calculate_emissions(...) across versions
+- write_run_log(...) helper for simple JSON logs
 """
 
-# steel_core_api_v2.py
-# -----------------------------------------------------------------------------
-# Thin, stable API layer that wraps your existing core logic (steel_model_core.py)
-# so the Streamlit app can focus ONLY on route building + logging.
-#
-# Exposes:
-#   - RouteConfig, ScenarioInputs, RunOutputs (dataclasses)
-#   - run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs
-#   - build_picks_index(...) helper to surface ambiguous materials (for UI)
-#   - write_run_log(log_dir: str, payload: dict) -> str
-#
-# This module deliberately imports your existing functions from steel_model_core
-# and does no reimplementation of balances or emissions.
-# -----------------------------------------------------------------------------
 from __future__ import annotations
-from dataclasses import dataclass, asdict
-from typing import Dict, List, Tuple, Optional, Any
-from collections import defaultdict, deque
-import os, json, pathlib, copy
+import os
+import json
+from dataclasses import dataclass, field
+from typing import Dict, Optional, Any, List, Tuple, Set
+from collections import deque
 from datetime import datetime
+import inspect
 
 import pandas as pd
 
-# Import the implementation you already have
+# Core functions & models from your existing engine
 from steel_model_core import (
-    # data models & loaders
-    Process,
+    # IO
     load_data_from_yaml,
     load_parameters,
     load_recipes_from_yaml,
     load_market_config,
     load_electricity_intensity,
+    # Overrides
     apply_fuel_substitutions,
     apply_dict_overrides,
     apply_recipe_overrides,
-    # calcs
-    adjust_blast_furnace_intensity,
-    adjust_process_gas_intensity,
-    calculate_balance_matrix,
-    calculate_energy_balance,
-    calculate_internal_electricity,
-    adjust_energy_balance,
-    calculate_emissions,
-    expand_energy_tables_for_active,
-    # route helpers & constants
+    # Route helpers
     STAGE_MATS,
-    OUTSIDE_MILL_PROCS,
     build_route_mask,
     enforce_eaf_feed,
+    # Calculations
+    calculate_balance_matrix,
+    expand_energy_tables_for_active,
+    calculate_internal_electricity,
+    calculate_energy_balance,
+    adjust_energy_balance,
+    calculate_emissions,  # signature may vary; we guard below
+    # Data classes/types
+    Process,
+    OUTSIDE_MILL_PROCS,
+    compute_inside_elec_reference_for_share,
 )
 
 # ==============================
-# Dataclasses (stable contract)
+# Dataclasses
 # ==============================
-@dataclass(frozen=True)
+@dataclass
 class RouteConfig:
-    route_preset: str                           # "BF-BOF" | "DRI-EAF" | "EAF-Scrap" | "External" | "auto"
-    stage_key: str                              # key from STAGE_MATS (e.g., "Finished")
-    demand_qty: float                           # demand quantity at stage
-    picks_by_material: Dict[str, str]           # material -> chosen producer name
-    pre_select_soft: Optional[Dict[str, int]] = None  # optional soft disables (0/1)
+    route_preset: str               # 'BF-BOF' | 'DRI-EAF' | 'EAF-Scrap' | 'External' | 'auto'
+    stage_key: str                  # key in STAGE_MATS
+    demand_qty: float               # demand at stage
+    picks_by_material: Dict[str, str] = field(default_factory=dict)
+    pre_select_soft: Optional[Dict[str, int]] = None  # processes softly disabled (0/1)
 
-@dataclass(frozen=True)
+
+@dataclass
 class ScenarioInputs:
-    country_code: Optional[str]                 # ISO3 for electricity EF; may be None
-    scenario: Dict[str, Any]                    # raw scenario dict loaded from YAML
-    route: RouteConfig
+    country_code: Optional[str]     # Electricity EF country (optional)
+    scenario: Dict[str, Any]        # Full scenario dict (overrides, flags, etc.)
+    route: RouteConfig              # Route config
+
 
 @dataclass
 class RunOutputs:
-    production_routes: Dict[str, int]           # process -> {0/1}
-    prod_levels: Dict[str, float]               # process -> runs
+    production_routes: Dict[str, int]
+    prod_levels: Dict[str, float]
     energy_balance: pd.DataFrame
     emissions: Optional[pd.DataFrame]
     total_co2e_kg: Optional[float]
-    meta: Dict[str, Any]
+    meta: Dict[str, Any] = field(default_factory=dict)
+
 
 # ==============================
 # Helpers
 # ==============================
 
-def _ns_to_dict(ns):
-    try:
-        return {k: _ns_to_dict(getattr(ns, k)) for k in vars(ns)}
-    except Exception:
-        if isinstance(ns, dict):
-            return {k: _ns_to_dict(v) for k, v in ns.items()}
-        if isinstance(ns, (list, tuple)):
-            return [_ns_to_dict(v) for v in ns]
-        return ns
+
+
+def _credit_enabled(scn: dict | None) -> bool:
+    """
+    Returns True if recovered process-gas → electricity credit should be applied.
+    Recognized flags in scenario:
+      - process_gas_credit: true/false
+      - bf_gas_credit: true/false
+      - credits: { process_gas: true/false }
+    Default True (enabled) unless explicitly disabled.
+    """
+    if not isinstance(scn, dict):
+        return True
+    for k in ("process_gas_credit", "bf_gas_credit"):
+        if k in scn:
+            v = scn[k]
+            if isinstance(v, str):
+                return v.strip().lower() not in {"false", "0", "no", "off"}
+            return bool(v)
+    credits = scn.get("credits")
+    if isinstance(credits, dict) and "process_gas" in credits:
+        v = credits["process_gas"]
+        if isinstance(v, str):
+            return v.strip().lower() not in {"false", "0", "no", "off"}
+        return bool(v)
+    return True
 
 
 def _build_producers_index(recipes: List[Process]) -> Dict[str, List[Process]]:
@@ -105,118 +120,169 @@ def _build_producers_index(recipes: List[Process]) -> Dict[str, List[Process]]:
     return prod
 
 
-def build_picks_index(recipes: List[Process], demand_mat: str,
-                       pre_mask: Optional[Dict[str, int]] = None,
-                       pre_select: Optional[Dict[str, int]] = None
-                      ) -> List[Tuple[str, List[str]]]:
-    """Return [(material, [enabled_producer_names,...]), ...] encountered upstream.
-       Use this to populate the UI with radios/selects. Non-ambiguous nodes
-       are omitted.
+def _build_routes_from_picks(
+    recipes: List[Process],
+    demand_mat: str,
+    picks_by_material: Dict[str, str],
+    pre_mask: Optional[Dict[str, int]] = None,
+    pre_select: Optional[Dict[str, int]] = None,
+) -> Dict[str, int]:
     """
-    pre_mask = pre_mask or {}
-    pre_select = pre_select or {}
-    producers = _build_producers_index(recipes)
-
-    out: List[Tuple[str, List[str]]] = []
-    seen_mats: set[str] = set()
-    q = deque([demand_mat])
-    while q:
-        mat = q.popleft()
-        if mat in seen_mats:
-            continue
-        seen_mats.add(mat)
-        cand = producers.get(mat, [])
-        enabled = [r for r in cand if pre_mask.get(r.name, 1) > 0 and pre_select.get(r.name, 1) > 0]
-        if not cand:
-            continue
-        if len(enabled) <= 1:
-            pick = enabled[0] if len(enabled) == 1 else None
-            if pick:
-                for im in pick.inputs:
-                    if im not in seen_mats:
-                        q.append(im)
-            continue
-        out.append((mat, [r.name for r in enabled]))
-        for r in enabled:
-            for im in r.inputs:
-                if im not in seen_mats:
-                    q.append(im)
-    return out
-
-
-def build_routes_from_picks(recipes: List[Process], demand_mat: str,
-                             picks_by_material: Dict[str, str],
-                             pre_mask: Optional[Dict[str, int]] = None,
-                             pre_select: Optional[Dict[str, int]] = None) -> Dict[str, int]:
-    """Deterministic on/off map from material→chosen producer, walking upstream."""
+    Traverse upstream from demand_mat and build a 0/1 mask of chosen processes.
+    If multiple producers exist for a material:
+      - use picks_by_material[material] if present,
+      - else pick the first enabled producer (deterministic).
+    pre_mask / pre_select can disable producers (0/1).
+    """
     pre_mask = pre_mask or {}
     pre_select = pre_select or {}
     producers = _build_producers_index(recipes)
     chosen: Dict[str, int] = {}
-    visited: set[str] = set()
+    visited_mats: Set[str] = set()
     q = deque([demand_mat])
+
     while q:
         mat = q.popleft()
-        if mat in visited:
+        if mat in visited_mats:
             continue
-        visited.add(mat)
+        visited_mats.add(mat)
+
         cand = producers.get(mat, [])
         enabled = [r for r in cand if pre_mask.get(r.name, 1) > 0 and pre_select.get(r.name, 1) > 0]
         if not enabled:
             continue
-        # pick
+
+        # Decide pick
         if len(enabled) == 1:
             pick = enabled[0]
         else:
             pick_name = picks_by_material.get(mat)
-            pick = next((r for r in enabled if r.name == pick_name), enabled[0])
+            if pick_name is None:
+                pick = enabled[0]  # deterministic default
+            else:
+                pick = next((r for r in enabled if r.name == pick_name), enabled[0])
+
+        # Record chosen vs others
         chosen[pick.name] = 1
         for r in cand:
             if r.name != pick.name:
                 chosen[r.name] = 0
+
+        # Recurse on inputs
         for im in pick.inputs.keys():
-            if im not in visited:
+            if im not in visited_mats:
                 q.append(im)
+
     return chosen
 
 
-# ==============================
-# Core API: run_scenario
-# ==============================
+def _infer_eaf_mode(route_preset: str) -> Optional[str]:
+    return {
+        "EAF-Scrap": "scrap",
+        "DRI-EAF": "dri",
+        "BF-BOF": None,
+        "External": None,
+        "auto": None,
+    }.get(route_preset, None)
 
+
+def _robust_call_calculate_emissions(calc_fn, **kwargs):
+    """
+    Call calculate_emissions with only the parameters it actually accepts.
+    This avoids crashes across slightly different local signatures.
+    """
+    sig = inspect.signature(calc_fn)
+    usable = {k: v for k, v in kwargs.items() if k in sig.parameters}
+    return calc_fn(**usable)
+
+
+def write_run_log(log_dir: str, payload: Dict[str, Any]) -> str:
+    """
+    Write a compact JSON log (config + total CO2e). Returns the file path.
+    """
+    os.makedirs(log_dir, exist_ok=True)
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    fname = f"run_{ts}.json"
+    fpath = os.path.join(log_dir, fname)
+    with open(fpath, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+    return fpath
+
+
+# ==============================
+# Main API
+# ==============================
 def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     """
-    Load all base tables, apply scenario overrides, compile route mask, and run
-    the full pipeline: material balance → energy → internal electricity credit →
-    emissions. Returns RunOutputs with total CO₂e in kg.
+    Execute the model for the given ScenarioInputs.
+    Steps:
+      1) Load base tables
+      2) Apply scenario overrides (fuels, energy tables, EFs, params, recipes)
+      3) Lock route preset; build route mask; enforce EAF feed
+      4) Build production route from UI picks (or deterministically)
+      5) Solve balances
+      6) Apply/disable internal-electricity credit per scenario
+      7) Compute emissions (robust to signature)
     """
-    base = os.path.join(data_dir, "")
+    scenario: Dict[str, Any] = scn.scenario or {}
+    route_preset: str = scn.route.route_preset or "auto"
+    stage_key: str = scn.route.stage_key
+    demand_qty: float = float(scn.route.demand_qty)
+    picks_by_material: Dict[str, str] = scn.route.picks_by_material or {}
+    pre_select_soft: Dict[str, int] = scn.route.pre_select_soft or {}
+    country_code: Optional[str] = scn.country_code or None
 
-    # --- Load base inputs
+    # Flag for BF process-gas → electricity credit
+    credit_on: bool = _credit_enabled(scenario)
+
+    # ---------- Load base data ----------
+    base = os.path.join(data_dir, "")
     energy_int     = load_data_from_yaml(os.path.join(base, 'energy_int.yml'))
     energy_shares  = load_data_from_yaml(os.path.join(base, 'energy_matrix.yml'))
     energy_content = load_data_from_yaml(os.path.join(base, 'energy_content.yml'))
     e_efs          = load_data_from_yaml(os.path.join(base, 'emission_factors.yml'))
     params         = load_parameters      (os.path.join(base, 'parameters.yml'))
     mkt_cfg        = load_market_config   (os.path.join(base, 'mkt_config.yml'))
-    elec_map       = load_electricity_intensity(os.path.join(base, 'electricity_intensity.yml'))
+    elec_map       = load_electricity_intensity(os.path.join(base, 'electricity_intensity.yml')) or {}
 
-    # --- Recipes (first pass)
-    recipes = load_recipes_from_yaml(os.path.join(base, 'recipes.yml'), params, energy_int, energy_shares, energy_content)
+    # Country-driven Electricity EF (if provided in UI)
+    if country_code and country_code in elec_map:
+        try:
+            e_efs['Electricity'] = float(elec_map[country_code])
+        except Exception:
+            pass  # keep original if casting fails
 
-    # --- Scenario-level overrides
-    scenario = scn.scenario or {}
+    # Initial recipes
+    recipes = load_recipes_from_yaml(
+        os.path.join(base, 'recipes.yml'),
+        params, energy_int, energy_shares, energy_content
+    )
+    # ---- Enforce route-locked energy_int override (defense-in-depth) ----
+    allowed_proc_by_route = {
+        "BF-BOF":    "Blast Furnace",
+        "DRI-EAF":   "Direct Reduction Iron",
+        "EAF-Scrap": "Electric Arc Furnace",
+    }
+    allowed_proc = allowed_proc_by_route.get(route_preset)
+    if allowed_proc:
+        ei = scenario.get('energy_int')
+        if isinstance(ei, dict):
+            # keep only the allowed key; drop all others
+            scenario['energy_int'] = {k: v for k, v in ei.items() if k == allowed_proc and v is not None}
+        else:
+            scenario['energy_int'] = {}
+    else:
+        # No overrides allowed for 'External'/'auto'
+        scenario['energy_int'] = {}
+
+    # ---------- Scenario overrides ----------
     apply_fuel_substitutions(scenario.get('fuel_substitutions', {}), energy_shares, energy_int, energy_content, e_efs)
     apply_dict_overrides(energy_int,     scenario.get('energy_int', {}))
     apply_dict_overrides(energy_shares,  scenario.get('energy_matrix', {}))
     apply_dict_overrides(energy_content, scenario.get('energy_content', {}))
     apply_dict_overrides(e_efs,          scenario.get('emission_factors', {}))
 
-    # --- Country-specific electricity EF
-    if scn.country_code and scn.country_code in elec_map:
-        e_efs['Electricity'] = float(elec_map[scn.country_code])
-
-    # --- Params merge & renormalize blend if needed
+    # Parameters (light/deep merge)
     from types import SimpleNamespace
     def _recursive_ns_update(ns, patch):
         for k, v in (patch or {}).items():
@@ -228,131 +294,211 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
                 _recursive_ns_update(cur, v)
             else:
                 setattr(ns, k, v)
-    def _renorm_blend(ns):
-        try:
-            b = ns.blend
-            s = float(getattr(b, 'sinter', 0.0))
-            p_ = float(getattr(b, 'pellet', 0.0))
-            l = float(getattr(b, 'lump',   0.0))
-            tot = s + p_ + l
-            if tot and abs(tot - 1.0) > 1e-9:
-                b.sinter = s / tot; b.pellet = p_ / tot; b.lump = l / tot
-        except AttributeError:
-            pass
-    _param_patch = scenario.get('param_overrides') or scenario.get('parameters', {})
-    _recursive_ns_update(params, _param_patch)
-    _renorm_blend(params)
 
-    # --- Intensity adjustments (process-gas recovery, etc.)
+    _param_patch = scenario.get('param_overrides', None)
+    if _param_patch is None:
+        _param_patch = scenario.get('parameters', {})
+    _recursive_ns_update(params, _param_patch)
+
+    # Intensity adjustments
+    from steel_model_core import adjust_blast_furnace_intensity, adjust_process_gas_intensity
     adjust_blast_furnace_intensity(energy_int, energy_shares, params)
     adjust_process_gas_intensity('Coke Production', 'process_gas_coke', energy_int, energy_shares, params)
 
-    # --- Recipes again to refresh formulas after param updates
-    recipes = load_recipes_from_yaml(os.path.join(base, 'recipes.yml'), params, energy_int, energy_shares, energy_content)
+    # Re-load recipes to re-evaluate expressions with updated params; then recipe overrides
+    recipes = load_recipes_from_yaml(
+        os.path.join(base, 'recipes.yml'),
+        params, energy_int, energy_shares, energy_content
+    )
     recipes = apply_recipe_overrides(recipes, scenario.get('recipe_overrides', {}), params, energy_int, energy_shares, energy_content)
 
-    # --- Route preset → pre-mask & EAF feed enforcement copy for UI logic
-    demand_mat = STAGE_MATS[scn.route.stage_key]
-    pre_mask = build_route_mask(scn.route.route_preset, recipes)
+    # ---------- Route mask & feed enforcement ----------
+    pre_mask = build_route_mask(route_preset, recipes)
+    eaf_mode = _infer_eaf_mode(route_preset)
 
-    recipes_for_route = copy.deepcopy(recipes)
-    eaf_feed_mode = {
-        "EAF-Scrap": "scrap",
-        "DRI-EAF":   "dri",
-        "BF-BOF":    None,
-        "External":  None,
-        "auto":      None,
-    }.get(scn.route.route_preset)
-    enforce_eaf_feed(recipes_for_route, eaf_feed_mode)
+    # Work on a copy for calculations (enforce feed)
+    import copy
+    recipes_calc = copy.deepcopy(recipes)
+    enforce_eaf_feed(recipes_calc, eaf_mode)
 
-    # --- Build production on/off map from picks
-    prod_routes = build_routes_from_picks(
-        recipes_for_route,
+    # ---------- Build production route from picks ----------
+    demand_mat = STAGE_MATS[stage_key]
+    production_routes: Dict[str, int] = _build_routes_from_picks(
+        recipes_calc,
         demand_mat,
-        scn.route.picks_by_material,
+        picks_by_material,
         pre_mask=pre_mask,
-        pre_select=scn.route.pre_select_soft or {},
+        pre_select=pre_select_soft,
     )
 
-    # --- Solve material balance
-    balance_matrix, prod_lvl = calculate_balance_matrix(recipes_for_route, {demand_mat: scn.route.demand_qty}, prod_routes)
-    if balance_matrix is None:
-        raise RuntimeError("Material balance failed.")
+    # ---------- Solve balances ----------
+    final_demand = {demand_mat: demand_qty}
 
-    # Make sure energy tables include all active variants
-    active_procs = [p for p, r in prod_lvl.items() if r > 1e-9]
+    balance_matrix, prod_levels = calculate_balance_matrix(recipes_calc, final_demand, production_routes)
+    if balance_matrix is None:
+        # Return empty-ish structures with a message rather than crashing
+        return RunOutputs(
+            production_routes=production_routes,
+            prod_levels={},
+            energy_balance=pd.DataFrame(),
+            emissions=None,
+            total_co2e_kg=None,
+            meta={"error": "Material balance failed"},
+        )
+
+    # Ensure energy tables have rows for all active variants
+    active_procs = [p for p, r in prod_levels.items() if r > 1e-9]
+    from steel_model_core import expand_energy_tables_for_active
     expand_energy_tables_for_active(active_procs, energy_shares, energy_int)
 
-    # --- Internal electricity and energy balance
-    recipes_dict = {r.name: r for r in recipes_for_route}
-    internal_elec = calculate_internal_electricity(prod_lvl, recipes_dict, params)
+    # Internal electricity from recovered gases (before credit)
+    recipes_dict = {r.name: r for r in recipes_calc}
+    internal_elec = calculate_internal_electricity(prod_levels, recipes_dict, params)
 
-    energy_balance = calculate_energy_balance(prod_lvl, energy_int, energy_shares)
-    energy_balance = adjust_energy_balance(energy_balance, internal_elec)
+    # Energy balance (base)
+    energy_balance = calculate_energy_balance(prod_levels, energy_int, energy_shares)
 
-    # --- Process-gas EF mix and totals (Coke + BF top-gas)
-    gas_coke_MJ = prod_lvl.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get('Process Gas', 0.0)
-    gas_bf_MJ   = (getattr(params, 'bf_adj_intensity', 0.0) - getattr(params, 'bf_base_intensity', 0.0)) * prod_lvl.get('Blast Furnace', 0.0)
+    # Optional fix-ups to BF / Coke carriers (if your CLI does this)
+    try:
+        if 'Blast Furnace' in energy_balance.index and hasattr(params, 'bf_base_intensity'):
+            bf_runs = float(prod_levels.get('Blast Furnace', 0.0))
+            base_bf = float(params.bf_base_intensity)
+            bf_sh   = energy_shares.get('Blast Furnace', {})
+            for carrier in energy_balance.columns:
+                if carrier != 'Electricity':
+                    energy_balance.loc['Blast Furnace', carrier] = bf_runs * base_bf * float(bf_sh.get(carrier, 0.0))
+        cp_runs = float(prod_levels.get('Coke Production', 0.0))
+        base_cp = float(getattr(params, 'coke_production_base_intensity', energy_int.get('Coke Production', 0.0)))
+        cp_sh   = energy_shares.get('Coke Production', {})
+        if cp_runs and cp_sh:
+            for carrier in energy_balance.columns:
+                if carrier != 'Electricity':
+                    energy_balance.loc['Coke Production', carrier] = cp_runs * base_cp * float(cp_sh.get(carrier, 0.0))
+    except Exception:
+        pass  # if fields missing, skip the fix-up
+
+    # Compute recovered gas flows for dynamic EF (if needed by your emissions fn)
+    try:
+        gas_coke_MJ = prod_levels.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get('Process Gas', 0.0)
+    except Exception:
+        gas_coke_MJ = 0.0
+    try:
+        # If params store bf_adj_intensity / bf_base_intensity
+        bf_adj = float(getattr(params, 'bf_adj_intensity', 0.0))
+        bf_base = float(getattr(params, 'bf_base_intensity', 0.0))
+        gas_bf_MJ = (bf_adj - bf_base) * prod_levels.get('Blast Furnace', 0.0)
+    except Exception:
+        gas_bf_MJ = 0.0
     total_gas_MJ = float(gas_coke_MJ + gas_bf_MJ)
 
-    cp_shares = (load_data_from_yaml(os.path.join(base, 'energy_matrix.yml')) or {}).get('Coke Production', {})
-    bf_shares = (load_data_from_yaml(os.path.join(base, 'energy_matrix.yml')) or {}).get('Blast Furnace', {})
-    fuels_cp = [c for c in cp_shares if c != 'Electricity' and cp_shares[c] > 0]
-    fuels_bf = [c for c in bf_shares if c != 'Electricity' and bf_shares[c] > 0]
-    EF_coke_gas = (sum(cp_shares[c] * (load_data_from_yaml(os.path.join(base, 'emission_factors.yml')) or {}).get(c, 0.0) for c in fuels_cp) / max(1e-12, sum(cp_shares[c] for c in fuels_cp))) if fuels_cp else 0.0
-    EF_bf_gas   = (sum(bf_shares[c] * (load_data_from_yaml(os.path.join(base, 'emission_factors.yml')) or {}).get(c, 0.0) for c in fuels_bf) / max(1e-12, sum(bf_shares[c] for c in fuels_bf))) if fuels_bf else 0.0
+    # Dynamic EF for process gas based on energy shares & EF table
+    def _blend_EF(shares: Dict[str, float], efs: Dict[str, float]) -> float:
+        fuels = [(c, s) for c, s in shares.items() if c != 'Electricity' and s > 0]
+        if not fuels:
+            return 0.0
+        denom = sum(s for _, s in fuels) or 1e-12
+        return sum(s * float(efs.get(c, 0.0)) for c, s in fuels) / denom
+
+    EF_coke_gas = _blend_EF(energy_shares.get('Coke Production', {}), e_efs)
+    EF_bf_gas   = _blend_EF(energy_shares.get('Blast Furnace', {}), e_efs)
     EF_process_gas = EF_coke_gas if total_gas_MJ <= 1e-9 else (
         (EF_coke_gas * (gas_coke_MJ / max(1e-12, total_gas_MJ))) + (EF_bf_gas * (gas_bf_MJ / max(1e-12, total_gas_MJ)))
     )
 
-    # --- Emissions
-    emissions = calculate_emissions(
-        mkt_cfg,
-        prod_lvl,
-        energy_balance,
-        e_efs,
-        load_data_from_yaml(os.path.join(base, 'process_emissions.yml')),
-        internal_elec,
-        {demand_mat: scn.route.demand_qty},
-        total_gas_MJ,
-        EF_process_gas,
+    # Utility efficiency for converting process gas to electricity
+    try:
+        util_eff = recipes_dict.get('Utility Plant', Process('',{},{})).outputs.get('Electricity', 0.0)
+    except Exception:
+        util_eff = 0.0
+    # recompute internal elec defensively from total gas
+    internal_elec = max(internal_elec, total_gas_MJ * util_eff)
+
+    # FIXED PLANT-LEVEL CALCULATIONS (not dependent on user's stop-at-stage)
+    # Compute reference in-mill electricity (IP3 boundary)
+    inside_elec_ref = compute_inside_elec_reference_for_share(
+        recipes=recipes,
+        energy_int=energy_int,
+        energy_shares=energy_shares,
+        energy_content=energy_content,
+        params=params,
+        route_key=route_preset,
+        demand_qty=demand_qty,
+        stage_ref="IP3",
+    )
+    
+    # Fixed plant-level internal electricity fraction
+    if inside_elec_ref > 1e-9:
+        f_internal = min(1.0, internal_elec / inside_elec_ref)
+    else:
+        f_internal = 0.0
+    
+    # Fixed internal electricity EF
+    ef_internal_electricity = (EF_process_gas / util_eff) if util_eff > 1e-9 else 0.0
+
+    # Apply/disable internal electricity credit
+    if credit_on:
+        energy_balance = adjust_energy_balance(energy_balance, internal_elec)
+    else:
+        internal_elec  = 0.0
+        total_gas_MJ   = 0.0
+        EF_process_gas = 0.0
+        # do not adjust energy_balance when credit is off
+
+    # Load process-emissions yaml for direct process emissions (if needed)
+    process_emissions_table = load_data_from_yaml(os.path.join(base, 'process_emissions.yml'))
+
+    # Emissions (robust to differing signatures)
+    emissions = _robust_call_calculate_emissions(
+        calculate_emissions,
+        mkt_cfg=mkt_cfg,
+        prod_lvl=prod_levels,            # some versions expect prod_lvl
+        prod_level=prod_levels,          # others expect prod_level
+        energy_balance=energy_balance,   # some versions expect energy_balance
+        energy_df=energy_balance,        # others expect energy_df
+        # emission factors
+        e_efs=e_efs,                     # some versions expect e_efs
+        energy_efs=e_efs,                # others expect energy_efs
+        # process emissions table
+        process_emissions_table=process_emissions_table,  # some versions expect this name
+        process_efs=process_emissions_table,              # others expect process_efs
+        internal_elec=internal_elec,
+        final_demand=final_demand,
+        total_gas_MJ=total_gas_MJ,
+        EF_process_gas=EF_process_gas,
+        # Fixed plant-level values
+        internal_fraction_plant=f_internal,
+        ef_internal_electricity=ef_internal_electricity,
     )
 
-    total = None
-    if emissions is not None and not emissions.empty:
-        if ("TOTAL" in emissions.index) and ("TOTAL CO2e" in emissions.columns):
-            total = float(emissions.loc["TOTAL", "TOTAL CO2e"])  # already in kg in your core
-        elif "TOTAL CO2e" in emissions.columns:
-            total = float(emissions["TOTAL CO2e"].sum())
+    # Ensure a TOTAL row if your function doesn't add it
+    total_co2 = None
+    try:
+        if emissions is not None and not emissions.empty:
+            if 'TOTAL' not in emissions.index and 'TOTAL CO2e' in emissions.columns:
+                emissions.loc['TOTAL'] = emissions.sum()
+            if 'TOTAL' in emissions.index and 'TOTAL CO2e' in emissions.columns:
+                total_co2 = float(emissions.loc['TOTAL', 'TOTAL CO2e'])
+            elif 'TOTAL CO2e' in emissions.columns:
+                total_co2 = float(emissions['TOTAL CO2e'].sum())
+    except Exception:
+        pass
 
     meta = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "country_code": scn.country_code,
-        "route_preset": scn.route.route_preset,
-        "stage_key": scn.route.stage_key,
-        "demand_qty": scn.route.demand_qty,
+        "route_preset": route_preset,
+        "stage_key": stage_key,
+        "demand_qty": demand_qty,
+        "country_code": country_code,
+        "process_gas_credit_enabled": bool(credit_on),
+        "inside_elec_ref": inside_elec_ref,
+        "f_internal": f_internal,
+        "ef_internal_electricity": ef_internal_electricity,
     }
 
     return RunOutputs(
-        production_routes=prod_routes,
-        prod_levels=dict(prod_lvl),
+        production_routes=production_routes,
+        prod_levels=prod_levels,
         energy_balance=energy_balance,
         emissions=emissions,
-        total_co2e_kg=total,
+        total_co2e_kg=total_co2,
         meta=meta,
     )
-
-
-# ==============================
-# Logging
-# ==============================
-
-def write_run_log(log_dir: str, payload: Dict[str, Any]) -> str:
-    """Write a single JSON log with config + CO₂e. Returns file path."""
-    pathlib.Path(log_dir).mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    fname = f"run_{ts}.json"
-    fpath = str(pathlib.Path(log_dir) / fname)
-    with open(fpath, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
-    return fpath

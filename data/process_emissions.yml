@@ -16,7 +16,7 @@ processes:
   "Diesel from Market": 0.822
   "Ethanol from Market": 0.7842487075
   "Biodiesel from Market": 0.7090511333
-  "Natural gas from Market": 0.8244897959
+  "Natural gas from Market": 0.0
   "LPG from Market": 0.985
   "Biomethane from Market": 0.2020687091
   "Hydrogen (Electrolysis) from Market": 2.58
@@ -24,7 +24,7 @@ processes:
   "Wood from Market": 0.1016513597
   "Charcoal from Market": 0.38
   "Utility Plant": 0.0
-  "Coal from Market": 0.5236088979
+  "Coal from Market": 0
   "Anthracite Coal from Market": 0.5236088979
   "PCI Coal from Market": 0.5236088979
   "Coke Petroleum from Market": 0.4123244572

@@ -120,7 +120,11 @@ def render_sidebar_logos(
             if left_path.exists():
                 st.image(str(left_path), width=width_px)
         with colm:
-            _render_svg(middle_path, width_px=(middle_width_px or width_px))
+            if middle_path.exists():
+                if middle_path.suffix.lower() == ".svg":
+                    _render_svg(middle_path, width_px=(middle_width_px or width_px))
+                else:
+                    st.image(str(middle_path), width=(middle_width_px or width_px))
         with col2:
             if right_path.exists():
                 st.image(str(right_path), width=width_px)
@@ -430,7 +434,7 @@ run_now = False
 # Sidebar – data & scenario
 # -----------------------------
 
-render_sidebar_logos(width_px=80, middle_svg="fgv-logo.svg", middle_width_px=120)
+render_sidebar_logos(width_px=80, middle_svg="fgv-logo.png", middle_width_px=120)
 with st.sidebar:
     st.header("Main options")
     # Scenario picker (from data/scenarios)

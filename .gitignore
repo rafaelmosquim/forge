@@ -41,3 +41,6 @@ _cleanup_*.txt
 _cleanup_*.zip
 _archive_*.zip
 repo_tree.txt
+
+# Preview lists from cleanup
+_preview_*.txt

@@ -31,3 +31,7 @@ validation/summary.csv
 .DS_Store
 Thumbs.db
 .vscode/
+
+scripts/
+
+validation/

@@ -1,0 +1,13 @@
+[server]
+headless = true
+enableXsrfProtection = true
+maxUploadSize = 200
+maxMessageSize = 200
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#2563eb"
+secondaryBackgroundColor = "#f6f8fa"

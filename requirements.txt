@@ -1,15 +1,6 @@
-<<<<<<< HEAD
 streamlit>=1.30
 pandas>=2.1
 numpy>=1.26
 pyyaml>=6.0
 plotly>=5.18
 matplotlib>=3.8
-=======
-streamlit>=1.30
-pandas>=2.1
-numpy>=1.26
-pyyaml>=6.0
-plotly>=5.18
-matplotlib>=3.8
->>>>>>> e627957cda3b625b9cd0019305e3110416d0bcfe

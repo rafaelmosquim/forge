@@ -1,0 +1,33 @@
+# Python / build
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+*.pdb
+*.log
+
+# Virtual envs & local configs
+.venv/
+.env
+.ipynb_checkpoints/
+.spyproject/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Generated stuff (don’t version)
+artifacts/
+logs/
+run_logs/
+_backup_*/
+old/
+
+# Validation outputs (keep YAML cards, ignore csv/png)
+validation/**/*.csv
+validation/**/*.png
+validation/summary.csv
+
+# OS/Editors
+.DS_Store
+Thumbs.db
+.vscode/

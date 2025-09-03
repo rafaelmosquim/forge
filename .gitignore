@@ -35,3 +35,9 @@ Thumbs.db
 scripts/
 
 validation/
+
+# Cleanup artifacts
+_cleanup_*.txt
+_cleanup_*.zip
+_archive_*.zip
+repo_tree.txt

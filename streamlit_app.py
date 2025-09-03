@@ -106,7 +106,7 @@ def _pick_first(*names: str):
 def render_sidebar_logos(
     left="faculty_logo.png",
     right="university_logo.png",
-    middle_svg="fgv-logo.svg",
+    middle_svg="fgv-logo.png",
     width_px=100,
     middle_width_px=None,
 ):

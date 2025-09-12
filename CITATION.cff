@@ -3,7 +3,6 @@
 
 ### `CITATION.cff`
 
-```yaml
 cff-version: 1.2.0
 message: If you use FORGE in your work, please cite this software and the archived release below.
 title: FORGE — Flexible Optimization of Routes for GHG & Energy
@@ -43,18 +42,7 @@ license: MIT
 version: 1.0.0
 date-released: 2025-09-12
 repository-code: https://github.com/USER/forge
-identifiers:
-  - type: doi
-    value: 10.5281/zenodo.XXXXXXX   # <- version DOI for this release
-  - type: doi
-    value: 10.5281/zenodo.YYYYYYY   # <- concept DOI (always-latest)
 preferred-citation:
   type: software
   title: FORGE — Flexible Optimization of Routes for GHG & Energy (v1.0.0)
-  authors:
-    - family-names: Mosquim
-      given-names: Rafael
-  year: 2025
-  identifiers:
-    - type: doi
-      value: 10.5281/zenodo.XXXXXXX
+

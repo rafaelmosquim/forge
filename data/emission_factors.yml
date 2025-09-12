@@ -1,9 +1,9 @@
 emission_factors:
-  Electricity: 38.5
-  FLF: 94.11850817
-  RLF: 23.58045034
-  Gas: 72.72788705
-  Wood: 9.823188667
-  Coal: 111.9508768
-  Charcoal: 20.43228169
-  Coke: 135.8112848
+  Electricity: 38.50
+  FLF: 94.12
+  RLF: 23.58
+  Gas: 72.73
+  Wood: 9.82
+  Coal: 111.95
+  Charcoal: 20.43
+  Coke: 135.82

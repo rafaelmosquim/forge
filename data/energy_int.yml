@@ -38,13 +38,13 @@ processes:
   "Coke Production": 6.54
   "Steam Production": ~
   "Nitrogen from Market": ~
-  "Nitrogen Production": 4.940640469
+  "Nitrogen Production": 4.94
   "Oxygen from Market": ~
   "Oxygen Production": 4.5
   "Burnt Lime from Market": ~
-  "Burnt Lime Production": 6.609049917
+  "Burnt Lime Production": 6.61
   "Dolomite from Market": ~
-  "Dolomite Production": 6.609049917
+  "Dolomite Production": 6.61
   "Alloys Mix for Low Alloy Steel (LAS)": ~
   "Alloys Mix for High Alloy Steel (HAS)": ~
   "Scrap Purchase": ~
@@ -60,19 +60,19 @@ processes:
   "Regular Steel": ~
   "Steel Refining (Low Alloy)": 6.5
   "Steel Refining (High Alloy)": 6.5
-  "Continuous Casting": 0.250486122
+  "Continuous Casting": 0.25
   "Ingot Casting": 0.0
   "Hot Rolling": 2.5
   "Cold Rolling": 1.1
   "Rod/bar/section Mill": 3.0
   "Steel Thermal Treatment": 2.0
   "Hot Dip Metal Coating": 2.5
-  "Electrolytic Metal Coating": 4.601907399
+  "Electrolytic Metal Coating": 4.60
   "Direct use of Basic Steel Products": ~
   "Casting/Extrusion/Conformation": 1.0
-  "Stamping/calendering/lamination": 1.839329388
-  "Machining": 1.155055062
+  "Stamping/calendering/lamination": 1.84
+  "Machining": 1.16
   "No Coating": ~
   "Hot Dip Metal Coating FP": 2.5
-  "Electrolytic Metal Coating FP": 4.601907399
+  "Electrolytic Metal Coating FP": 4.60
   "Organic or Sintetic Coating (painting)": 1.0

@@ -1,0 +1,60 @@
+
+---
+
+### `CITATION.cff`
+
+```yaml
+cff-version: 1.2.0
+message: If you use FORGE in your work, please cite this software and the archived release below.
+title: FORGE — Flexible Optimization of Routes for GHG & Energy
+abstract: >
+  FORGE computes cradle-to-gate energy use and GHG emissions for steel across BF-BOF, DRI-EAF, and EAF-scrap routes with explicit recipes, route masks, and on-site electricity crediting. It includes 1-D sensitivity sweeps and Monte Carlo uncertainty with pinned seeds.
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.<VERSION>
+  - type: doi
+    value: 10.5281/zenodo.<CONCEPT>
+authors:
+  - family-names: Mosquim
+    given-names: Rafael
+    email: rafael@hotmail.com
+    orcid: 0000-0002-8636-6649
+  - family-names: Pineheiro Lima
+    given-names: Paulo Sergio
+    email: psplima@hotmail.com
+    orcid: 0009-0002-7474-6342
+  - family-names: Pastre
+    given-names: Leonardo Pastre
+    email: l238957@dac.unicamp.br  
+    orcid: 0009-0003-8892-1460
+  - family-names: Seabra
+    given-names: Joaquim
+    email: jseabra@fem.unicamp.br
+    orcid: 0000-0002-1463-7104   
+keywords:
+  - steel
+  - LCI
+  - decarbonization
+  - BF-BOF
+  - DRI-EAF
+  - EAF
+  - Monte Carlo
+license: MIT
+version: 1.0.0
+date-released: 2025-09-12
+repository-code: https://github.com/USER/forge
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.XXXXXXX   # <- version DOI for this release
+  - type: doi
+    value: 10.5281/zenodo.YYYYYYY   # <- concept DOI (always-latest)
+preferred-citation:
+  type: software
+  title: FORGE — Flexible Optimization of Routes for GHG & Energy (v1.0.0)
+  authors:
+    - family-names: Mosquim
+      given-names: Rafael
+  year: 2025
+  identifiers:
+    - type: doi
+      value: 10.5281/zenodo.XXXXXXX

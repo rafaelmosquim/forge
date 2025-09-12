@@ -1,79 +1,79 @@
 processes:
-  "Manganese from Market": 3.952583804
-  "Chromium from Market": 9.067500573
-  "Nickel from Market": 24.22294048
-  "Molibdenium from Market": 17.22139365
-  "Copper from Market": 5.162316693
-  "Silicon from market": 6.531026787
-  "Vanadium from market": 21.07142857
-  "Titanium from market": 49.54455658
-  "Niobium from market": 17.20991218
-  "Aluminium from market": 21.85420022
+  "Manganese from Market": 3.95
+  "Chromium from Market": 9.07
+  "Nickel from Market": 24.22
+  "Molibdenium from Market": 17.22
+  "Copper from Market": 5.16
+  "Silicon from market": 6.53
+  "Vanadium from market": 21.07
+  "Titanium from market": 49.54
+  "Niobium from market": 17.21
+  "Aluminium from market": 21.85
   "Zinc from Market": 5.45
-  "Limestone from Market": 0.002744187323
+  "Limestone from Market": 0.44
   "Process Gas": ~
-  "Fuel Oil from Market": 0.662
-  "Diesel from Market": 0.822
-  "Ethanol from Market": 0.7842487075
-  "Biodiesel from Market": 0.7090511333
-  "Natural gas from Market": 0.8244897959
-  "LPG from Market": 0.985
-  "Biomethane from Market": 0.2020687091
+  "Fuel Oil from Market": 0.66
+  "Diesel from Market": 0.82
+  "Ethanol from Market": 0.78
+  "Biodiesel from Market": 0.71
+  "Natural gas from Market": 0.00
+  "LPG from Market": 0.98
+  "Biomethane from Market": 0.20
   "Hydrogen (Electrolysis) from Market": 2.58
-  "Hydrogen (Methane reforming) from Market": 10.8
-  "Wood from Market": 0.1016513597
-  "Charcoal from Market": 0.38
-  "Utility Plant": 0.0
-  "Coal from Market": 0.5236088979
-  "Anthracite Coal from Market": 0.5236088979
-  "PCI Coal from Market": 0.5236088979
-  "Coke Petroleum from Market": 0.4123244572
-  "Coke Mineral from Market": 0.817162311
-  "Electricity from Market": 0.1387
-  "Electricity Hydro from Market": 0.07247525118
-  "Electricity Eolic from Market": 0.01106854874
-  "Electricity Solar from Market": 0.07701712258
-  "Electricity Biomass from Market": 0.07721741146
-  "Electricity Production": 0.0
-  "Charcoal Production": 1.751355837
-  "Coke Production": 0.8677011976
-  "Steam Production": 0.0
-  "Nitrogen from Market": 0.4365224944
-  "Nitrogen Production": 0.0
-  "Oxygen from Market": 1.093603953
-  "Oxygen Production": 0.0
-  "Burnt Lime from Market": 1.159317009
-  "Burnt Lime Production": 1.159317011
-  "Dolomite from Market": 0.1251731843
-  "Dolomite Production": 0.08943387259
-  "Alloys Mix for Low Alloy Steel (LAS)": 11.17433627
-  "Alloys Mix for High Alloy Steel (HAS)": 13.76737566
-  "Scrap Purchase": 0.00958
-  "Iron Ore from Market": 0.00889
-  "Direct Iron ore": 0.0
-  "Sintering": 0.4197238619
-  "Pelletizing": 0.08915412303
-  "Blast Furnace": 1.685862723
-  "Direct Reduction Iron": 1.929732488
-  "Iron Foundry": 1.829255912
-  "Electric Arc Furnace": 1.328105452
-  "Basic Oxygen Furnace": 2.239549972
-  "Regular Steel": 0.0
-  "Steel Refining (Low Alloy)": 2.239549972
-  "Steel Refining (High Alloy)": 2.197783211
-  "Continuous Casting": 0.0
-  "Ingot Casting": 0.0
-  "Hot Rolling": 0.2784805367
-  "Cold Rolling": 0.6429804522
-  "Rod/bar/section Mill": 0.1657451298
-  "Steel Thermal Treatment": 0.0
-  "Hot Dip Metal Coating": 0.0
-  "Electrolytic Metal Coating": 0.0
-  "Direct use of Basic Steel Products": 0.0
-  "Casting/Extrusion/Conformation": 0.0
-  "Stamping/calendering/lamination": 0.0
-  "Machining": 0.0
-  "No Coating": 0.0
-  "Hot Dip Metal Coating FP": 0.0
-  "Electrolytic Metal Coating FP": 0.0
-  "Organic or Sintetic Coating (painting)": 0.0
+  "Hydrogen (Methane reforming) from Market": 10.80
+  "Wood from Market": 0.10
+  "Charcoal from Market": 0.00
+  "Utility Plant": 0.00
+  "Coal from Market": 0.00
+  "Anthracite Coal from Market": 0.00
+  "PCI Coal from Market": 0.00
+  "Coke Petroleum from Market": 0.00
+  "Coke Mineral from Market": 0.00
+  "Electricity from Market": 0.14
+  "Electricity Hydro from Market": 0.07
+  "Electricity Eolic from Market": 0.01
+  "Electricity Solar from Market": 0.08
+  "Electricity Biomass from Market": 0.08
+  "Electricity Production": 0.00
+  "Charcoal Production": 1.75
+  "Coke Production": 0.87
+  "Steam Production": 0.00
+  "Nitrogen from Market": 0.44
+  "Nitrogen Production": 0.00
+  "Oxygen from Market": 1.09
+  "Oxygen Production": 0.00
+  "Burnt Lime from Market": 1.16
+  "Burnt Lime Production": 1.16
+  "Dolomite from Market": 0.13
+  "Dolomite Production": 0.09
+  "Alloys Mix for Low Alloy Steel (LAS)": 11.17
+  "Alloys Mix for High Alloy Steel (HAS)": 13.77
+  "Scrap Purchase": 0.01
+  "Iron Ore from Market": 0.01
+  "Direct Iron ore": 0.00
+  "Sintering": 0.42
+  "Pelletizing": 0.09
+  "Blast Furnace": 1.69
+  "Direct Reduction Iron": 1.93
+  "Iron Foundry": 1.83
+  "Electric Arc Furnace": 1.33
+  "Basic Oxygen Furnace": 2.24
+  "Regular Steel": 0.00
+  "Steel Refining (Low Alloy)": 2.24
+  "Steel Refining (High Alloy)": 2.20
+  "Continuous Casting": 0.00
+  "Ingot Casting": 0.00
+  "Hot Rolling": 0.28
+  "Cold Rolling": 0.64
+  "Rod/bar/section Mill": 0.17
+  "Steel Thermal Treatment": 0.00
+  "Hot Dip Metal Coating": 0.00
+  "Electrolytic Metal Coating": 0.00
+  "Direct use of Basic Steel Products": 0.00
+  "Casting/Extrusion/Conformation": 0.00
+  "Stamping/calendering/lamination": 0.00
+  "Machining": 0.00
+  "No Coating": 0.00
+  "Hot Dip Metal Coating FP": 0.00
+  "Electrolytic Metal Coating FP": 0.00
+  "Organic or Sintetic Coating (painting)": 0.00

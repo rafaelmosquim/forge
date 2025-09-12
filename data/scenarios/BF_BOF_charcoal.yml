@@ -5,36 +5,64 @@ route_overrides:
   Basic Oxygen Furnace: 1.0
   Electric Arc Furnace: 0.0
   Direct Reduction Iron: 0.0
-  Charcoal from Market: 0.0   # optional, to force Wood → kiln path
   Charcoal Production: 1.0
-  Coke Production: 1.0
+  Charcoal from Market: 0.0
+  Coke Production: 0.0
+  Coke from market: 0.0
+  Coal from Market: 0.0
+  PCI Coal from Market: 0.0
 
+# optional; fine to keep
 fuel_substitutions:
   Coal: Charcoal
-  Coke: Charcoal
   PCI Coal from Market: Charcoal
 
-energy_int:                # only lines that differ from base
-  Blast Furnace: 14.95       # +15 % vs coal BF
+energy_int:
+  Blast Furnace: 14.95
+
+# 🔑 This is what the app uses to compute BF "Coke/Coal/Charcoal" inputs
+energy_matrix:
+  Blast Furnace:
+    Coke: 0.0
+    Coal: 0.0
+    Charcoal: 1.0
+  Sintering:
+    Coke: 0.0
+    Charcoal: 0.77
+    Electricity: 0.23 
+
 
 recipe_overrides:
+  # Belt-and-suspenders: force BF coke/coal to zero;
+  # (don't override Charcoal to "1.0" – the share above will compute the right mass)
+  Blast Furnace:
+    inputs:
+      Sinter: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.sinter"
+      Pellet: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.pellet"
+      Iron Ore: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.lump"
+      Nitrogen: 0.0750 * 1.0
+      Oxygen: 0.0800 * 1.0
+      Limestone: 0.0400 * 1.0
+      Coke: 0.0
+      Coal: 0.0
+
   Charcoal Production:
-    inputs: { Wood: 2.5226 }
+    inputs:  { Wood: 2.5226 }
     outputs: { Charcoal (raw): 1.0 }
 
-  Coke Production:
-    inputs:
-      Nitrogen: 0.02
-      Charcoal (raw): 1.25
-    outputs:
-      Charcoal (BF): 1.0
-      Process Gas: "process_gas_coke * (inputs['Charcoal (raw)'] * energy_content['Charcoal'])"
+  # Since Coke Production is disabled, this block is unnecessary; remove or leave harmlessly
+  # Coke Production:
+  #   inputs:
+  #     Nitrogen: 0.02
+  #     Charcoal (raw): 1.25
+  #   outputs:
+  #     Coke: 1.0
+  #     Process Gas: "process_gas_coke * (inputs['Charcoal (raw)'] * energy_content['Charcoal'])"
 
+  # Use the standard 'Charcoal' token here (not "Charcoal (BF)")
   Sintering:
     inputs:
       Iron Ore: "feo3_sinter / feo3_lump"
       Limestone: 0.140
-      Charcoal (BF): >
-        energy_int['Sintering'] * energy_shares['Sintering']['Charcoal'] / energy_content['Charcoal']
+      Charcoal: "energy_int['Sintering'] * energy_shares['Sintering']['Charcoal'] / energy_content['Charcoal']"
     outputs: { Sinter: 1.0 }
-

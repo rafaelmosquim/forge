@@ -258,12 +258,34 @@
     Dolomite: 1.0
 
 - process: Alloys Mix for Low Alloy Steel (LAS)
-  inputs: {}
-  outputs: {}
+  inputs:
+    Manganese: 0.414
+    Chromium: 0.083
+    Nickel: 0.221
+    Molibdenium: 0.055
+    Copper: 0.166
+    Silicon: 0.0
+    Vanadium: 0.028
+    Titanium: 0.014
+    Niobium: 0.014
+    Aluminium: 0.006
+  outputs:
+    Alloys Mix for Low Alloy Steel (LAS): 1.0
 
 - process: Alloys Mix for High Alloy Steel (HAS)
-  inputs: {}
-  outputs: {}
+  inputs:
+    Manganese: 0.061
+    Chromium: 0.545
+    Nickel: 0.303
+    Molibdenium: 0.061
+    Copper: 0.0
+    Silicon: 0.030
+    Vanadium: 0.0
+    Titanium: 0.0
+    Niobium: 0.0
+    Aluminium: 0.0    
+  outputs:
+    Alloys Mix for High Alloy Steel (HAS): 1.0
 
 - process: Scrap Purchase
   inputs: {}
@@ -321,9 +343,10 @@
 
 - process: Direct Reduction Iron
   inputs:
-    Sinter: "(1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.sinter"
-    Pellet: "(1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.pellet"
-    Iron Ore: "(1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.lump"
+    Sinter: "(1 / iron_content_pig_iron) * ( (blend.sinter/feo3_sinter) / ( (blend.sinter/feo3_sinter) + (blend.pellet/feo3_pellet) + (blend.lump/feo3_lump) ) )"
+    Pellet: "(1 / iron_content_pig_iron) * ( (blend.pellet/feo3_pellet) / ( (blend.sinter/feo3_sinter) + (blend.pellet/feo3_pellet) + (blend.lump/feo3_lump) ) )"
+    Iron Ore: "(1 / iron_content_pig_iron) * ( (blend.lump/feo3_lump) / ( (blend.sinter/feo3_sinter) + (blend.pellet/feo3_pellet) + (blend.lump/feo3_lump) ) )"
+
     Gas: >
       energy_int['Direct Reduction Iron']
       * energy_shares['Direct Reduction Iron'].get('Gas', 0)
@@ -382,7 +405,7 @@
 
 - process: Steel Refining (High Alloy)
   inputs:
-    Liquid Steel: 1.0 - 0.335
+    Liquid Steel: 1.0 - 0.330
     Alloys Mix for High Alloy Steel (HAS): 0.33
     Nitrogen: 0.0070
     Oxygen: 0.0250
@@ -492,7 +515,9 @@
 # -------------------------
 # IP4: Manufactured feed (inside mill)
 # -------------------------
-# (REMOVED) ❌ Direct use of Basic Steel Products (IP4) — direct use is an exit, not IP4.
+- process: Direct use of Basic Steel Products
+  inputs:  { Intermediate Process 3: 1.0 }
+  outputs: { Manufactured Feed (IP4): 1.0 }
 
 - process: Casting/Extrusion/Conformation
   inputs:  { Intermediate Process 3: 1.0 }

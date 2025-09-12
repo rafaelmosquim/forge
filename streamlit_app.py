@@ -475,7 +475,7 @@ with st.sidebar:
     stage_keys = _detect_stage_keys()
     stage_menu = {
         "Pig iron": stage_keys["pig_iron"],
-        "Liquid steel": stage_keys["liquid_steel"],
+        #"Liquid steel": stage_keys["liquid_steel"],
         "Crude steel": stage_keys["as_cast"],
         #"Steel-mill steel": stage_keys["after_cr"],
         "Finished": stage_keys["finished"],
@@ -488,8 +488,8 @@ with st.sidebar:
         index=list(stage_menu.keys()).index(default_stage_label),
         help=(
             "Pig iron: hot metal after Blast Furnace/DRI."
-            "Liquid steel: after BOF/EAF (before continuous casting)."
-            "Crude steel: after continuous casting.  "
+            #"Liquid steel: after BOF/EAF (before continuous casting)."
+            "Crude steel: after continuous casting."
             #"Steel-mill steel: plant boundary.  "
             "Finished: include off-site processing."
         ),
@@ -504,12 +504,14 @@ with st.sidebar:
     # Grid EF country (passed to core; EF not altered in-app)
     elec_map = load_electricity_intensity(os.path.join(DATA_ROOT, "electricity_intensity.yml")) or {}
     country_opts = sorted(elec_map.keys()) if elec_map else []
-    country_code = st.selectbox("Grid electricity country (for Electricity EF)", options=[""] + country_opts, index=0)
+    country_code = st.selectbox("Country grid electricity", options=["BRA"] + country_opts, index=0, 
+                                help = "Sets emission factor for electricity. Values for 2024, " \
+                                "from https://ourworldindata.org/electricity-mix")
                 
-    # Logging
-    st.header("Logging")
-    do_log = st.checkbox("Write JSON log (config + CO₂)", value=False)
-    log_dir = st.text_input("Log folder", value="run_logs")
+    # # Logging
+    # st.header("Logging")
+    # do_log = st.checkbox("Write JSON log (config + CO₂)", value=False)
+    # log_dir = st.text_input("Log folder", value="run_logs")
 
 # -----------------------------
 # Build UI graph (for picks)
@@ -620,7 +622,7 @@ with tab_main:
         "IP1": "Alloying",
         "Raw": "Post-CC",
         "IP4": "Shaping (off-site)",
-        "Finished": "Finishing (off-site)",
+        "Finished": "Finishing (off-site)"
     }
     
     def _fmt_proc(name: str) -> str:
@@ -630,7 +632,7 @@ with tab_main:
     UPSTREAM_MATS = {
         "Nitrogen",
         "Oxygen",
-        "Coal",
+        #"Coal",
         "Coke",
         "Dolomite",
         "Burnt Lime"
@@ -644,11 +646,15 @@ with tab_main:
         "Oxygen Production": "Onsite",
         "Oxygen from market": "Purchase",
         "Coke Production": "Onsite",
-        "Coke from market": "Purchase",
+        "Coke Petroleum from Market": "Purchase (pet)",
+        "Coke Mineral from Market": "Purchase (raw)",
         "Dolomite Production": "Onsite",
         "Dolomite from market": "Purchase",
         "Burnt Lime Production": "Onsite",
         "Burnt Lime from market": "Purchase",
+        "Coal from Market": "Coking Coal",
+        "Anthracite Coal from Market": "Anthracite",
+        "PCI Coal from Market": "Pulverized"
     })
     
     def _stage_label_for(mat_name: str) -> str:
@@ -675,40 +681,41 @@ with tab_main:
     primary_order = ["IP1", "Raw", "IP4", "Finished"]
     
            
-    if MAP_PNG.exists():
-        b64 = base64.b64encode(MAP_PNG.read_bytes()).decode()
-        st.components.v1.html(
-            f"""
-            <div style="display:flex;align-items:center;gap:8px;margin:0 0 8px 0;">
-            <h3 style="margin:0;">Downstream choices</h3>
-            <button
-                onclick="(function(){{
-                const w = window.open('about:blank','_blank');
-                if(!w) return;   // popup blocked
-                w.document.title = 'Process Map';
-                w.document.body.style.margin = '0';
-                w.document.body.style.background = '#0b0b0b';
-                const img = new Image();
-                img.style.display = 'block';
-                img.style.maxWidth = '100%';
-                img.style.height = 'auto';
-                img.style.margin = '0 auto';
-                img.src = 'data:image/png;base64,{b64}';
-                img.onload = () => w.document.body.appendChild(img);
-                }})()"
-                style="text-decoration:none;padding:.35rem .6rem;border:1px solid #cbd5e1;border-radius:.5rem;cursor:pointer;background:none;">
-                Process Map ❓
-            </button>
-            </div>
-            """,
-            height=48
-        )
-    else:
-        st.subheader("Downstream choices")
-        st.caption(f"Map not found at: {MAP_PNG}")
+    # --- Downstream header + "Process Map" button, same font as Upstream
+    left, right = st.columns([1, 3])
+    with left:
+        st.subheader("Downstream choices")        # same font as Upstream
 
+    with right:
+        if MAP_PNG.exists():
+            b64 = base64.b64encode(MAP_PNG.read_bytes()).decode()
+            st.components.v1.html(
+                f"""
+                <button
+                    onclick="(function(){{
+                        const w = window.open('about:blank','_blank'); if(!w) return;
+                        w.document.title='Process Map';
+                        w.document.body.style.margin='0';
+                        w.document.body.style.background='#0b0b0b';
+                        const img=new Image();
+                        img.style.display='block';
+                        img.style.maxWidth='50%';
+                        img.style.height='auto';
+                        img.style.margin='0 auto';
+                        img.src='data:image/png;base64,{b64}';
+                        img.onload=()=>w.document.body.appendChild(img);
+                    }})()"
+                    style="padding:.35rem .6rem;border:1px solid #cbd5e1;border-radius:.5rem;
+                        cursor:pointer;background:none;">
+                    Process Map
+                </button>
+                """,
+                height=40,
+            )
+        else:
+            st.caption(f"Map not found at: {MAP_PNG}")
 
-         
+        
     cols = st.columns(len(primary_order))
     
     def _use_selectbox(options: list[str]) -> bool:
@@ -783,24 +790,24 @@ with tab_main:
     
     # 4) Finished
     _render_group("Finished", cols[3])
-    st.divider()
+
     # --- Upstream picks, no title line ---
-    st.subheader("Upstream choices")
+    st.subheader("Upstream choices", help="Model considers Scopes 1+2 only; upstream purchases excludes emissions from this process.")
     if groups.get("Upstream"):
         _render_group("Upstream", st.container(), show_title=False, n_cols = 6)
         
     
     # Reset & Run row
-    c1, c2 = st.columns([1, 1])
-    with c1:
-        if st.button("Reset picks"):
-            st.session_state.picks_by_material = {}
-            for k in list(st.session_state.keys()):
-                if k.startswith("radio_") or k.startswith("pick_") or k in ("cc_choice_radio", "cr_toggle"):
-                    del st.session_state[k]
-            st.experimental_rerun()
-    with c2:
-        run_now = st.button("Run model", type="primary")
+    # c1, c2 = st.columns([1, 1])
+    # with c2:
+    #     if st.button("Reset picks"):
+    #         st.session_state.picks_by_material = {}
+    #         for k in list(st.session_state.keys()):
+    #             if k.startswith("radio_") or k.startswith("pick_") or k in ("cc_choice_radio", "cr_toggle"):
+    #                 del st.session_state[k]
+    #         st.experimental_rerun()
+    # with c1:
+    run_now = st.button("Run model", type="primary")
     
     st.markdown("<hr class='hr'>", unsafe_allow_html=True)
 
@@ -1238,49 +1245,94 @@ if not IS_PAPER:
         # ---- BF fuel split (only for BF-BOF) ----
         if route == "BF-BOF":
             with st.expander("Blast Furnace — fuel split", expanded=False):
-                def _get_default_shares():
-                    bf_mx = (scenario.get('energy_matrix') or {}).get('Blast Furnace', {})
-                    coke0 = float(bf_mx.get('Coke', None)) if bf_mx else None
-                    coal0 = float(bf_mx.get('Coal', None)) if bf_mx else None
-                    char0 = float(bf_mx.get('Charcoal', None)) if bf_mx else None
-                    if coke0 is not None and (coal0 is not None or char0 is not None):
-                        return coke0, (coal0 or 0.0), (char0 or 0.0)
+
+                def _bf_base_shares_with_extras():
+                    """Return (elec0, coke0, coal0, char0, others_dict) from scenario or base file."""
+                    # scenario override (if any)
+                    sc_bf = (scenario.get('energy_matrix') or {}).get('Blast Furnace', {}) or {}
+                    # base file fallback
                     try:
-                        base_sh = load_data_from_yaml(os.path.join(DATA_ROOT, 'energy_matrix.yml')) or {}
-                        bf = base_sh.get('Blast Furnace', {})
-                        return float(bf.get('Coke', 0.6)), float(bf.get('Coal', 0.4)), float(bf.get('Charcoal', 0.0))
+                        base = load_data_from_yaml(os.path.join(DATA_ROOT, 'energy_matrix.yml')) or {}
                     except Exception:
-                        return 0.6, 0.4, 0.0
+                        base = {}
+                    base_bf = base.get('Blast Furnace', {}) or {}
 
-                coke0, coal0, char0 = _get_default_shares()
-                pci0 = max(0.0, min(1.0, coal0 + char0))
-                coke0 = max(0.0, min(1.0, coke0))
+                    def _get(d, k, default=0.0):
+                        v = d.get(k, None)
+                        try:
+                            return float(v) if v is not None else float(base_bf.get(k, default))
+                        except Exception:
+                            return float(base_bf.get(k, default))
 
-                coke_share = st.slider(
-                    "Coke share of BF thermal input (non-electric)",
-                    min_value=0.0, max_value=1.0, value=float(coke0), step=0.01, key="static_bf_coke"
+                    # read core carriers
+                    elec0 = _get(sc_bf, 'Electricity', 0.0)
+                    coke0 = _get(sc_bf, 'Coke',       0.0)
+                    coal0 = _get(sc_bf, 'Coal',       0.0)
+                    char0 = _get(sc_bf, 'Charcoal',   0.0)
+
+                    # preserve any other carriers (Gas, Wood, etc.)
+                    others_keys = set(sc_bf.keys()) | set(base_bf.keys())
+                    others_keys.difference_update({'Electricity', 'Coke', 'Coal', 'Charcoal'})
+                    others = {}
+                    for k in sorted(others_keys):
+                        others[k] = _get(sc_bf, k, 0.0)
+
+                    # tiny normalization guard (don’t change relative sizes)
+                    total = elec0 + coke0 + coal0 + char0 + sum(others.values())
+                    if total > 0:
+                        scale = 1.0 / total
+                        elec0 *= scale; coke0 *= scale; coal0 *= scale; char0 *= scale
+                        for k in others: others[k] *= scale
+
+                    return elec0, coke0, coal0, char0, others
+
+                elec0, coke0, coal0, char0, others = _bf_base_shares_with_extras()
+
+                # Thermal slice available to C/C/C = 1 - (electricity + others)
+                others_sum = sum(others.values())
+                thermal_total = max(1e-9, 1.0 - elec0 - others_sum)
+
+                # Defaults for sliders expressed INSIDE the thermal slice
+                coke_frac_th = (coke0 / thermal_total) if thermal_total > 0 else 0.0
+                pci_th = max(0.0, 1.0 - coke_frac_th)  # remaining thermal is PCI
+                pci_char_frac = (char0 / max(1e-9, (coal0 + char0))) if (coal0 + char0) > 0 else 0.0
+
+                # UI
+                coke_share_th = st.slider(
+                    "Coke share (of BF thermal input)",
+                    0.0, 1.0, float(coke_frac_th), 0.01, key="static_bf_coke"
                 )
                 pci_charcoal_frac = st.slider(
-                    "Charcoal fraction inside PCI",
-                    min_value=0.0, max_value=1.0,
-                    value=float(0.0 if pci0 <= 1e-9 else char0 / max(pci0, 1e-9)),
-                    step=0.01,
-                    help="0 → PCI is 100% Coal; 1 → PCI is 100% Charcoal. Coke is unchanged.",
-                    key="static_bf_charfrac"
+                    "Charcoal fraction inside PCI (coal↔charcoal)",
+                    0.0, 1.0, float(pci_char_frac), 0.01, key="static_bf_charfrac",
+                    help="0 → PCI is 100% Coal; 1 → PCI is 100% Charcoal. Electricity and other carriers stay fixed."
                 )
 
-                pci_share = 1.0 - coke_share
-                coal_share = pci_share * (1.0 - pci_charcoal_frac)
-                char_share = pci_share * pci_charcoal_frac
+                # Recompose absolute shares (keep electricity & others fixed)
+                coke_abs = thermal_total * coke_share_th
+                pci_abs  = thermal_total - coke_abs
+                coal_abs = pci_abs * (1.0 - pci_charcoal_frac)
+                char_abs = pci_abs * pci_charcoal_frac
 
+                # Write back without touching Electricity or the 'others'
                 scenario.setdefault('energy_matrix', {})
-                S = max(1e-9, coke_share + coal_share + char_share)
-                scenario['energy_matrix']['Blast Furnace'] = {
-                    'Coke':     float(coke_share / S),
-                    'Coal':     float(coal_share / S),
-                    'Charcoal': float(char_share / S),
-                }
-                st.caption("PCI fuel replacement only affects the PCI slice; Coke remains as set.")
+                bm = {'Electricity': elec0, 'Coke': coke_abs, 'Coal': coal_abs, 'Charcoal': char_abs, **others}
+
+                # final tiny renorm to sum exactly 1.0, **locking** Electricity proportion
+                total = sum(bm.values())
+                if total > 0:
+                    scale = 1.0 / total
+                    # scale all, but rescale thermal/others uniformly (electricity included so sums to 1)
+                    for k in bm:
+                        bm[k] *= scale
+
+                scenario['energy_matrix']['Blast Furnace'] = bm
+
+                st.caption(
+                    "Slider adjusts only the thermal slice (Coke vs PCI). Electricity and any other carriers stay fixed; "
+                    "PCI is split between Coal and Charcoal."
+                )
+
 
         # ---- Gas blend (NG / biomethane / Green H₂ / Blue H₂) ----
         with st.expander("Gas blend (sets EF for 'gas')", expanded=False):
@@ -1392,22 +1444,27 @@ if run_now:
         emissions        = out.emissions
         total            = out.total_co2e_kg
 
-        # ---- Emission factor summary (inc. yield) ----
-        st.subheader("Emission Factor")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric("Total emissions", f"{(total or 0):,.0f} kg CO₂e")
-        ef_gross = (total / demand_qty) if (total is not None and demand_qty and demand_qty > 0) else None
-        with c2:
-            st.metric(f"Gross EF (kg CO2 per unit {stage_label})", f"{ef_gross:.3f}" if ef_gross is not None else "—")
-        ef_final = (ef_gross / max(1e-9, yield_frac)) if (ef_gross is not None and use_yield) else None
-        with c3:
-            st.metric("Final EF (inc. yield)", f"{ef_final:.3f}" if ef_final is not None else "—",
-                      help="Computed as (total/demand) ÷ yield")
+        # # ---- Emission factor summary (inc. yield) ----
+        # st.subheader("Emission Factor")
+        # c1, c2, c3 = st.columns(3)
+        # with c1:
+        #     st.metric("Total emissions", f"{(total or 0):,.0f} kg CO₂e")
+        # ef_gross = (total / demand_qty) if (total is not None and demand_qty and demand_qty > 0) else None
+        # with c2:
+        #     st.metric(f"Gross EF (kg CO2 per unit {stage_label})", f"{ef_gross:.3f}" if ef_gross is not None else "—")
+        # ef_final = (ef_gross / max(1e-9, yield_frac)) if (ef_gross is not None and use_yield) else None
+        # with c3:
+        #     st.metric("Final EF (inc. yield)", f"{ef_final:.3f}" if ef_final is not None else "—",
+        #               help="Computed as (total/demand) ÷ yield")
 
         st.success("Model run complete (core).")
 
-        top_metrics.metric("Total CO₂e", f"{(total or 0):,.0f} kg CO₂e per ton of final product")
+        top_metrics.metric(
+            "Total CO₂e",
+            f"{((((total or 0)/0.85) if stage_key in ('Finished','Finished steel') else (total or 0))):,.0f} kg CO₂e per ton of final product",
+            help="If “Finished” is selected: value = raw total ÷ 0.85 (default model yield). Otherwise: raw total."
+        )
+
 
         # ---- Downloads ----
         df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")
@@ -1432,34 +1489,34 @@ if run_now:
         else:
             st.info("No energy balance table for this run.")
 
-        # ---- JSON run log ----
-        if do_log:
-            try:
-                payload = {
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
-                    "data_root": DATA_ROOT,
-                    "route": {
-                        "route_preset": route,
-                        "stage_key": stage_key,
-                        "stage_material": STAGE_MATS[stage_key],
-                        "demand_qty": float(demand_qty),
-                        "picks_by_material": dict(st.session_state.get("picks_by_material", {})),
-                        "pre_select_soft": pre_select_soft,
-                        "yield_applied": bool(use_yield),
-                        "yield_fraction": float(yield_frac) if use_yield else None,
-                        "ef_gross_kg_per_unit": float(ef_gross) if ef_gross is not None else None,
-                        "ef_final_kg_per_unit": float(ef_final) if ef_final is not None else None,
-                    },
-                    "country_code": country_code or None,
-                    "scenario_file": scenario_choice,
-                    "total_co2e_kg": float(total) if total is not None else None,
-                    "stage_label": stage_label,
-                    "ef_electricity_mixed_g_per_MJ": float(ef_mix) if ef_mix is not None else None,
-                }
-                log_path = write_run_log(log_dir or "run_logs", payload)
-                st.caption(f"Log written: `{log_path}`")
-            except Exception as e:
-                st.warning(f"Could not write JSON log: {e}")
+        # # ---- JSON run log ----
+        # if do_log:
+        #     try:
+        #         payload = {
+        #             "timestamp": datetime.utcnow().isoformat() + "Z",
+        #             "data_root": DATA_ROOT,
+        #             "route": {
+        #                 "route_preset": route,
+        #                 "stage_key": stage_key,
+        #                 "stage_material": STAGE_MATS[stage_key],
+        #                 "demand_qty": float(demand_qty),
+        #                 "picks_by_material": dict(st.session_state.get("picks_by_material", {})),
+        #                 "pre_select_soft": pre_select_soft,
+        #                 "yield_applied": bool(use_yield),
+        #                 "yield_fraction": float(yield_frac) if use_yield else None,
+        #                 "ef_gross_kg_per_unit": float(ef_gross) if ef_gross is not None else None,
+        #                 "ef_final_kg_per_unit": float(ef_final) if ef_final is not None else None,
+        #             },
+        #             "country_code": country_code or None,
+        #             "scenario_file": scenario_choice,
+        #             "total_co2e_kg": float(total) if total is not None else None,
+        #             "stage_label": stage_label,
+        #             "ef_electricity_mixed_g_per_MJ": float(ef_mix) if ef_mix is not None else None,
+        #         }
+        #         log_path = write_run_log(log_dir or "run_logs", payload)
+        #         st.caption(f"Log written: `{log_path}`")
+        #     except Exception as e:
+        #         st.warning(f"Could not write JSON log: {e}")
 
     except Exception as e:
         st.error("Run crashed. Traceback below:")

@@ -651,7 +651,7 @@ def calculate_emissions(
     prod_level,
     energy_df,
     energy_efs,
-    process_efs,
+    process_efs,            
     internal_elec,          # kept for signature compatibility (not used here)
     final_demand,
     total_gas_MJ,

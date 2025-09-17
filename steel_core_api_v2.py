@@ -238,7 +238,14 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     # ---------- Load base data ----------
     base = os.path.join(data_dir, "")
-    energy_int     = load_data_from_yaml(os.path.join(base, 'energy_int.yml'))
+    # allow scenario to select an alternate energy_int file
+    _ei_file = (scenario.get('energy_int_file') or 'energy_int.yml').strip()
+    # simple guard against weird inputs
+    _allowed = {'energy_int.yml', 'energy_int_min.yml', 'energy_int_max.yml', 'energy_int_likely.yml'}
+    if _ei_file not in _allowed:
+        _ei_file = 'energy_int.yml'
+    energy_int = load_data_from_yaml(os.path.join(base, _ei_file))
+    # (optional) record in meta later
     energy_shares  = load_data_from_yaml(os.path.join(base, 'energy_matrix.yml'))
     energy_content = load_data_from_yaml(os.path.join(base, 'energy_content.yml'))
     e_efs          = load_data_from_yaml(os.path.join(base, 'emission_factors.yml'))

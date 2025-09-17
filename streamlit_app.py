@@ -583,6 +583,22 @@ with st.sidebar:
     # do_log = st.checkbox("Write JSON log (config + CO₂)", value=False)
     # log_dir = st.text_input("Log folder", value="run_logs")
 
+    # --- Energy intensity set picker (min / likely / max) ---
+    ei_choice = st.selectbox(
+        "Energy intensity set",
+        ["Likely (default)", "Low (min)", "High (max)"],
+        index=0,
+        key="ei_set"
+    )
+    _ei_map = {
+        "Likely (default)": "energy_int.yml",
+        "Low (min)":        "energy_int_min.yml",
+        "High (max)":       "energy_int_max.yml",
+    }
+    scenario["energy_int_file"] = _ei_map[ei_choice]
+    st.caption(f"Using: {scenario['energy_int_file']}")
+
+
 # -----------------------------
 # Build UI graph (for picks)
 # -----------------------------

@@ -591,7 +591,7 @@ with st.sidebar:
     # Grid EF country (passed to core; EF not altered in-app)
     elec_map = load_electricity_intensity(os.path.join(DATA_ROOT, "electricity_intensity.yml")) or {}
     country_opts = sorted(elec_map.keys()) if elec_map else []
-    country_code = st.selectbox("Country grid electricity", options=["BRA"] + country_opts, index=0, 
+    country_code = st.selectbox("Country grid electricity",  country_opts, index=0, 
                                 help = "Sets emission factor for electricity. Values for 2024, " \
                                 "from https://ourworldindata.org/electricity-mix")
                 
@@ -1522,22 +1522,26 @@ if run_now:
         with main_after_run:
             st.success("Model run complete (core).")
 
-            is_finished = stage_key in ("Finished", "Finished steel")
-            raw_total   = float(total or 0.0)
-            reported    = (raw_total/0.85) if is_finished else raw_total
+            fyield = float(res.meta.get("finished_yield", 0.85))
+            raw_total = float(res.total_co2e_kg or 0.0)
 
+            # If reporting *per ton finished*, divide by yield only when the boundary is Finished
+            # (adjust the condition to your exact stage labels)
+            is_finished = stage_key in ("Finished", "Finished steel")
+            adj_total = (raw_total / max(fyield, 1e-9)) if is_finished else raw_total
+
+            # Show both numbers side-by-side
             c1, c2 = st.columns(2)
             with c1:
                 st.metric(
-                    "Total CO₂e — raw",
-                    f"{raw_total:,.0f} kg CO₂e per ton",
-                    help="Direct model total (no yield adjustment)."
+                    "Total CO₂e (raw)",
+                    f"{raw_total:,.0f} kg CO₂e / t at {stage_key}"
                 )
             with c2:
                 st.metric(
-                    "Total CO₂e — reported (÷0.85)" if is_finished else "Total CO₂e — reported",
-                    f"{reported:,.0f} kg CO₂e per ton",
-                    help="This accounts for yield (0.85%) downstream if product is Finished."
+                    "Total CO₂e (per t finished)",
+                    f"{adj_total:,.0f} kg CO₂e / t finished",
+                    help=f"Computed as raw ÷ yield; yield = {fyield:.2f}"
                 )
 
             # Downloads

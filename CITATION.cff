@@ -6,6 +6,7 @@
 cff-version: 1.2.0
 message: If you use FORGE in your work, please cite this software and the archived release below.
 title: FORGE — Flexible Optimization of Routes for GHG & Energy
+version: "v0.99"
 abstract: >
   FORGE computes cradle-to-gate energy use and GHG emissions for steel across BF-BOF, DRI-EAF, and EAF-scrap routes with explicit recipes, route masks, and on-site electricity crediting. It includes 1-D sensitivity sweeps and Monte Carlo uncertainty with pinned seeds.
 identifiers:
@@ -18,7 +19,7 @@ authors:
     given-names: Rafael
     email: rafael@hotmail.com
     orcid: 0000-0002-8636-6649
-  - family-names: Pineheiro Lima
+  - family-names: Pinheiro Lima
     given-names: Paulo Sergio
     email: psplima@hotmail.com
     orcid: 0009-0002-7474-6342

@@ -1,0 +1,15 @@
+{
+  "title": "FORGE – Flexible Optimization of Routes for GHG & Energy (v0.99)",
+{
+  "creators": [
+    {"name": "Mosquim, Rafael", "orcid": "0000-0002-8636-6649", "affiliation": "UNICAMP"},
+    {"name": "Pinheiro Lima, Paulo Sergio", "orcid": "0009-0002-7474-6342", "affiliation": "UNICAMP"},
+    {"name": "Pastre, Leonardo", "orcid": "0009-0003-8892-1460", "affiliation": "UNICAMP"},
+    {"name": "Seabra, Joaquim", "orcid": "0000-0002-1463-7104", "affiliation": "UNICAMP"}
+  ]
+}
+  "upload_type": "software",
+  "license": "mit-license",
+  "description": "First frozen version used in the Brazil steel decarbonization study. Streamlit app + YAML configs; reproducible environment lock included.",
+  "keywords": ["steel","decarbonization","techno-economics","Brazil","Streamlit","YAML"]
+}

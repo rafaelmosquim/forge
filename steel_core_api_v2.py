@@ -492,7 +492,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
                 total_co2 = float(emissions['TOTAL CO2e'].sum())
     except Exception:
         pass
-
+    fyield = float(getattr(params, "finished_yield", 0.85))    
     meta = {
         "route_preset": route_preset,
         "stage_key": stage_key,
@@ -502,6 +502,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "inside_elec_ref": inside_elec_ref,
         "f_internal": f_internal,
         "ef_internal_electricity": ef_internal_electricity,
+        "finished_yield": fyield
     }
 
     return RunOutputs(

@@ -1,0 +1,28 @@
+processes:
+  "Electricity Production": 1.78
+  "Coke Production": 5.68
+  "Nitrogen Production": 4.80
+  "Oxygen Production": 4.40
+  "Sintering": 1.56
+  "Pelletizing": 0.98
+  "Burnt Lime Production": 6.61
+  "Dolomite Production": 6.61
+  "Blast Furnace": 12.00                   # Iron Oxide Reduction (BF coal/pig iron)
+  "Direct Reduction Iron": 9.00            # Redução do Óxido de Ferro (DRI)
+  "Electric Arc Furnace": 2.10             # Secondary Steel Production (EAF/Scrap)
+  "Basic Oxygen Furnace": 0.00             # Steel Production (BOF/Steel)
+  "Steel Refining (Low Alloy)": 3.00
+  "Steel Refining (High Alloy)": 3.00
+  "Continuous Casting": 0.20
+  "Ingot Casting": 0.00
+  "Hot Rolling": 2.00
+  "Cold Rolling": 1.00
+  "Rod/bar/section Mill": 2.00             # Long Steel Forming
+  "Steel Thermal Treatment": 1.50
+  "Hot Dip Metal Coating": 2.00
+  "Electrolytic Metal Coating": 4.00
+  "Casting/Extrusion/Conformation": 1.00    # Fundição (downstream casting/extrusion)
+  "Stamping/calendering/lamination": 1.50   # Estampagem
+  "Machining": 1.00                         # Usinagem
+  "Hot Dip Metal Coating FP": 2.00
+  "Electrolytic Metal Coating FP": 4.00

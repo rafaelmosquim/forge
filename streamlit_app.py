@@ -72,7 +72,7 @@ st.set_page_config(
 
 APP_PROFILE = os.getenv("APP_PROFILE", "dev").lower()
 IS_PAPER = (APP_PROFILE == "paper")
-DATA_ROOT = "data"  # fixed data folder
+DATA_ROOT = st.session_state.get("DATA_ROOT", "data")
 
 
 
@@ -513,6 +513,23 @@ with st.sidebar:
         if not sc_dir.exists():
             return []
         return sorted([p.name for p in sc_dir.glob("*.yml")])
+    
+    # Choose which data folder to use
+    data_choice = st.selectbox(
+        "Data set",
+        ["Likely (data/)", "Low (data_min/)", "High (data_max/)"],
+        index=0,
+        help="Switches all YAML loads to the chosen folder."
+    )
+    _map = {
+        "Likely (data/)": "data",
+        "Low (data_min/)": "data_min",
+        "High (data_max/)": "data_max",
+    }
+    DATA_ROOT = _map[data_choice]
+    st.session_state["DATA_ROOT"] = DATA_ROOT
+    st.caption(f"Using data folder: {DATA_ROOT}/")
+
 
     available = list_scenarios(DATA_ROOT)
     PREFERRED = "BF_BOF_coal.yml"
@@ -578,27 +595,6 @@ with st.sidebar:
                                 help = "Sets emission factor for electricity. Values for 2024, " \
                                 "from https://ourworldindata.org/electricity-mix")
                 
-    # # Logging
-    # st.header("Logging")
-    # do_log = st.checkbox("Write JSON log (config + CO₂)", value=False)
-    # log_dir = st.text_input("Log folder", value="run_logs")
-
-    # --- Energy intensity set picker (min / likely / max) ---
-    ei_choice = st.selectbox(
-        "Energy intensity set",
-        ["Likely (default)", "Low (min)", "High (max)"],
-        index=0,
-        key="ei_set"
-    )
-    _ei_map = {
-        "Likely (default)": "energy_int.yml",
-        "Low (min)":        "energy_int_min.yml",
-        "High (max)":       "energy_int_max.yml",
-    }
-    scenario["energy_int_file"] = _ei_map[ei_choice]
-    st.caption(f"Using: {scenario['energy_int_file']}")
-
-
 # -----------------------------
 # Build UI graph (for picks)
 # -----------------------------

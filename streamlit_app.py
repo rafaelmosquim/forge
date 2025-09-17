@@ -27,6 +27,10 @@ import pandas as pd
 import yaml
 import numpy as np
 from copy import deepcopy
+from types import SimpleNamespace
+import textwrap, json, yaml
+from steel_core_api_v2 import ScenarioInputs, run_scenario
+
 
 # --- Core wrappers (no duplicate math here) ---
 from steel_core_api_v2 import (
@@ -70,9 +74,13 @@ APP_PROFILE = os.getenv("APP_PROFILE", "dev").lower()
 IS_PAPER = (APP_PROFILE == "paper")
 DATA_ROOT = "data"  # fixed data folder
 
+
+
 # -----------------------------
 # Helpers
 # -----------------------------
+
+
 
 from pathlib import Path
 
@@ -102,6 +110,60 @@ def _pick_first(*names: str):
         if p.exists():
             return p
     return None
+
+def _coalesce_df(*candidates):
+    for x in candidates:
+        if isinstance(x, pd.DataFrame):
+            return x
+    return None
+
+def _pick(o, name, default=None):
+    if o is None: return default
+    if isinstance(o, dict): return o.get(name, default)
+    return getattr(o, name, default)
+
+def _find_balance_matrix(o):
+    """
+    Try common attribute names; validate by presence of 'External Inputs'/'Final Demand'.
+    """
+    if o is None: return None
+    candidates = [
+        "balance_matrix", "material_balance", "mass_balance",
+        "balance_df", "materials_df", "balance", "matrix"
+    ]
+    for nm in candidates:
+        df = _pick(o, nm)
+        if isinstance(df, pd.DataFrame):
+            idx = df.index.astype(str)
+            if any("External Inputs" == i for i in idx) and any("Final Demand" == i for i in idx):
+                return df
+    # As a last resort, scan all DataFrame attrs on the object
+    for nm in dir(o):
+        try:
+            df = getattr(o, nm)
+        except Exception:
+            continue
+        if isinstance(df, pd.DataFrame):
+            idx = df.index.astype(str)
+            if "External Inputs" in idx and "Final Demand" in idx:
+                return df
+    return None
+
+def _find_params(last):
+    # 1) session_state
+    ps = st.session_state.get("params")
+    if ps is not None:
+        return ps
+    # 2) attributes on last
+    for nm in ["params", "parameters", "model_params", "run_params"]:
+        ps = _pick(last, nm)
+        if ps is not None:
+            return ps
+    # 3) fallback minimal namespace (enough for UI defaults)
+    return SimpleNamespace(
+        fC_coal_coking=0.82, fC_pci=0.80, fC_coke_product=0.90,
+        limestone_purity=1.0, fC_hot_metal=0.045, fC_liquid_steel=0.0015, fC_dri=0.01
+    )
 
 def render_sidebar_logos(
     left="faculty_logo.png",
@@ -354,6 +416,14 @@ def build_producers_index(recipes: List[Process]) -> Dict[str, List[Process]]:
             prod.setdefault(m, []).append(r)
     return prod
 
+def _pick(o, name, default=None):
+    # works for dicts and objects (dataclass/SimpleNamespace/attrs)
+    if o is None:
+        return default
+    if isinstance(o, dict):
+        return o.get(name, default)
+    return getattr(o, name, default)
+
 
 def gather_ambiguous_chain_materials(
     recipes: List[Process],
@@ -518,6 +588,7 @@ with st.sidebar:
 # -----------------------------
 with tab_main:
     top_metrics = st.empty()
+    main_after_run = st.container() 
     try:
         recipes_for_ui, pre_mask, demand_mat = _load_for_picks(DATA_ROOT, route, stage_key, scenario)
     except Exception as e:
@@ -1138,68 +1209,48 @@ if not IS_PAPER:
                 index=1,
                 key="mc_metric_choice"
             )
-            
+
             series = pd.to_numeric(mc_df[metric_choice_mc], errors="coerce").dropna().to_numpy()
             if series.size == 0:
                 st.info("No valid Monte Carlo results.")
             else:
                 import numpy as np
                 import matplotlib.pyplot as plt
-            
-                # Route-based Worldsteel ref (tCO2/t)
-                worldsteel_t = {"BF-BOF": 2.32, "DRI-EAF": 1.36, "EAF-Scrap": 0.70}
-                ref_t = worldsteel_t.get(route)
-            
-                # Auto-match units for EF metrics (tCO2/t vs kg/unit)
-                ref_val = None
+
+                # Axis label (no auto unit switching tied to external refs)
                 x_label = metric_choice_mc
-                if ("EF" in metric_choice_mc) and (ref_t is not None):
-                    if np.nanmedian(series) < 20:   # data looks like tCO2/t
-                        ref_val = ref_t
-                        x_label = "tCO₂ per t product"
-                    else:                           # data looks like kg/unit
-                        ref_val = ref_t * 1000.0
-                        x_label = "kg CO₂ per unit"
-            
+
                 # Gaussian KDE (Silverman's bandwidth)
                 n = series.size
                 s = np.std(series, ddof=1) if n > 1 else 0.0
-                h = 1.06 * s * (n ** (-1/5)) if s > 0 else max(1e-3, 0.01 * np.mean(series))
+                h = 1.06 * s * (n ** (-1/5)) if s > 0 else max(1e-3, 0.01 * (np.mean(series) if series.size else 1.0))
                 x_min, x_max = series.min(), series.max()
                 pad = 0.05 * (x_max - x_min if x_max > x_min else 1.0)
                 xs = np.linspace(x_min - pad, x_max + pad, 400)
-            
+
                 # KDE evaluation
                 u = (xs[:, None] - series[None, :]) / h
                 kde = (np.exp(-0.5 * u * u).sum(axis=1) / (n * h * np.sqrt(2 * np.pi)))
-            
+
                 fig, ax = plt.subplots(figsize=(7, 4))
                 ax.plot(xs, kde, linewidth=2, label=f"KDE (N={n})")
                 ax.fill_between(xs, 0, kde, alpha=0.18)
-            
-                # tiny rug so you still "see every run"
+
+                # Tiny rug so you still "see every run"
                 ax.plot(series, np.zeros_like(series), "|", markersize=10, alpha=0.45)
-            
-                # Worldsteel reference line + % below it
-                if ref_val is not None:
-                    ax.axvline(ref_val, linestyle="--", linewidth=2, label=f"Worldsteel ({route})", color="red")
-                    pct_le = float((series <= ref_val).mean() * 100.0)
-                    st.caption(f"{pct_le:.1f}% of runs ≤ Worldsteel reference for {route}.")
-            
+
                 ax.set_xlabel(x_label)
                 ax.set_ylabel("Density")
-                if ref_val is not None:
-                    ax.legend(loc="best")
-            
+                ax.legend(loc="best")
+
                 st.pyplot(fig)
+
         pass
 # -----------------------------
 # Static Tab UI
 # -----------------------------
 if not IS_PAPER:
     with tab_static:
-        st.subheader("Static modifications")
-
         # ---- Route-locked process energy intensity override ----
         allowed_proc_by_route = {
             "BF-BOF":   ("Blast Furnace",        "BF base energy intensity (MJ/kg hot metal)"),
@@ -1396,9 +1447,11 @@ if not IS_PAPER:
                 key="static_yield_value",
             )
         pass
+
 # -----------------------------
 # Execute model when requested
 # -----------------------------
+
 if run_now:
     try:
         with st.spinner("Running model (core)…"):
@@ -1415,114 +1468,93 @@ if run_now:
                 route=route_cfg,
             )
             out = run_scenario(DATA_ROOT, scn)
+            
+        # ---- Map core outputs (after the spinner) ----
+        production_routes = getattr(out, "production_routes", None)
+        prod_lvl         = getattr(out, "prod_levels", None)
+        energy_balance   = getattr(out, "energy_balance", None)
+        emissions        = getattr(out, "emissions", None)
+        total            = getattr(out, "total_co2e_kg", None)
 
-            # --- Debug: grid + internal electricity EFs (country-aware; units in gCO2/MJ) ---
-            _dbg = getattr(out, "meta", {}) or {}
-            fi  = _dbg.get("f_internal")
-            efi = _dbg.get("ef_internal_electricity")
-            cc  = _dbg.get("country_code") or (country_code or None)
-
-            efg = None
-            try:
-                elec_map = load_electricity_intensity(os.path.join(DATA_ROOT, "electricity_intensity.yml")) or {}
-                if cc and cc in elec_map:
-                    efg = float(elec_map[cc])
-            except Exception:
-                efg = None
-            if not isinstance(efg, (int, float)):
-                try:
-                    ef_table = load_data_from_yaml(os.path.join(DATA_ROOT, "emission_factors.yml")) or {}
-                    efg = float(ef_table.get("Electricity"))
-                except Exception:
-                    efg = None
-            ef_mix = fi * efi + (1.0 - fi) * efg if all(isinstance(x, (int, float)) for x in (fi, efi, efg)) else None
-
-        # ---- Map core outputs ----
-        production_routes = out.production_routes
-        prod_lvl         = out.prod_levels
-        energy_balance   = out.energy_balance
-        emissions        = out.emissions
-        total            = out.total_co2e_kg
-
-        # # ---- Emission factor summary (inc. yield) ----
-        # st.subheader("Emission Factor")
-        # c1, c2, c3 = st.columns(3)
-        # with c1:
-        #     st.metric("Total emissions", f"{(total or 0):,.0f} kg CO₂e")
-        # ef_gross = (total / demand_qty) if (total is not None and demand_qty and demand_qty > 0) else None
-        # with c2:
-        #     st.metric(f"Gross EF (kg CO2 per unit {stage_label})", f"{ef_gross:.3f}" if ef_gross is not None else "—")
-        # ef_final = (ef_gross / max(1e-9, yield_frac)) if (ef_gross is not None and use_yield) else None
-        # with c3:
-        #     st.metric("Final EF (inc. yield)", f"{ef_final:.3f}" if ef_final is not None else "—",
-        #               help="Computed as (total/demand) ÷ yield")
-
-        st.success("Model run complete (core).")
-
-        top_metrics.metric(
-            "Total CO₂e",
-            f"{((((total or 0)/0.85) if stage_key in ('Finished','Finished steel') else (total or 0))):,.0f} kg CO₂e per ton of final product",
-            help="If “Finished” is selected: value = raw total ÷ 0.85 (default model yield). Otherwise: raw total."
+        # Try to grab the material balance from out under common names
+        balance_matrix = next(
+            (x for x in [
+                getattr(out, "balance_matrix", None),
+                getattr(out, "material_balance", None),
+                getattr(out, "mass_balance", None),
+                _find_balance_matrix(out),
+            ] if isinstance(x, pd.DataFrame)),
+            None
         )
 
+        # Params (for the Validation tab sliders). Prefer session, else from out/meta, else a small fallback.
+        params = (
+            st.session_state.get("params")
+            or getattr(out, "params", None)
+            or getattr(out, "parameters", None)
+            or SimpleNamespace(
+                fC_coal_coking=0.82, fC_pci=0.80, fC_coke_product=0.90,
+                limestone_purity=1.0, fC_hot_metal=0.045, fC_liquid_steel=0.0015, fC_dri=0.01
+            )
+        )
 
-        # ---- Downloads ----
-        df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")
-        d1, d2, d3 = st.columns(3)
-        d1.download_button("Production runs (CSV)", data=df_runs.to_csv().encode("utf-8"),
-                           file_name="production_runs.csv", mime="text/csv")
-        if energy_balance is not None and not energy_balance.empty:
-            d2.download_button("Energy balance (CSV)", data=energy_balance.to_csv().encode("utf-8"),
-                               file_name="energy_balance.csv", mime="text/csv")
-        if emissions is not None and hasattr(emissions, "to_csv"):
-            d3.download_button("Emissions (CSV)", data=emissions.to_csv().encode("utf-8"),
-                               file_name="emissions.csv", mime="text/csv")
+        # ✅ Persist exactly what the Validation tab needs
+        st.session_state["last_run_outputs"] = SimpleNamespace(
+            emissions=emissions,
+            balance_matrix=balance_matrix,
+            params=params,
+        )
+        # Optional but handy elsewhere
+        st.session_state["last_run_recipes"] = getattr(out, "recipes", None)
 
-        # ---- Show tables safely ----
-        if emissions is not None and hasattr(emissions, "empty") and not emissions.empty:
-            st.dataframe(emissions)
-        else:
-            st.info("No per-process emissions table for this run.")
+        with main_after_run:
+            st.success("Model run complete (core).")
 
-        if energy_balance is not None and hasattr(energy_balance, "empty") and not energy_balance.empty:
-            st.dataframe(energy_balance)
-        else:
-            st.info("No energy balance table for this run.")
+            is_finished = stage_key in ("Finished", "Finished steel")
+            raw_total   = float(total or 0.0)
+            reported    = (raw_total/0.85) if is_finished else raw_total
 
-        # # ---- JSON run log ----
-        # if do_log:
-        #     try:
-        #         payload = {
-        #             "timestamp": datetime.utcnow().isoformat() + "Z",
-        #             "data_root": DATA_ROOT,
-        #             "route": {
-        #                 "route_preset": route,
-        #                 "stage_key": stage_key,
-        #                 "stage_material": STAGE_MATS[stage_key],
-        #                 "demand_qty": float(demand_qty),
-        #                 "picks_by_material": dict(st.session_state.get("picks_by_material", {})),
-        #                 "pre_select_soft": pre_select_soft,
-        #                 "yield_applied": bool(use_yield),
-        #                 "yield_fraction": float(yield_frac) if use_yield else None,
-        #                 "ef_gross_kg_per_unit": float(ef_gross) if ef_gross is not None else None,
-        #                 "ef_final_kg_per_unit": float(ef_final) if ef_final is not None else None,
-        #             },
-        #             "country_code": country_code or None,
-        #             "scenario_file": scenario_choice,
-        #             "total_co2e_kg": float(total) if total is not None else None,
-        #             "stage_label": stage_label,
-        #             "ef_electricity_mixed_g_per_MJ": float(ef_mix) if ef_mix is not None else None,
-        #         }
-        #         log_path = write_run_log(log_dir or "run_logs", payload)
-        #         st.caption(f"Log written: `{log_path}`")
-        #     except Exception as e:
-        #         st.warning(f"Could not write JSON log: {e}")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric(
+                    "Total CO₂e — raw",
+                    f"{raw_total:,.0f} kg CO₂e per ton",
+                    help="Direct model total (no yield adjustment)."
+                )
+            with c2:
+                st.metric(
+                    "Total CO₂e — reported (÷0.85)" if is_finished else "Total CO₂e — reported",
+                    f"{reported:,.0f} kg CO₂e per ton",
+                    help="This accounts for yield (0.85%) downstream if product is Finished."
+                )
 
+            # Downloads
+            df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")
+            d1, d2, d3 = st.columns(3)
+            d1.download_button("Production runs (CSV)", data=df_runs.to_csv().encode("utf-8"),
+                               file_name="production_runs.csv", mime="text/csv")
+            if isinstance(energy_balance, pd.DataFrame) and not energy_balance.empty:
+                d2.download_button("Energy balance (CSV)", data=energy_balance.to_csv().encode("utf-8"),
+                                   file_name="energy_balance.csv", mime="text/csv")
+            if isinstance(emissions, pd.DataFrame):
+                d3.download_button("Emissions (CSV)", data=emissions.to_csv().encode("utf-8"),
+                                   file_name="emissions.csv", mime="text/csv")
+
+            # Tables
+            if isinstance(emissions, pd.DataFrame) and not emissions.empty:
+                st.dataframe(emissions)
+            else:
+                st.info("No per-process emissions table for this run.")
+
+            if isinstance(energy_balance, pd.DataFrame) and not energy_balance.empty:
+                st.dataframe(energy_balance)
+            else:
+                st.info("No energy balance table for this run.")
+                
     except Exception as e:
         st.error("Run crashed. Traceback below:")
         st.exception(e)
         st.stop()
-
 
 st.caption("© 2025 UNICAMP – Faculdade de Engenharia Mecânica. App v1.2 (scenario-locked route, core-calculated, clean stage selector)")
 

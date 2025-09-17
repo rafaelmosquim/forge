@@ -77,6 +77,7 @@ class RunOutputs:
     energy_balance: pd.DataFrame
     emissions: Optional[pd.DataFrame]
     total_co2e_kg: Optional[float]
+    balance_matrix: Optional[pd.DataFrame] = None   # ← add this line
     meta: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -335,6 +336,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     final_demand = {demand_mat: demand_qty}
 
     balance_matrix, prod_levels = calculate_balance_matrix(recipes_calc, final_demand, production_routes)
+    
     if balance_matrix is None:
         # Return empty-ish structures with a message rather than crashing
         return RunOutputs(
@@ -343,6 +345,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
             energy_balance=pd.DataFrame(),
             emissions=None,
             total_co2e_kg=None,
+            balance_matrix=pd.DataFrame(),
             meta={"error": "Material balance failed"},
         )
 
@@ -500,5 +503,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         energy_balance=energy_balance,
         emissions=emissions,
         total_co2e_kg=total_co2,
+        balance_matrix=balance_matrix,
         meta=meta,
     )

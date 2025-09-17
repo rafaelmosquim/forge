@@ -9,8 +9,6 @@
 ## How to cite
 If you use FORGE, please cite the archived release:
 Mosquim, R. *FORGE — Flexible Optimization of Routes for GHG & Energy* (v1.0.0). Zenodo. https://doi.org/10.5281/zenodo.<VERSION>
-
-
 ---
 
 ## Features

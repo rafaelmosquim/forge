@@ -3,10 +3,10 @@
 # -----------------------------------------------------------------
 
 # Material composition
-iron_content_pig_iron: 0.615
+iron_content_pig_iron: 0.565
 feo3_sinter: 0.80
 feo3_pellet: 0.90
-feo3_lump: 0.879
+feo3_lump: 0.808
 
 # Blend proportions for Blast Furnace
 blend:
@@ -15,10 +15,10 @@ blend:
   lump: 0.10
 
 # Blast Furnace gas config
-process_gas: 0.275
-process_gas_coke: 0.085  # your coke-oven value
+process_gas: 0.30
+process_gas_coke: 0.10  # your coke-oven value
 
 # Yield for finished steel stage
-finished_yield: 0.85
+finished_yield: 0.80
 
 

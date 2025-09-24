@@ -11,6 +11,7 @@ processes:
   "Direct Reduction Iron": 11.00           # Redução do Óxido de Ferro (DRI)
   "Electric Arc Furnace": 6.50             # Secondary Steel Production (EAF/Scrap)
   "Basic Oxygen Furnace": 0.58             # Steel Production (BOF/Steel)
+  "Iron Foundry": 0.0  
   "Steel Refining (Low Alloy)": 7.00
   "Steel Refining (High Alloy)": 7.00
   "Continuous Casting": 0.40
@@ -26,3 +27,4 @@ processes:
   "Machining": 1.30
   "Hot Dip Metal Coating FP": 3.00
   "Electrolytic Metal Coating FP": 5.00
+  "Organic or Sintetic Coating (painting)": 1.0

@@ -79,9 +79,6 @@ DATA_ROOT = st.session_state.get("DATA_ROOT", "data")
 # -----------------------------
 # Helpers
 # -----------------------------
-
-
-
 from pathlib import Path
 
 APP_DIR = Path(__file__).parent
@@ -121,6 +118,14 @@ def _pick(o, name, default=None):
     if o is None: return default
     if isinstance(o, dict): return o.get(name, default)
     return getattr(o, name, default)
+
+def _finished_yield_from_data(data_root: str) -> float:
+    p = load_parameters(os.path.join(data_root, "parameters.yml"))
+    try:
+        return float(getattr(p, "finished_yield"))
+    except Exception:
+        st.error(f"{data_root}/parameters.yml must define 'finished_yield' (e.g., 0.85).")
+        st.stop()
 
 def _find_balance_matrix(o):
     """
@@ -283,6 +288,30 @@ def _route_from_scenario(scenario: dict | None, scenario_name: str) -> str:
     if "bf" in name or "bof" in name:    return "BF-BOF"
     if "external" in name:               return "External"
     return "auto"
+
+from pathlib import Path
+
+def _route_label_for_file(fname: str) -> str:
+    stem = Path(fname).stem.lower()
+
+    # Base route
+    if ("bf" in stem and "bof" in stem):
+        label = "BF-BOF"
+    elif ("dri" in stem and "eaf" in stem):
+        label = "DRI-EAF"
+    elif ("eaf" in stem and "scrap" in stem):
+        label = "EAF-Scrap"
+    elif ("external" in stem):
+        label = "External"
+    else:
+        return Path(fname).stem.replace("_", " ").title()
+
+    # Suffix only when it’s the charcoal variant
+    if label == "BF-BOF":
+        if any(tok in stem for tok in ["charcoal", "char_", "-char", "_char", "pci_char", "biochar", "biomass"]):
+            label += " (charcoal)"
+
+    return label
 
 
 def _detect_stage_keys() -> Dict[str, str]:
@@ -517,14 +546,14 @@ with st.sidebar:
     # Choose which data folder to use
     data_choice = st.selectbox(
         "Data set",
-        ["Likely (data/)", "Low (data_min/)", "High (data_max/)"],
+        ["Likely", "Optimistic (Low)", "Pessimistic (High)"],
         index=0,
-        help="Switches all YAML loads to the chosen folder."
+        help="Selects the appropriate data-set."
     )
     _map = {
-        "Likely (data/)": "data",
-        "Low (data_min/)": "data_min",
-        "High (data_max/)": "data_max",
+        "Likely": "data",
+        "Optimistic (Low)": "data_min",
+        "Pessimistic (High)": "data_max",
     }
     DATA_ROOT = _map[data_choice]
     st.session_state["DATA_ROOT"] = DATA_ROOT
@@ -539,7 +568,8 @@ with st.sidebar:
         scenario_choice = st.selectbox(
             "Route",
             options=available,
-            index=default_idx
+            index=default_idx,
+            format_func=_route_label_for_file,
         )
         scenario_path = pathlib.Path(DATA_ROOT) / "scenarios" / scenario_choice
         scenario = load_data_from_yaml(str(scenario_path), default_value=None, unwrap_single_key=False)
@@ -561,29 +591,32 @@ with st.sidebar:
      # Cleaned "Stop at stage" (Pig iron / Liquid steel / Finished)
     stage_keys = _detect_stage_keys()
     stage_menu = {
-        "Pig iron": stage_keys["pig_iron"],
-        #"Liquid steel": stage_keys["liquid_steel"],
+        #"Pig iron": stage_keys["pig_iron"],
+        "Liquid steel": stage_keys["liquid_steel"],
         "Crude steel": stage_keys["as_cast"],
+        "Validation (as cast)": stage_keys["as_cast"],
         #"Steel-mill steel": stage_keys["after_cr"],
         "Finished": stage_keys["finished"],
     }
-    default_stage_label = "Crude steel"
+    default_stage_label = "Validation (as cast)"
     
     stage_label = st.radio(
         "Product",
         options=list(stage_menu.keys()),
         index=list(stage_menu.keys()).index(default_stage_label),
         help=(
-            "Pig iron: hot metal after Blast Furnace/DRI."
-            #"Liquid steel: after BOF/EAF (before continuous casting)."
-            "Crude steel: after continuous casting."
-            #"Steel-mill steel: plant boundary.  "
-            "Finished: include off-site processing."
+            #• "Pig iron: hot metal after Blast Furnace/DRI.\n"
+            "• Liquid steel: after BOF/EAF (before continuous casting).\n"
+            "• Crude steel: after continuous casting.\n"
+            "• Validation (as cast): same as crude steel, upstream choices pre-selected.\n"
+            #"Steel-mill steel: plant boundary.\n"
+            "• Finished: may include off-site processing."
         ),
     )
     stage_key = stage_menu[stage_label]
     is_as_cast  = (stage_label == "Crude steel")
     is_after_cr = (stage_label == "Steel-mill steel")
+    is_validation = (stage_label == "Validation (as cast)")
     is_finished = (stage_label == "Finished")
     
     demand_qty = 1000
@@ -631,12 +664,20 @@ with tab_main:
     forced_pre_select = {}
     
     # 1) Lock CRUDE STEEL to Regular (R) and remove any lingering post-CC picks
-    if is_as_cast:
+    if is_as_cast or is_validation:
         forced_pre_select["Cast Steel (IP1)"] = "Continuous Casting (R)"
         pbm = st.session_state.setdefault("picks_by_material", {})
         for k in ("Raw Products (types)", "Intermediate Process 3"):
             pbm.pop(k, None)
-    
+    # 1b) Validation upstream defaults (pre-selects hide those radios)
+    if is_validation:
+        forced_pre_select.update({
+            "Nitrogen":   "Nitrogen from market",
+            "Oxygen":     "Oxygen from market",
+            "Dolomite":   "Dolomite from market",
+            "Burnt Lime": "Burnt Lime from market",
+            "Coke":       "Coke Production",
+        })
     # 2) For Steel-mill steel / Finished, propagate Post-CC choice AND force the IP3 bridge
     if enable_post_cc:
         # HR vs Rod/bar path after CC
@@ -969,7 +1010,7 @@ if not IS_PAPER:
         else:
             # Numeric range UI (one set of widgets only)
             if param_label.startswith("BOF scrap"):
-                vmin_default, vmax_default, steps_default = 0.00, 0.25, 6
+                vmin_default, vmax_default, steps_default = 0.00, 0.20, 6
                 step_size = 0.01
             else:
                 vmin_default, vmax_default, steps_default = 11.0, 15.0, 9
@@ -1104,9 +1145,9 @@ if not IS_PAPER:
             cmin, cmed, cmax = st.columns(3)
             series = res_df[ycol].astype(float)
             if series.notna().any():
-                with cmin: st.metric(f"Min {ycol}",    f"{series.min():,.2f}")
-                with cmed: st.metric(f"Median {ycol}", f"{series.median():,.2f}")
-                with cmax: st.metric(f"Max {ycol}",    f"{series.max():,.2f}")
+                with cmin: st.metric(f"Min {ycol}",    f"{series.min():,.0f}")
+                with cmed: st.metric(f"Median {ycol}", f"{series.median():,.0f}")
+                with cmax: st.metric(f"Max {ycol}",    f"{series.max():,.0f}")
             else:
                 st.info("No valid points computed.")
 
@@ -1256,7 +1297,7 @@ if not IS_PAPER:
                 ax.legend(loc="best")
 
                 st.pyplot(fig)
-
+      
         pass
 # -----------------------------
 # Static Tab UI
@@ -1522,27 +1563,27 @@ if run_now:
         with main_after_run:
             st.success("Model run complete (core).")
 
-            fyield = float(res.meta.get("finished_yield", 0.85))
-            raw_total = float(res.total_co2e_kg or 0.0)
+            # 1) Pull yield from the chosen data folder (fallback to 0.85 if missing)
+            fyield    = _finished_yield_from_data(DATA_ROOT) 
 
-            # If reporting *per ton finished*, divide by yield only when the boundary is Finished
-            # (adjust the condition to your exact stage labels)
-            is_finished = stage_key in ("Finished", "Finished steel")
-            adj_total = (raw_total / max(fyield, 1e-9)) if is_finished else raw_total
+            # 2) Raw EF per ton at the CURRENT stage (no yield applied)
+            total_kg   = float(getattr(out, "total_co2e_kg", 0.0) or 0.0)
+            demand_kg  = float(demand_qty) if float(demand_qty) > 0 else 1000.0  # guard
+            raw_per_t  = total_kg / (demand_kg / 1000.0)  # kg CO2e per tonne at current stage
 
-            # Show both numbers side-by-side
+            # 3) EF per ton FINISHED (apply yield ONLY if current stage is not Finished)
+            is_finished = str(stage_key) in ("Finished", "Finished steel")
+            per_t_finished = raw_per_t if not is_finished else (raw_per_t / max(fyield, 1e-9))
+
+            # 4) Display
             c1, c2 = st.columns(2)
             with c1:
-                st.metric(
-                    "Total CO₂e (raw)",
-                    f"{raw_total:,.0f} kg CO₂e / t at {stage_key}"
-                )
+                st.metric("EF (raw)", f"{raw_per_t:,.0f} kg CO₂e / t at {stage_key}",
+                        help="No yield applied (equivalent to yield = 1.00).")
             with c2:
-                st.metric(
-                    "Total CO₂e (per t finished)",
-                    f"{adj_total:,.0f} kg CO₂e / t finished",
-                    help=f"Computed as raw ÷ yield; yield = {fyield:.2f}"
-                )
+                st.metric("EF (per t finished)", f"{per_t_finished:,.0f} kg CO₂e / t finished",
+                        help=f"Computed from raw EF; if stage ≠ Finished, divide by yield = {fyield:.2f}.")
+
 
             # Downloads
             df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")

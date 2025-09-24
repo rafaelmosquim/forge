@@ -1,0 +1,162 @@
+- name: "Manganese from Market"
+  value: 1
+- name: "Chromium from Market"
+  value: 1
+- name: "Nickel from Market"
+  value: 1
+- name: "Molibdenium from Market"
+  value: 1
+- name: "Copper from Market"
+  value: 1
+- name: "Silicon from market"
+  value: 1
+- name: "Vanadium from market"
+  value: 1
+- name: "Titanium from market"
+  value: 1
+- name: "Niobium from market"
+  value: 1
+- name: "Aluminium from market"
+  value: 1
+- name: "Zinc from Market"
+  value: 1
+- name: "Limestone from Market"
+  value: 1
+- name: "Process Gas"
+  value: 2
+- name: "Fuel Oil from Market"
+  value: 1
+- name: "Diesel from Market"
+  value: 1
+- name: "Ethanol from Market"
+  value: 1
+- name: "Biodiesel from Market"
+  value: 1
+- name: "Natural gas from Market"
+  value: 1
+- name: "LPG from Market"
+  value: 1
+- name: "Biomethane from Market"
+  value: 1
+- name: "Hydrogen (Electrolysis) from Market"
+  value: 1
+- name: "Hydrogen (Methane reforming) from Market"
+  value: 1
+- name: "Wood from Market"
+  value: 1
+- name: "Charcoal from Market"
+  value: 1
+- name: "Coal from Market"
+  value: 1
+- name: "Anthracite Coal from Market"
+  value: 1
+- name: "PCI Coal from Market"
+  value: 1
+- name: "Coke Petroleum from Market"
+  value: 1
+- name: "Coke Mineral from Market"
+  value: 1
+- name: "Electricity from Market"
+  value: 1
+- name: "Electricity Hydro from Market"
+  value: 1
+- name: "Electricity Eolic from Market"
+  value: 1
+- name: "Electricity Solar from Market"
+  value: 1
+- name: "Electricity Biomass from Market"
+  value: 1
+- name: "Electricity Production"
+  value: 2
+- name: "Charcoal Production"
+  value: 2
+- name: "Coke Production"
+  value: 2
+- name: "Steam Production"
+  value: 2
+- name: "Utility Plant"
+  value: 2  # Internal manufacturing process
+- name: "Nitrogen from Market"
+  value: 1
+- name: "Nitrogen Production"
+  value: 2
+- name: "Oxygen from Market"
+  value: 1
+- name: "Oxygen Production"
+  value: 2
+- name: "Burnt Lime from Market"
+  value: 1
+- name: "Burnt Lime Production"
+  value: 2
+- name: "Dolomite from Market"
+  value: 1
+- name: "Dolomite Production"
+  value: 2
+- name: |
+    Alloys Mix for Low Alloy Steel
+    (LAS)
+  value: 1
+- name: |
+    Alloys Mix for High Alloy Steel
+    (HAS)
+  value: 1
+- name: "Scrap Purchase"
+  value: 1
+- name: "Iron Ore from Market"
+  value: 1
+- name: "Direct Iron ore"
+  value: null  # Missing value in input
+- name: "Sintering"
+  value: 2
+- name: "Pelletizing"
+  value: 2
+- name: "Blast Furnace"
+  value: 2
+- name: "Direct Reduction Iron"
+  value: 2
+- name: "Iron Foundry"
+  value: 2
+- name: "Electric Arc Furnace"
+  value: 2
+- name: "Basic Oxygen Furnace"
+  value: 2
+- name: "Regular Steel"
+  value: 2
+- name: "Regular Steel Production"
+  value: 2
+- name: "Steel Refining (Low Alloy)"
+  value: 2
+- name: "Steel Refining (High Alloy)"
+  value: 2
+- name: "Continuous Casting"
+  value: 2
+- name: "Ingot Casting"
+  value: 2
+- name: "Hot Rolling"
+  value: 2
+- name: "Cold Rolling"
+  value: 2
+- name: "Rod/bar/section Mill"
+  value: 2
+- name: "Steel Thermal Treatment"
+  value: 2
+- name: "Hot Dip Metal Coating"
+  value: 2
+- name: "Electrolytic Metal Coating"
+  value: 2
+- name: "Direct use of Basic Steel Products"
+  value: null  # Missing value in input
+- name: "Casting/Extrusion/Conformation"
+  value: 2
+- name: "Stamping/calendering/lamination"
+  value: 2
+- name: "Machining"
+  value: 2
+- name: "No Coating"
+  value: null  # Missing value in input
+- name: "Hot Dip Metal Coating FP"
+  value: 2
+- name: "Electrolytic Metal Coating FP"
+  value: 2
+- name: "Organic or Sintetic Coating (painting)"
+  value: 2

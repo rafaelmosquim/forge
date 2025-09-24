@@ -1,0 +1,23 @@
+route_overrides:
+  Blast Furnace: 0.0
+  Basic Oxygen Furnace: 0.0
+  Electric Arc Furnace: 1.0
+  Direct Reduction Iron: 0.0
+  Charcoal from Market: 0.0 
+  Charcoal Production: 0
+  Coke Production: 0
+  Sintering: 0
+
+recipe_overrides:
+  Electric Arc Furnace:
+    inputs:
+      Nitrogen: 0.1017
+      Oxygen: 0.0225
+      Dolomite: 0.0108
+      Burnt Lime: 0.0369
+      Pig Iron: 0.0
+      Scrap: 1.0
+      Gas: >
+        energy_int['Electric Arc Furnace']
+        * energy_shares['Electric Arc Furnace'].get('Gas', 0)
+        / energy_content['Gas']

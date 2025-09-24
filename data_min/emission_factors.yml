@@ -1,0 +1,12 @@
+emission_factors:
+  Electricity: 38.50
+  FLF: 94.12
+  RLF: 23.58
+  Gas: 72.73
+  Biomethane: 5.55
+  Green hydrogen: 21.47
+  Blue hydrogen: 89.88
+  Wood: 9.82
+  Coal: 111.95
+  Charcoal: 20.43
+  Coke: 135.82

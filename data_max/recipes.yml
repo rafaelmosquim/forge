@@ -219,8 +219,8 @@
 
 - process: Coke Production
   inputs: 
-    Nitrogen: 0.02
-    Coal: 1.25 
+    Nitrogen: 0.022
+    Coal: 1.3
   outputs:
     Coke: 1.0
     Process Gas: "process_gas_coke * (inputs['Coal'] * energy_content['Coal'])" 
@@ -233,7 +233,7 @@
   inputs:
     Process Gas: 1.0
   outputs:
-    Electricity: 0.34  # 34% efficiency
+    Electricity: 0.32  # 32% efficiency
 
 - process: Nitrogen Production
   inputs: {}
@@ -305,7 +305,7 @@
 - process: Sintering
   inputs:
     Iron Ore: "feo3_sinter / feo3_lump"
-    Limestone: 0.140
+    Limestone: 0.154
     Coke: >
       energy_int['Sintering']
       * energy_shares['Sintering']['Coke']
@@ -316,8 +316,8 @@
 - process: Pelletizing
   inputs:
     Iron Ore: "feo3_pellet / feo3_lump"
-    Limestone: 0.065
-    Burnt Lime: 0.01
+    Limestone: 0.0715
+    Burnt Lime: 0.011
   outputs:
     Pellet: 1.0
 
@@ -326,9 +326,9 @@
     Sinter: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.sinter"
     Pellet: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.pellet"
     Iron Ore: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.lump"
-    Nitrogen: 0.0750 * 1.0
-    Oxygen: 0.0800 * 1.0
-    Limestone: 0.0400 * 1.0
+    Nitrogen: 0.0825
+    Oxygen: 0.0880
+    Limestone: 0.044
     Coke: >
       energy_int['Blast Furnace']
       * energy_shares['Blast Furnace']['Coke']
@@ -365,10 +365,10 @@
 
 - process: Electric Arc Furnace
   inputs:
-    Nitrogen: 0.1130
-    Oxygen: 0.0250
-    Dolomite: 0.0120
-    Burnt Lime: 0.0410
+    Nitrogen: 0.1243
+    Oxygen: 0.0275
+    Dolomite: 0.0132
+    Burnt Lime: 0.0451
     Pig Iron: 1
     Gas: >
       energy_int['Electric Arc Furnace']
@@ -379,12 +379,12 @@
 
 - process: Basic Oxygen Furnace
   inputs:
-    Nitrogen: 0.1130
-    Oxygen: 0.0900
-    Dolomite: 0.0050
-    Burnt Lime: 0.0450
-    Pig Iron:   0.9
-    Scrap:      0.1
+    Nitrogen: 0.1243
+    Oxygen: 0.0990
+    Dolomite: 0.0055
+    Burnt Lime: 0.0495
+    Pig Iron:   0.95
+    Scrap:      0.05
   outputs:
     Liquid Steel: 1.0
 
@@ -396,10 +396,10 @@
   inputs:
     Liquid Steel: 1.0 - 0.035
     Alloys Mix for Low Alloy Steel (LAS): 0.035
-    Nitrogen: 0.0070
-    Oxygen: 0.0250
-    Dolomite: 0.0050
-    Burnt Lime: 0.0300
+    Nitrogen: 0.0077
+    Oxygen: 0.0275
+    Dolomite: 0.0055
+    Burnt Lime: 0.0330
   outputs:
     Liquid Steel L: 1.0
 
@@ -407,10 +407,10 @@
   inputs:
     Liquid Steel: 1.0 - 0.330
     Alloys Mix for High Alloy Steel (HAS): 0.33
-    Nitrogen: 0.0070
-    Oxygen: 0.0250
-    Dolomite: 0.0050
-    Burnt Lime: 0.0300
+    Nitrogen: 0.0077
+    Oxygen: 0.0275
+    Dolomite: 0.0055
+    Burnt Lime: 0.0330
   outputs:
     Liquid Steel H: 1.0
 

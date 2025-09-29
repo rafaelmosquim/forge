@@ -592,7 +592,7 @@ with st.sidebar:
     stage_keys = _detect_stage_keys()
     stage_menu = {
         #"Pig iron": stage_keys["pig_iron"],
-        "Liquid steel": stage_keys["liquid_steel"],
+        #"Liquid steel": stage_keys["liquid_steel"],
         "Crude steel": stage_keys["as_cast"],
         "Validation (as cast)": stage_keys["as_cast"],
         #"Steel-mill steel": stage_keys["after_cr"],

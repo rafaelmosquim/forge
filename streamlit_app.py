@@ -606,7 +606,7 @@ with st.sidebar:
         index=list(stage_menu.keys()).index(default_stage_label),
         help=(
             #• "Pig iron: hot metal after Blast Furnace/DRI.\n"
-            "• Liquid steel: after BOF/EAF (before continuous casting).\n"
+            #"• Liquid steel: after BOF/EAF (before continuous casting).\n"
             "• Crude steel: after continuous casting.\n"
             "• Validation (as cast): same as crude steel, upstream choices pre-selected.\n"
             #"Steel-mill steel: plant boundary.\n"

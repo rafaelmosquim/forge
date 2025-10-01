@@ -10,9 +10,9 @@ abstract: >
   FORGE computes cradle-to-gate energy use and GHG emissions for steel across BF-BOF, DRI-EAF, and EAF-scrap routes with explicit recipes, route masks, and on-site electricity crediting. It includes 1-D sensitivity sweeps and Monte Carlo uncertainty with pinned seeds.
 identifiers:
   - type: doi
-    value: 10.5281/zenodo.<VERSION>
+    value: 10.5281/zenodo.17192803
   - type: doi
-    value: 10.5281/zenodo.<CONCEPT>
+    value: 10.5281/zenodo.17145189
 authors:
   - family-names: Mosquim
     given-names: Rafael
@@ -41,7 +41,7 @@ keywords:
 license: MIT
 version: 1.0.0
 date-released: 2025-09-12
-repository-code: https://github.com/USER/forge
+repository-code: "https://github.com/rafaelmosquim/forge/tree/app/v1.0.0"
 preferred-citation:
   type: software
   title: FORGE — Flexible Optimization of Routes for GHG & Energy (v1.0.0)

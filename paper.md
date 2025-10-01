@@ -70,8 +70,6 @@ FORGE employs an interactive, web-based architecture to handle the inherent comp
 
 To validate FORGE against industry benchmarks, we configured the model with the "Likely" dataset and Brazil grid electricity (country code: BRA), then computed emissions at the crude steel stage ("Validation (as cast") boundary. Table 1 compares these results with Worldsteel 2023 industry averages [@worldsteel2023].
 
-## Validation
-
 Table 1 compares FORGE results (Likely dataset, Brazil grid, crude steel boundary) with Worldsteel 2023 benchmarks.
 
 **Table 1. Model validation: FORGE vs. Worldsteel 2023 (tonne CO₂ per tonne crude steel).**
@@ -84,8 +82,7 @@ Table 1 compares FORGE results (Likely dataset, Brazil grid, crude steel boundar
 
 *Notes: FORGE simulations used the “Likely” dataset and Brazil grid electricity factor. Boundary: crude steel (as-cast), selected via “Validation (as cast)” option.*
 
-
-The validation shows strong agreement for BF-BOF and DRI-EAF routes. The EAF-Scrap route shows significantly lower emissions in FORGE due to Brazil's renewable-heavy electricity grid (84% renewable in 2023), compared to the global average grid mix reflected in Worldsteel data.
+The validation shows strong agreement for BF-BOF. The EAF-Scrap and DRI-EAF routes routes show significantly lower emissions in FORGE due to Brazil's renewable-heavy electricity grid (84% renewable in 2023), compared to the global average grid mix reflected in Worldsteel data.
 
 ## Model Configuration
 
@@ -105,20 +102,17 @@ First author would like to thank the funding from \textit{Fundação de Desenvol
 The authors designed the modeling logic and data structures based on a prior Excel implementation. Large language models were used as coding assistants to translate stepwise specifications into Python snippets. Each generated change was reviewed, tested, and integrated by the authors, who iterated the prompts from failing tests and model discrepancies. All architectural choices, algorithms, and validation procedures are human contributions.
 
 ## Installation
-
-``bash
+```bash
 git clone https://github.com/rafaelmosquim/forge.git
 cd forge
 pip install -r requirements.txt
 streamlit run streamlit_app.py
+```
 
 # Availability
-``markdown
 FORGE is open-source and available under the MIT license. The latest version is available at:
 - **Source code**: https://github.com/rafaelmosquim/forge
 - **Archived release**: [@mosquim2025forge]
 - **Documentation**: Included in repository
 
 # References
-
-FORGE v1.0.0 is archived on Zenodo: [@mosquim2025forge]

@@ -1153,58 +1153,8 @@ def enforce_eaf_feed(recipes, mode: str | None):
     # set the forced feed to 1.0 (you can change the amount if your unit differs)
     eaf.inputs = {**non_feed, want: 1.0}
     print(f"[INFO] EAF feed forced to '{want}' ({mode})")
-    
-# def build_pre_for_route(route_key):
-#     """Return (pre_select, pre_mask, recipe_overrides) for a clean, unique path."""
-#     route = route_key.upper()
-#     pre_select = {
-#         # lock one CC variant and a simple downstream
-#         "Continuous Casting (R)": 1,
-#         #"Hot Rolling": 0,                    # prefer rods for this sweep; flip if you want
-#         #"Rod/bar/section Mill": 1,
-#         "Ingot Casting": 0,
-#         "Direct use of Basic Steel Products (IP4)": 1,
-#         "No Coating": 1,
-#         # keep treatments OFF for the simple baseline
-#         #"Cold Rolling": 0,
-#         "Steel Thermal Treatment": 0,
-#         "Hot Dip Metal Coating": 0,
-#         "Electrolytic Metal Coating": 0,
-#         "Casting/Extrusion/Conformation": 0,
-#         "Stamping/calendering/lamination": 0,
-#         "Machining": 0,
-#         "Bypass Raw→IP3": 0,
-#         "Bypass CR→IP3": 0,
-#     }
-#     pre_mask = {}
-#     recipe_overrides = {}
-
-#     if route == "BF-BOF":
-#         # Liquid Steel → BOF; Pig Iron → BF
-#         pre_mask.update({
-#             "Direct Reduction Iron": 0,
-#             "Electric Arc Furnace": 0,
-#         })
-#     elif route == "DRI-EAF":
-#         # Liquid Steel → EAF; Pig Iron → DRI; ensure EAF uses Pig Iron (not Scrap)
-#         pre_mask.update({
-#             "Blast Furnace": 0,
-#             "Basic Oxygen Furnace": 0,
-#         })
-#         recipe_overrides["Electric Arc Furnace"] = {"inputs": {"Pig Iron": 1.0, "Scrap": 0.0}}
-#     elif route == "EAF-SCRAP":
-#         # Liquid Steel → EAF; NO pig-iron path; force scrap mode
-#         pre_mask.update({
-#             "Blast Furnace": 0,
-#             "Basic Oxygen Furnace": 0,
-#             "Direct Reduction Iron": 0,
-#         })
-#         recipe_overrides["Electric Arc Furnace"] = {"inputs": {"Pig Iron": 0.0, "Scrap": 1.0}}
-#     else:
-#         raise ValueError(f"Unknown route '{route_key}'")
-
-#     return pre_select, pre_mask, recipe_overrides
-    
+   
+ 
 
 # ===================================================================
 #                           MAIN EXECUTION

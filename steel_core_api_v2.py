@@ -77,7 +77,7 @@ class RunOutputs:
     energy_balance: pd.DataFrame
     emissions: Optional[pd.DataFrame]
     total_co2e_kg: Optional[float]
-    balance_matrix: Optional[pd.DataFrame] = None   # ← add this line
+    balance_matrix: Optional[pd.DataFrame] = None
     meta: Dict[str, Any] = field(default_factory=dict)
 
 

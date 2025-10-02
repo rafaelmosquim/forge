@@ -2,13 +2,17 @@
 
 **FORGE** is a transparent, YAML-driven steel plant model that computes **cradle-to-gate** energy use and GHG emissions across multiple routes (BF-BOF, DRI-EAF, EAF-scrap) and downstream options. It supports route locking by scenario, on-site electricity crediting, sensitivity analysis, and Monte Carlo uncertainty.
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17246738.svg)](https://doi.org/10.5281/zenodo.17246738)
+
+
 > **Reference this release:**  
-> This paper uses **FORGE v1.0.0** — Zenodo DOI: **10.5281/zenodo.17192803**  
+> This paper uses **FORGE v1.0.1** — Zenodo DOI: **10.5281/zenodo.17246738**  
 > Concept DOI (always points to latest): **10.5281/zenodo.17145189**
 
 ## How to cite
-If you use FORGE, please cite the archived release:
-Mosquim, R. *FORGE — Flexible Optimization of Routes for GHG & Energy* (v1.0.0). Zenodo. https://doi.org/10.5281/zenodo.17192803
+Mosquim, R., Lima, P. S. P., Pastre, L., & Seabra, J. (2025).
+*FORGE — Flexible Optimization of Routes for GHG & Energy* (v1.0.1).
+Zenodo. https://doi.org/10.5281/zenodo.17246738
 
 For general reference to the project (latest version):  
 https://doi.org/10.5281/zenodo.17145189

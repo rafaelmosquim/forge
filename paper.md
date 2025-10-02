@@ -112,7 +112,8 @@ streamlit run streamlit_app.py
 # Availability
 FORGE is open-source and available under the MIT license. The latest version is available at:
 - **Source code**: https://github.com/rafaelmosquim/forge
-- **Archived release**: [@mosquim2025forge]
+- **Archived release (v1.0.1):** https://doi.org/10.5281/zenodo.17246738  
+- **Concept DOI (always latest):** https://doi.org/10.5281/zenodo.17145189
 - **Documentation**: Included in repository
 
 # References

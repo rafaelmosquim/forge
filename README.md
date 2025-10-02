@@ -2,6 +2,7 @@
 
 **FORGE** is a transparent, YAML-driven steel plant model that computes **cradle-to-gate** energy use and GHG emissions across multiple routes (BF-BOF, DRI-EAF, EAF-scrap) and downstream options. It supports route locking by scenario, on-site electricity crediting, sensitivity analysis, and Monte Carlo uncertainty.
 
+[![CI](https://github.com/rafaelmosquim/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/rafaelmosquim/forge/actions/workflows/ci.yml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17246738.svg)](https://doi.org/10.5281/zenodo.17246738)
 
 
@@ -43,3 +44,11 @@ git clone https://github.com/rafaelmosquim/forge.git
 cd forge
 python -m venv .venv && source .venv/bin/activate   # on Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+## Tests
+Run the lightweight consistency checks:
+
+```bash
+pytest
+```

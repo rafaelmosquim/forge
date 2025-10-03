@@ -30,8 +30,7 @@ bibliography: paper.bib
 
 FORGE is a Python-based model for assessing energy consumption and greenhouse gas 
 emissions in steel production routes. It enables comparative analysis of different 
-steelmaking pathways (BF-BOF, DRI-EAF, EAF-scrap) with customizable process parameters, 
-energy carriers, and emission factors.
+steelmaking pathways (BF-BOF, DRI-EAF, EAF-scrap) and products (Pig Iron, Cast Steel, Automotive steel) with customizable process parameters, energy carriers, and emission factors.
 
 # Statement of Need
 
@@ -68,7 +67,7 @@ FORGE employs an interactive, web-based architecture to handle the inherent comp
 
 # Validation
 
-To validate FORGE against industry benchmarks, we configured the model with the "Likely" dataset and Brazil grid electricity (country code: BRA), then computed emissions at the crude steel stage ("Validation (as cast") boundary. Table 1 compares these results with Worldsteel 2023 industry averages [@worldsteel2023].
+To validate FORGE against industry benchmarks, we configured the model with the "Likely" dataset and Brazil grid electricity (country code: BRA), then computed emissions at the crude steel stage ("Validation (as cast")) boundary. Table 1 compares these results with Worldsteel 2023 industry averages [@worldsteel2023].
 
 Table 1 compares FORGE results (Likely dataset, Brazil grid, crude steel boundary) with Worldsteel 2023 benchmarks.
 
@@ -99,7 +98,30 @@ validation by independent users.
 
 First author would like to thank the funding from \textit{Fundação de Desenvolvimento da Pesquisa} (FUNDEP), Project 27192*57 - Linha V Mover ''Do berço ao Portão''
 
-The authors designed the modeling logic and data structures based on a prior Excel implementation. Large language models were used as coding assistants to translate stepwise specifications into Python snippets. Each generated change was reviewed, tested, and integrated by the authors, who iterated the prompts from failing tests and model discrepancies. All architectural choices, algorithms, and validation procedures are human contributions.
+## Development Process
+
+The FORGE software was developed through an iterative, AI-assisted process 
+that leveraged large language models for code generation while maintaining 
+rigorous domain expertise and validation throughout.
+
+### Development Workflow:
+
+1. **Mathematical Formulation**: The core steel production algorithms were 
+   first specified mathematically based on the established Excel model
+
+2. **AI-Assisted Implementation**: Python code was generated iteratively 
+   through prompt engineering that incorporated domain-specific constraints
+
+3. **Validation and Refinement**: Each component was validated against the 
+   original Excel model, with multiple rounds of debugging and optimization
+
+4. **Software Engineering**: The initial AI-generated code was restructured 
+   for maintainability, with comprehensive testing and documentation added
+
+This process required substantial domain expertise in steel production 
+processes and emissions accounting, as well as significant software 
+engineering effort to transform initial code snippets into a robust, 
+production-ready package.
 
 ## Installation
 ```bash

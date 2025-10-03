@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 Steel Model – Routes & Treatments (scenario-locked route; core-calculated)
-Clean "Stop at stage" (Pig iron / Liquid steel / Finished).
+Clean "Stop at stage" (Crude steel / Validation / Finished).
 No Finished-tailoring UI.
 
+- Validation is a pre-selected scenario to ensure reproductibility of results.
 - Force the route from scenario (content or filename). No route radio.
 - Keep the original UI (per-material "treatments" and options).
 - Delegate balances/emissions to steel_core_api_v2.run_scenario (no duplicate math).
-- Show results and write a simple JSON log (config + total CO₂e).
+- Show results and write a simple JSON log (config + total CO₂e). This function was disabled from the review code;
 """
 
 from __future__ import annotations

@@ -4,7 +4,10 @@ Final script to calculate a material balance, energy balance, and emissions,
 including internal utility-plant electricity credit.
 
 Route selection is interactive: whenever a material has multiple producers,
-the user picks exactly one. No route_config.yml is used.
+the user picks exactly one. Can be done via promtp, but app UI is more untuitive.
+No route_config.yml is used.
+
+
 """
 
 import copy

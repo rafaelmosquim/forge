@@ -56,6 +56,15 @@ from steel_model_core import (
 # ==============================
 @dataclass
 class RouteConfig:
+    """Configuration for steel production route selection.
+    
+    Args:
+        route_preset: Steel production route ('BF-BOF', 'DRI-EAF', etc.); avoids unreal routes by pre-selecting;
+        stage_key: Production stage to stop at (key from STAGE_MATS); ensures no downstream process is used if not asked;
+        demand_qty: Quantity demanded at the specified stage; locked at 1000 kg to ease comparisons; 
+        picks_by_material: User selections for material producers; resolves ambiguity (i.e. N2 produced in house or bought);
+        pre_select_soft: Processes to enable/disable by default
+    """    
     route_preset: str               # 'BF-BOF' | 'DRI-EAF' | 'EAF-Scrap' | 'External' | 'auto'
     stage_key: str                  # key in STAGE_MATS
     demand_qty: float               # demand at stage
@@ -65,6 +74,22 @@ class RouteConfig:
 
 @dataclass
 class ScenarioInputs:
+
+    """Execute the steel model for given scenario inputs. 
+    Core model crashes if ambiguous producers are not resolved;
+    App UI creates a single scenario, which API passes into the core for calculations.
+    
+    Args:
+        data_dir: Path to directory containing YAML configuration files
+        scn: Scenario configuration including route and parameters
+        
+    Returns:
+        RunOutputs: Complete model results with balances and emissions
+        
+    Raises:
+        FileNotFoundError: If required data files are missing
+        ValueError: If scenario configuration is invalid
+    """
     country_code: Optional[str]     # Electricity EF country (optional)
     scenario: Dict[str, Any]        # Full scenario dict (overrides, flags, etc.)
     route: RouteConfig              # Route config
@@ -72,20 +97,30 @@ class ScenarioInputs:
 
 @dataclass
 class RunOutputs:
+
+    """Complete results from a steel model scenario run.
+    
+    Attributes:
+        production_routes: Dict mapping process names to enabled state (0/1)
+        prod_levels: Dict mapping process names to production run counts
+        energy_balance: DataFrame of energy flows by process and carrier (MJ)
+        emissions: DataFrame of CO2e emissions by process (kg)
+        total_co2e_kg: Total CO2e emissions for the scenario (kg)
+        balance_matrix: DataFrame of material balances
+        meta: Dictionary of metadata about the run
+    """    
     production_routes: Dict[str, int]
     prod_levels: Dict[str, float]
     energy_balance: pd.DataFrame
     emissions: Optional[pd.DataFrame]
     total_co2e_kg: Optional[float]
-    balance_matrix: Optional[pd.DataFrame] = None
+    balance_matrix: Optional[pd.DataFrame] = None   # ← add this line
     meta: Dict[str, Any] = field(default_factory=dict)
 
 
 # ==============================
 # Helpers
 # ==============================
-
-
 
 def _credit_enabled(scn: dict | None) -> bool:
     """
@@ -200,6 +235,16 @@ def _robust_call_calculate_emissions(calc_fn, **kwargs):
 def write_run_log(log_dir: str, payload: Dict[str, Any]) -> str:
     """
     Write a compact JSON log (config + total CO2e). Returns the file path.
+
+        Args:
+        log_dir: Directory path where log file should be written
+        payload: Dictionary containing scenario config and results
+        
+    Returns:
+        str: Path to the created log file
+        
+    Note:
+        Log files are named with UTC timestamp: run_YYYYMMDDTHHMMSSZ.json
     """
     os.makedirs(log_dir, exist_ok=True)
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")

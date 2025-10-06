@@ -22,7 +22,7 @@ authors:
 affiliations:
   - name: UNICAMP - Faculdade de Engenharia Mecânica, Brazil
     index: 1
-date: 2025
+date: 2025-10-06
 bibliography: paper.bib
 ---
 
@@ -67,10 +67,10 @@ FORGE employs an interactive, web-based architecture to handle the inherent comp
 
 # Validation
 
-To validate FORGE against industry benchmarks, we configured the model with the "Likely" dataset and Brazil grid electricity (country code: BRA), then computed emissions at the crude steel stage ("Validation (as cast")) boundary. Table 1 compares these results with Worldsteel 2023 industry averages [@worldsteel2023].
+To validate FORGE against industry benchmarks, we configured the model with the "Likely" dataset and Brazil grid electricity (country code: BRA), then computed emissions at the crude steel stage ("Validation (as-cast)") boundary. Table 1 compares these results with Worldsteel 2023 industry averages [@worldsteel2023].
 
 
-**Table 1. Model validation: FORGE vs. Worldsteel 2023 (tonne CO₂ per tonne crude steel).**
+**Table 1. Model validation: FORGE vs. Worldsteel 2023 (tonne CO₂e per tonne crude steel).**
 
 | Route      | FORGE | Worldsteel 2023 |
 |------------|-------|-----------------|
@@ -78,19 +78,19 @@ To validate FORGE against industry benchmarks, we configured the model with the 
 | DRI–EAF    | 0.971 | 1.43            |
 | EAF–Scrap  | 0.208 | 0.70            |
 
-*Notes: FORGE simulations used the “Likely” dataset and Brazil grid electricity factor. Boundary: crude steel (as-cast), selected via “Validation (as cast)” option.*
+*Notes: FORGE simulations used the “Likely” dataset and Brazil grid electricity factor. Boundary: crude steel (as-cast), selected via “Validation (as-cast)” option.*
 
-The validation shows strong agreement for BF-BOF. The EAF-Scrap and DRI-EAF routes show significantly lower emissions in FORGE due to Brazil's renewable-heavy electricity grid (84% renewable in 2023), compared to the global average grid mix reflected in Worldsteel data.
+The validation shows strong agreement for BF-BOF. The EAF-scrap and DRI-EAF routes show significantly lower emissions in FORGE due to Brazil's renewable-heavy electricity grid, compared to the global average grid mix reflected in Worldsteel data.
 
 ## Model Configuration
 
 Validation simulations were performed with the following FORGE settings:
 - **Data selection**: "Likely" dataset (baseline scenario)
 - **Electricity grid**: Brazil (country code BRA) 
-- **System boundary**: Crude steel ("Validation (as cast)" stage)
+- **System boundary**: Crude steel ("Validation (as-cast)" stage)
 - **Demand quantity**: 1000 kg steel
 
-The "Validation (as cast)" stage boundary ensures consistent comparison by stopping the model after continuous casting, matching the crude steel reporting boundary used in industry benchmarks. This stage uses fixed pre-selections to enable reproducible 
+The "Validation (as-cast)" stage boundary ensures consistent comparison by stopping the model after continuous casting, matching the crude steel reporting boundary used in industry benchmarks. This stage uses fixed pre-selections to enable reproducible 
 validation by independent users.
 
 # Acknowledgements
@@ -99,28 +99,8 @@ First author would like to thank the funding from Fundação de Desenvolvimento 
 
 ## Development Process
 
-The FORGE software was developed through an iterative, AI-assisted process 
-that leveraged large language models for code generation while maintaining 
-rigorous domain expertise and validation throughout.
-
-### Development Workflow:
-
-1. **Mathematical Formulation**: The core steel production algorithms were 
-   first specified mathematically based on a previously validated Excel model.
-
-2. **AI-Assisted Implementation**: Python code was generated iteratively 
-   through prompt engineering that incorporated domain-specific constraints
-
-3. **Validation and Refinement**: Each component was validated against the 
-   original Excel model, with multiple rounds of debugging and optimization
-
-4. **Software Engineering**: The initial AI-generated code was restructured 
-   for maintainability, with comprehensive testing and documentation added
-
-This process required substantial domain expertise in steel production 
-processes and emissions accounting, as well as significant software 
-engineering effort to transform initial code snippets into a robust, 
-production-ready package.
+The codebase was written with AI assistance under human design, validation, 
+and benchmarking against a previously validated Excel model.
 
 ## Installation
 ```bash
@@ -133,8 +113,7 @@ streamlit run streamlit_app.py
 # Availability
 FORGE is open-source and available under the MIT license. The latest version is available at:
 - **Source code**: https://github.com/rafaelmosquim/forge
-- **Archived release (v1.0.1):** https://doi.org/10.5281/zenodo.17246738  
-- **Concept DOI (always latest):** https://doi.org/10.5281/zenodo.17145189
+- **Archived release (v1.0.2):** https://doi.org/10.5281/zenodo.XXXXXXX
 - **Documentation**: Included in repository
 
 # References

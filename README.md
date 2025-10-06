@@ -7,13 +7,13 @@
 
 
 > **Reference this release:**  
-> This paper uses **FORGE v1.0.1** — Zenodo DOI: **10.5281/zenodo.17246738**  
+> This paper uses **FORGE v1.0.2** — Zenodo DOI: **10.5281/zenodo.XXXXXXX**  
 > Concept DOI (always points to latest): **10.5281/zenodo.17145189**
 
 ## How to cite
 Mosquim, R., Lima, P. S. P., Pastre, L., & Seabra, J. (2025).
-*FORGE — Flexible Optimization of Routes for GHG & Energy* (v1.0.1).
-Zenodo. https://doi.org/10.5281/zenodo.17246738
+*FORGE — Flexible Optimization of Routes for GHG & Energy* (v1.0.2).
+Zenodo. https://doi.org/10.5281/zenodo.XXXXXXX
 
 For general reference to the project (latest version):  
 https://doi.org/10.5281/zenodo.17145189
@@ -23,7 +23,7 @@ https://doi.org/10.5281/zenodo.17145189
 
 
 ## Features
-- Route-locked scenarios (BF-BOF, DRI-EAF, EAF-Scrap, External)
+- Route-locked scenarios (BF-BOF, DRI-EAF, EAF-scrap, External)
 - Clean stage boundaries: **Pig iron**, **Crude steel**, **Finished**
 - Explicit recipes + energy matrix (shares), energy contents, and carrier EFs
 - On-site utility-plant electricity crediting (no double counting)
@@ -46,9 +46,25 @@ python -m venv .venv && source .venv/bin/activate   # on Windows: .venv\Scripts\
 pip install -r requirements.txt
 ```
 
+## Quick start (Streamlit)
+```bash
+streamlit run streamlity_app.py
+```
+In the main UI:
+1. Sidebar → Dataset = Likely, Grid = BRA, Product = Validation (as-cast)
+2. Sidebar → pick a Route (BF-BOF / DRI-EAF / EAF-scrap)
+3. Main → Tab = Main Model → Run model
+4. Reported Crude steel (as-cast) CO₂e matches Table 1 in the paper.
+
+CLI note: A CLI run is intentionally not provided because the recipe graph contains ambiguous producer choices;
+the UI resolves this interactively. 
+
 ## Tests
 Run the lightweight consistency checks:
 
 ```bash
 pytest
 ```
+
+## License
+MIT

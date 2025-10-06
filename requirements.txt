@@ -1,8 +1,13 @@
-streamlit==1.30.0
-pandas==2.2.3
-numpy==1.26.4; python_version < "3.12"
+# App
+streamlit>=1.38,<2          # supports NumPy 2.x and Python 3.13
+pandas==2.2.3               # OK on Python 3.13, works with NumPy 2.1+
+numpy==1.26.4; python_version < "3.13"
 numpy>=2.1,<2.3; python_version >= "3.13"
 PyYAML>=6.0.1,<7
 plotly==5.18.0
-matplotlib==3.8.0
-pytest==7.4.0
+
+# Plotting (avoid old wheels compiled against NumPy 1.x)
+matplotlib>=3.9,<3.11
+
+# Tests (7.x predates 3.13; use 8.x)
+pytest>=8.1,<9

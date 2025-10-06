@@ -52,8 +52,8 @@ from steel_model_core import (
     apply_fuel_substitutions,
     apply_dict_overrides,
     apply_recipe_overrides,
-    adjust_blast_furnace_intensity,
-    adjust_process_gas_intensity,
+    #adjust_blast_furnace_intensity,
+    #adjust_process_gas_intensity,
     # Sankey plot builders (work from prod levels / energy balance)
     make_mass_sankey,
     make_energy_sankey,
@@ -416,10 +416,6 @@ def _load_for_picks(data_dir: str, route_preset: str, stage_key: str, scenario: 
     if _param_patch is None:
         _param_patch = scenario.get('parameters', {})
     _recursive_ns_update(params, _param_patch)
-
-    # Intensity adjustments that affect connectivity/modes
-    adjust_blast_furnace_intensity(energy_int, energy_shares, params)
-    adjust_process_gas_intensity('Coke Production', 'process_gas_coke', energy_int, energy_shares, params)
 
     # Re-load recipes to re-evaluate expressions with new params
     recipes = load_recipes_from_yaml(

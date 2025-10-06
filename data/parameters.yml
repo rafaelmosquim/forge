@@ -14,9 +14,11 @@ blend:
   pellet: 0.10
   lump: 0.10
 
-# Blast Furnace gas config
-process_gas: 0.275
-process_gas_coke: 0.085  # your coke-oven value
+# Gas Recovery
+gas_recovery_rates:
+  Blast_Furnace: 0.266  # 4600 MJ gas / 18000 MJ total ≈ 25.5%
+  Coke_Production: 0.181  # Adjust based on your real data
+  Basic_Oxygen_Furnace: 0.573  # Adjust based on your real data
 
 # Yield for finished steel stage
 finished_yield: 0.85

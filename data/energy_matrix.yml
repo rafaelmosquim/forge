@@ -324,12 +324,14 @@ processes:
     Charcoal: 0
     Coke: 0
   "Coke Production":
-    Electricity: 0.005
+    Electricity: 0.01
     FLF: 0
     RLF: 0
-    Gas: 0
+    Gas: 0.08
+    Steam: 0.02
     Wood: 0
-    Coal: 0.995
+    Coal: 0.66
+    Pet_coke: 0.23
     Charcoal: 0
     Coke: 0
   "Utility Plant":
@@ -486,14 +488,15 @@ processes:
     Charcoal: 0
     Coke: 0
   "Blast Furnace":
-    Electricity: 0.04
+    Electricity: 0.02
     FLF: 0
     RLF: 0
-    Gas: 0
+    Gas: 0.12
+    Steam: 0.06
     Wood: 0
-    Coal: 0.192
+    Coal: 0.17
     Charcoal: 0
-    Coke: 0.768
+    Coke: 0.63
   "Direct Reduction Iron":
     Electricity: 0.06
     FLF: 0
@@ -522,12 +525,13 @@ processes:
     Charcoal: 0
     Coke: 0
   "Basic Oxygen Furnace":
-    Electricity: 1
+    Electricity: 0.75
     FLF: 0
     RLF: 0
-    Gas: 0
+    Gas: 0.08
     Wood: 0
     Coal: 0
+    Steam: 0.17
     Charcoal: 0
     Coke: 0
   "Regular Steel":

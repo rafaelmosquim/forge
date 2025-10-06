@@ -34,8 +34,9 @@ processes:
   "Electricity Solar from Market": ~
   "Electricity Biomass from Market": ~
   "Electricity Production": ~
+  "Utility Plant": ~
   "Charcoal Production": ~
-  "Coke Production": 6.54
+  "Coke Production": 17.2
   "Steam Production": ~
   "Nitrogen from Market": ~
   "Nitrogen Production": 4.94
@@ -52,11 +53,11 @@ processes:
   "Direct Iron ore": ~
   "Sintering": 2.0
   "Pelletizing": 1.1
-  "Blast Furnace": 13.0
+  "Blast Furnace": 17.6
   "Direct Reduction Iron": 10.0
   "Iron Foundry": 0.0
   "Electric Arc Furnace": 4.0
-  "Basic Oxygen Furnace": 0.35
+  "Basic Oxygen Furnace": 0.91
   "Regular Steel": ~
   "Steel Refining (Low Alloy)": 6.5
   "Steel Refining (High Alloy)": 6.5

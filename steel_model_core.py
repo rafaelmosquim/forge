@@ -42,7 +42,6 @@ def load_parameters(filepath):
             print("DEBUG: Raw parameters from YAML:", params_dict)
             params = json.loads(json.dumps(params_dict),
                         object_hook=lambda d: SimpleNamespace(**d))
-            print(f"DEBUG: process_gas value: {getattr(params, 'process_gas', 'NOT FOUND')}")
             return params
     except FileNotFoundError:
         print(f"FATAL ERROR: Parameters file not found: {filepath}")
@@ -343,18 +342,6 @@ def make_hybrid_sankey(energy_balance_df, emissions_df, title="Hybrid Sankey: En
     )
     return fig
 
-# ===================================================================
-#                   Scenario-helper utilities
-# ===================================================================
-def compute_inside_elec_reference_for_share(
-    recipes, energy_int, energy_shares, energy_content, params,
-    route_key: str, demand_qty: float, stage_ref: str = "IP3"
-) -> float:
-    inside_elec_ref, _f_internal, _ef_internal = compute_fixed_plant_elec_model(
-        recipes, energy_int, energy_shares, energy_content, params,
-        route_key=route_key, demand_qty=demand_qty, stage_ref=stage_ref
-    )
-    return float(inside_elec_ref)
 # --------------------------------------------------------------
 # Force in-house producers (nitrogen, oxygen, dolomite, burnt lime, coke)
 # --------------------------------------------------------------
@@ -473,44 +460,14 @@ def apply_recipe_overrides(recipes, overrides, params, energy_int, energy_shares
 # ===================================================================
 #                       Calculation Functions
 # ===================================================================
-def adjust_blast_furnace_intensity(energy_int, energy_shares, params):
-    """
-    Scales the BF intensity and saves both the original and adjusted values
-    so top-gas = adjusted_intensity – base_intensity can be harvested.
-    """
-    pg = getattr(params, 'process_gas', 0.0)
-    if 'Blast Furnace' not in energy_int:
-        return
+def _inside_elec_present(energy_balance_df):
+    """Sum in-mill Electricity (MJ) for the *current* boundary."""
+    if "Electricity" not in energy_balance_df.columns:
+        return 0.0
+    idx = [p for p in energy_balance_df.index
+           if p not in ("TOTAL", "Utility Plant") and p not in OUTSIDE_MILL_PROCS]
+    return float(energy_balance_df.loc[idx, "Electricity"].clip(lower=0).sum())
 
-    base = energy_int['Blast Furnace']
-    params.bf_base_intensity = base
-
-    shares = energy_shares.get('Blast Furnace', {})
-    carriers = ['Gas', 'Coal', 'Coke', 'Charcoal']
-    S = sum(shares.get(c, 0.0) for c in carriers)
-    denom = max(1e-9, 1 - pg * S)
-
-    adj = base / denom
-    energy_int['Blast Furnace'] = adj
-    params.bf_adj_intensity = adj
-
-    print(f"Adjusted BF intensity: {base:.2f} → {adj:.2f} MJ/t steel (recovering {pg*100:.1f}% of carriers)")
-
-def adjust_process_gas_intensity(proc_name, param_key, energy_int, energy_shares, params):
-    pg = getattr(params, param_key, 0.0)
-    if proc_name not in energy_int or pg <= 0:
-        return
-    base = energy_int[proc_name]
-    safe = proc_name.replace(' ','_').lower()
-    setattr(params, f"{safe}_base_intensity", base)
-
-    shares = energy_shares.get(proc_name, {})
-    S = sum(shares.get(c,0.0) for c in ['Gas','Coal','Coke','Charcoal'])
-    denom = max(1e-9, 1 - pg*S)
-    adj = base/denom
-    energy_int[proc_name] = adj
-    setattr(params, f"{safe}_adj_intensity", adj)
-    print(f"Adjusted {proc_name}: {base:.2f}→{adj:.2f} MJ/run")
 
 def calculate_balance_matrix(recipes, final_demand, production_routes):
     """
@@ -618,36 +575,6 @@ def adjust_energy_balance(energy_df, internal_elec):
     df.loc['Utility Plant'] = 0.0
     df.loc['Utility Plant', 'Electricity'] = -internal_elec
     return df
-
-def calculate_internal_electricity(prod_level, recipes_dict, params):
-    """
-    Internal electricity from recovered gases: BF top-gas delta + Coke-oven gas,
-    converted with Utility Plant efficiency (recipe output Electricity per MJ gas).
-    """
-    util_eff = 0.0
-    if 'Utility Plant' in recipes_dict:
-        util_eff = recipes_dict['Utility Plant'].outputs.get('Electricity', 0.0)
-
-    internal_elec = 0.0
-
-    # BF top-gas (difference between adjusted and base intensities)
-    bf_runs = float(prod_level.get('Blast Furnace', 0.0))
-    if bf_runs > 0 and hasattr(params,'bf_base_intensity') and hasattr(params,'bf_adj_intensity'):
-        bf_delta = params.bf_adj_intensity - params.bf_base_intensity
-        gf = bf_runs * bf_delta
-        print(f"DBG gas BF: runs={bf_runs:.3f}, delta={bf_delta:.2f} MJ/run → {gf:.1f} MJ")
-        internal_elec += gf * util_eff
-
-    # Coke-oven gas (recipe-defined)
-    cp_runs = float(prod_level.get('Coke Production', 0.0))
-    if 'Coke Production' in recipes_dict:
-        gas_per_run_cp = recipes_dict['Coke Production'].outputs.get('Process Gas', 0.0)
-        if cp_runs > 0 and gas_per_run_cp > 0:
-            gf_cp = cp_runs * gas_per_run_cp
-            print(f"DBG gas Coke: runs={cp_runs:.3f}, gas_per_run={gas_per_run_cp:.2f} MJ/run → {gf_cp:.1f} MJ")
-            internal_elec += gf_cp * util_eff
-
-    return internal_elec
 
 def calculate_emissions(
     mkt_cfg,
@@ -833,49 +760,64 @@ def compute_fixed_plant_elec_model(
     else:
         idx_all = [r for r in energy_ref.index if r not in ("TOTAL",)]
         idx_inside = [p for p in idx_all if p not in ("Utility Plant",) and p not in OUTSIDE_MILL_PROCS]
-        inside_elec_ref = float(energy_ref.loc[idx_inside, "Electricity"].clip(lower=0).sum())
+        inside_elec_ref = float(energy_ref.loc[idx_inside, "Electricity"].clip(lower=0).sum()) \
+            if "Electricity" in energy_ref.columns else 0.0
 
     # ---- fixed gas mix and internal electricity potential (based on reference runs) ----
     recipes_dict_ref = {r.name: r for r in recipes_ref}
     util_eff = recipes_dict_ref.get('Utility Plant', Process('', {}, {})).outputs.get('Electricity', 0.0)
 
-    # Coke-oven gas MJ from reference runs
-    gas_coke_MJ = float(prod_ref.get('Coke Production', 0.0)) * \
-                  float(recipes_dict_ref.get('Coke Production', Process('', {}, {})).outputs.get('Process Gas', 0.0))
+    # --- NEW: recovered gas from energy matrix & recovery rates (BF, CP, BOF) ---
+    recovery = getattr(params, "gas_recovery_rates", SimpleNamespace())
+    # Normalize access to spaced names
+    rr = {
+        "Blast Furnace": float(getattr(recovery, "Blast_Furnace", getattr(recovery, "Blast Furnace", 0.0)) or 0.0),
+        "Coke Production": float(getattr(recovery, "Coke_Production", getattr(recovery, "Coke Production", 0.0)) or 0.0),
+        "Basic Oxygen Furnace": float(getattr(recovery, "Basic_Oxygen_Furnace",
+                                            getattr(recovery, "Basic Oxygen Furnace", 0.0)) or 0.0),
+    }
 
-    # BF top-gas MJ from reference runs (delta intensity)
-    bf_runs_ref = float(prod_ref.get('Blast Furnace', 0.0))
-    if bf_runs_ref > 0 and hasattr(params, 'bf_adj_intensity') and hasattr(params, 'bf_base_intensity'):
-        gas_bf_MJ = (float(params.bf_adj_intensity) - float(params.bf_base_intensity)) * bf_runs_ref
-    else:
-        gas_bf_MJ = 0.0
+    def _proc_gas_MJ(proc_name: str) -> float:
+        runs = float(prod_ref.get(proc_name, 0.0))
+        if runs <= 0.0 or proc_name not in energy_int_ref:
+            return 0.0
+        total_MJ = runs * float(energy_int_ref.get(proc_name, 0.0))
+        return total_MJ * float(rr.get(proc_name, 0.0))
 
-    total_gas_MJ_ref = gas_coke_MJ + gas_bf_MJ
+    gas_bf_MJ  = _proc_gas_MJ("Blast Furnace")
+    gas_cp_MJ  = _proc_gas_MJ("Coke Production")
+    gas_bof_MJ = _proc_gas_MJ("Basic Oxygen Furnace")
+
+    total_gas_MJ_ref = gas_bf_MJ + gas_cp_MJ + gas_bof_MJ
     internal_elec_potential = total_gas_MJ_ref * float(util_eff)
 
-    # EF of coke-oven gas (exclude 'Electricity' share)
-    cp_shares = energy_shares_ref.get('Coke Production', {})
-    fuels_cp = [c for c in cp_shares if c != 'Electricity' and cp_shares[c] > 0]
-    e_efs_local = load_data_from_yaml(os.path.join('data', 'emission_factors.yml'))  # local read
-    EF_coke_gas = (sum(cp_shares[c] * e_efs_local.get(c, 0.0) for c in fuels_cp) /
-                   max(1e-12, sum(cp_shares[c] for c in fuels_cp))) if fuels_cp else 0.0
 
-    # EF of BF top-gas (exclude 'Electricity' share)
-    bf_shares = energy_shares_ref.get('Blast Furnace', {})
-    fuels_bf = [c for c in bf_shares if c != 'Electricity' and bf_shares[c] > 0]
-    EF_bf_gas = (sum(bf_shares[c] * e_efs_local.get(c, 0.0) for c in fuels_bf) /
-                 max(1e-12, sum(bf_shares[c] for c in fuels_bf))) if fuels_bf else 0.0
+    # --- NEW: EF of process gas (exclude Electricity in the shares) ---
+    e_efs_local = load_data_from_yaml(os.path.join('data', 'emission_factors.yml'))
 
-    # Reference gas EF weighted by reference gas volumes
-    if total_gas_MJ_ref <= 1e-9:
-        EF_process_gas_ref = 0.0
-    else:
+    def _proc_gas_EF(proc_name: str) -> float:
+        shares = dict(energy_shares_ref.get(proc_name, {}))
+        fuels = [(c, s) for c, s in shares.items() if c != "Electricity" and s > 0]
+        if not fuels:
+            return 0.0
+        denom = sum(s for _, s in fuels) or 1e-12
+        return sum(s * float(e_efs_local.get(c, 0.0)) for c, s in fuels) / denom
+
+    EF_bf   = _proc_gas_EF("Blast Furnace")
+    EF_cp   = _proc_gas_EF("Coke Production")
+    EF_bof  = _proc_gas_EF("Basic Oxygen Furnace")
+
+    if total_gas_MJ_ref > 1e-9:
         EF_process_gas_ref = (
-            (EF_coke_gas * (gas_coke_MJ / total_gas_MJ_ref)) +
-            (EF_bf_gas   * (gas_bf_MJ   / total_gas_MJ_ref))
+            (EF_bf  * gas_bf_MJ  +
+            EF_cp  * gas_cp_MJ  +
+            EF_bof * gas_bof_MJ) / total_gas_MJ_ref
         )
+    else:
+        EF_process_gas_ref = 0.0
 
     ef_internal_electricity = (EF_process_gas_ref / util_eff) if util_eff > 0 and total_gas_MJ_ref > 0 else 0.0
+
 
     # Fixed internal share
     if inside_elec_ref <= 1e-9:
@@ -1284,11 +1226,6 @@ if __name__ == '__main__':
     except Exception as _e:
         print("DBG blend after overrides → (missing)", _e)
 
-    # ---------- intensity adjustments (after overrides) ----------
-    adjust_blast_furnace_intensity(energy_int, energy_shares, params)
-    adjust_process_gas_intensity('Coke Production', 'process_gas_coke',
-                                 energy_int, energy_shares, params)
-
     # ---------- recipes (load once, then apply scenario recipe overrides) ----------
     recipes = load_recipes_from_yaml(
         os.path.join(base, 'recipes.yml'),
@@ -1368,9 +1305,8 @@ if __name__ == '__main__':
     # Present in-mill electricity (MJ) — scales with the user's current boundary
     inside_idx_present = [p for p in energy_balance.index
                           if p not in ("TOTAL","Utility Plant") and p not in OUTSIDE_MILL_PROCS]
-    inside_elec_present = float(energy_balance.loc[inside_idx_present, "Electricity"].clip(lower=0).sum()) \
-                          if "Electricity" in energy_balance.columns else 0.0
-
+    inside_elec_present = float(energy_balance.loc[inside_idx_present, "Electricity"].clip(lower=0).sum())
+    
     # ---------- FIXED plant electricity model (reference chain after Cold Rolling) ----------
     inside_elec_ref, f_internal, ef_internal_electricity = compute_fixed_plant_elec_model(
         recipes=recipes,
@@ -1385,27 +1321,6 @@ if __name__ == '__main__':
 
     # internal electricity *used* for the present boundary
     internal_used_present = f_internal * inside_elec_present
-
-    # Optional: repair BF/CP reporting to base thermal carriers (kept as in your flow)
-    if 'Blast Furnace' in energy_balance.index and hasattr(params, 'bf_base_intensity'):
-        bf_runs = float(prod_lvl.get('Blast Furnace', 0.0))
-        base_bf = float(params.bf_base_intensity)
-        bf_sh   = energy_shares.get('Blast Furnace', {})
-        for carrier in energy_balance.columns:
-            if carrier != 'Electricity':
-                energy_balance.loc['Blast Furnace', carrier] = bf_runs * base_bf * float(bf_sh.get(carrier, 0.0))
-
-    cp_runs = float(prod_lvl.get('Coke Production', 0.0))
-    base_cp = float(getattr(params, 'coke_production_base_intensity',
-                            energy_int.get('Coke Production', 0.0)))
-    cp_sh   = energy_shares.get('Coke Production', {})
-    if cp_runs and cp_sh:
-        for carrier in energy_balance.columns:
-            if carrier != 'Electricity':
-                energy_balance.loc['Coke Production', carrier] = cp_runs * base_cp * float(cp_sh.get(carrier, 0.0))
-
-    # Apply internal electricity credit (accounting only)
-    energy_balance = adjust_energy_balance(energy_balance, internal_used_present)
 
     # ---------- visibility ----------
     ef_grid = e_efs.get('Electricity', 0.0)
@@ -1484,4 +1399,3 @@ if __name__ == '__main__':
         fig_energy_ranked.write_html(outdir / "energy_to_process_sankey.html", include_plotlyjs="cdn")
 
     print("Saved Sankey diagrams to:", outdir.resolve())
-

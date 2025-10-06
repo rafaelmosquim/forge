@@ -223,7 +223,7 @@
     Coal: 1.25 
   outputs:
     Coke: 1.0
-    Process Gas: "process_gas_coke * (inputs['Coal'] * energy_content['Coal'])" 
+
 
 - process: Steam Production
   inputs: {}
@@ -231,7 +231,7 @@
 
 - process: Utility Plant
   inputs:
-    Process Gas: 1.0
+    Gas: 1.0
   outputs:
     Electricity: 0.34  # 34% efficiency
 
@@ -335,11 +335,11 @@
       / energy_content['Coke']
     Coal: >
       energy_int['Blast Furnace']
-      * energy_shares['Blast Furnace']['Coal']
+      * energy_shares['Blast Furnace']['Coal'] 
       / energy_content['Coal']
   outputs:
-    Pig Iron: 1.0
-    #Process Gas: "0.275 * (inputs['Coal'] * energy_content['Coal'] + inputs['Coke'] * energy_content['Coke'])"
+    Pig Iron: 1.0    # Mass output (reference unit)
+
 
 - process: Direct Reduction Iron
   inputs:
@@ -387,6 +387,7 @@
     Scrap:      0.1
   outputs:
     Liquid Steel: 1.0
+
 
 - process: Regular Steel
   inputs:  { Liquid Steel: 1.0 }

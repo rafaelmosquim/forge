@@ -41,14 +41,13 @@ from steel_model_core import (
     # Calculations
     calculate_balance_matrix,
     expand_energy_tables_for_active,
-    calculate_internal_electricity,
     calculate_energy_balance,
-    adjust_energy_balance,
+    compute_fixed_plant_elec_model,
     calculate_emissions,  # signature may vary; we guard below
     # Data classes/types
     Process,
     OUTSIDE_MILL_PROCS,
-    compute_inside_elec_reference_for_share,
+    #compute_inside_elec_reference_for_share,
 )
 
 # ==============================
@@ -353,11 +352,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         _param_patch = scenario.get('parameters', {})
     _recursive_ns_update(params, _param_patch)
 
-    # Intensity adjustments
-    from steel_model_core import adjust_blast_furnace_intensity, adjust_process_gas_intensity
-    adjust_blast_furnace_intensity(energy_int, energy_shares, params)
-    adjust_process_gas_intensity('Coke Production', 'process_gas_coke', energy_int, energy_shares, params)
-
     # Re-load recipes to re-evaluate expressions with updated params; then recipe overrides
     recipes = load_recipes_from_yaml(
         os.path.join(base, 'recipes.yml'),
@@ -406,72 +400,93 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     from steel_model_core import expand_energy_tables_for_active
     expand_energy_tables_for_active(active_procs, energy_shares, energy_int)
 
-    # Internal electricity from recovered gases (before credit)
-    recipes_dict = {r.name: r for r in recipes_calc}
-    internal_elec = calculate_internal_electricity(prod_levels, recipes_dict, params)
-
     # Energy balance (base)
     energy_balance = calculate_energy_balance(prod_levels, energy_int, energy_shares)
 
-    # Optional fix-ups to BF / Coke carriers (if your CLI does this)
-    try:
-        if 'Blast Furnace' in energy_balance.index and hasattr(params, 'bf_base_intensity'):
-            bf_runs = float(prod_levels.get('Blast Furnace', 0.0))
-            base_bf = float(params.bf_base_intensity)
-            bf_sh   = energy_shares.get('Blast Furnace', {})
-            for carrier in energy_balance.columns:
-                if carrier != 'Electricity':
-                    energy_balance.loc['Blast Furnace', carrier] = bf_runs * base_bf * float(bf_sh.get(carrier, 0.0))
-        cp_runs = float(prod_levels.get('Coke Production', 0.0))
-        base_cp = float(getattr(params, 'coke_production_base_intensity', energy_int.get('Coke Production', 0.0)))
-        cp_sh   = energy_shares.get('Coke Production', {})
-        if cp_runs and cp_sh:
-            for carrier in energy_balance.columns:
-                if carrier != 'Electricity':
-                    energy_balance.loc['Coke Production', carrier] = cp_runs * base_cp * float(cp_sh.get(carrier, 0.0))
-    except Exception:
-        pass  # if fields missing, skip the fix-up
+    # --- Recovered process gas (BF, CP, BOF) via recovery rates ---
+    # params.yml:
+    # gas_recovery_rates:
+    #   Blast_Furnace: 0.266
+    #   Coke_Production: 0.181
+    #   Basic_Oxygen_Furnace: 0.573
 
-    # Compute recovered gas flows for dynamic EF (if needed by your emissions fn)
-    try:
-        gas_coke_MJ = prod_levels.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get('Process Gas', 0.0)
-    except Exception:
-        gas_coke_MJ = 0.0
-    try:
-        # If params store bf_adj_intensity / bf_base_intensity
-        bf_adj = float(getattr(params, 'bf_adj_intensity', 0.0))
-        bf_base = float(getattr(params, 'bf_base_intensity', 0.0))
-        gas_bf_MJ = (bf_adj - bf_base) * prod_levels.get('Blast Furnace', 0.0)
-    except Exception:
-        gas_bf_MJ = 0.0
-    total_gas_MJ = float(gas_coke_MJ + gas_bf_MJ)
+    from types import SimpleNamespace
 
-    # Dynamic EF for process gas based on energy shares & EF table
-    def _blend_EF(shares: Dict[str, float], efs: Dict[str, float]) -> float:
-        fuels = [(c, s) for c, s in shares.items() if c != 'Electricity' and s > 0]
+    recipes_dict = {r.name: r for r in recipes_calc}
+    recovery = getattr(params, "gas_recovery_rates", SimpleNamespace())
+    rr = {
+        "Blast Furnace": float(getattr(recovery, "Blast_Furnace", getattr(recovery, "Blast Furnace", 0.0)) or 0.0),
+        "Coke Production": float(getattr(recovery, "Coke_Production", getattr(recovery, "Coke Production", 0.0)) or 0.0),
+        "Basic Oxygen Furnace": float(getattr(recovery, "Basic_Oxygen_Furnace", getattr(recovery, "Basic Oxygen Furnace", 0.0)) or 0.0),
+    }
+
+    def _proc_gas_MJ(proc_name: str) -> float:
+        runs = float(prod_levels.get(proc_name, 0.0))
+        if runs <= 0.0:
+            return 0.0
+        total_MJ = runs * float(energy_int.get(proc_name, 0.0))
+        return total_MJ * float(rr.get(proc_name, 0.0))
+
+    gas_bf_MJ  = _proc_gas_MJ("Blast Furnace")
+    gas_cp_MJ  = _proc_gas_MJ("Coke Production")
+    gas_bof_MJ = _proc_gas_MJ("Basic Oxygen Furnace")
+
+    total_gas_MJ = float(gas_bf_MJ + gas_cp_MJ + gas_bof_MJ)
+
+
+    def _proc_gas_EF(proc_name: str) -> float:
+        shares = dict(energy_shares.get(proc_name, {}))
+        fuels = [(c, s) for c, s in shares.items() if c != "Electricity" and s > 0]
         if not fuels:
             return 0.0
         denom = sum(s for _, s in fuels) or 1e-12
-        return sum(s * float(efs.get(c, 0.0)) for c, s in fuels) / denom
+        return sum(s * float(e_efs.get(c, 0.0)) for c, s in fuels) / denom
 
-    EF_coke_gas = _blend_EF(energy_shares.get('Coke Production', {}), e_efs)
-    EF_bf_gas   = _blend_EF(energy_shares.get('Blast Furnace', {}), e_efs)
-    EF_process_gas = EF_coke_gas if total_gas_MJ <= 1e-9 else (
-        (EF_coke_gas * (gas_coke_MJ / max(1e-12, total_gas_MJ))) + (EF_bf_gas * (gas_bf_MJ / max(1e-12, total_gas_MJ)))
-    )
+    EF_bf   = _proc_gas_EF("Blast Furnace")
+    EF_cp   = _proc_gas_EF("Coke Production")
+    EF_bof  = _proc_gas_EF("Basic Oxygen Furnace")
 
-    # Utility efficiency for converting process gas to electricity
+    if total_gas_MJ > 1e-9:
+        EF_process_gas = (EF_bf * gas_bf_MJ + EF_cp * gas_cp_MJ + EF_bof * gas_bof_MJ) / total_gas_MJ
+    else:
+        EF_process_gas = 0.0
+
+
     try:
         util_eff = recipes_dict.get('Utility Plant', Process('',{},{})).outputs.get('Electricity', 0.0)
     except Exception:
         util_eff = 0.0
-    # recompute internal elec defensively from total gas
-    internal_elec = max(internal_elec, total_gas_MJ * util_eff)
+
+    internal_elec = total_gas_MJ * util_eff  # potential internal electricity (MJ)
+
+    # --- QUICK HEALTH CHECK: Utility Plant gas→power path ---
+    def _hp(x): 
+        try: 
+            return f"{float(x):,.2f}"
+        except Exception:
+            return str(x)
+
+    print("\n[HP] === Utility Plant quick check ===")
+    print(f"[HP] Gas components (MJ):  BF={_hp(gas_bf_MJ)}, CP={_hp(gas_cp_MJ)}, BOF={_hp(gas_bof_MJ)}")
+    print(f"[HP] Total recovered gas to Utility (MJ): { _hp(total_gas_MJ) }")
+
+    print(f"[HP] Utility Plant efficiency (MJ_e per MJ_gas): { _hp(util_eff) }")
+    print(f"[HP] Internal electricity produced (MJ): { _hp(internal_elec) }")
+
+    if total_gas_MJ <= 1e-9:
+        print("[HP][WARN] total_gas_MJ is ~0 → check gas_recovery_rates in parameters.yml and energy_int/energy_matrix rows for BF/CP/BOF.")
+    if util_eff <= 0.0:
+        print("[HP][WARN] Utility Plant 'Electricity' output is 0 or missing in recipes.yml (process name must be exactly 'Utility Plant').")
+
+    # (Optional) show the plant row in the energy table (presentation only)
+    # from steel_model_core import adjust_energy_balance
+    # energy_balance = adjust_energy_balance(energy_balance, internal_elec)
+
 
     # FIXED PLANT-LEVEL CALCULATIONS (not dependent on user's stop-at-stage)
     # Compute reference in-mill electricity (IP3 boundary)
-    inside_elec_ref = compute_inside_elec_reference_for_share(
-        recipes=recipes,
+    inside_elec_ref, f_internal, ef_internal_electricity = compute_fixed_plant_elec_model(
+        recipes=recipes,                           # note: pass the base recipes (not calc copy)
         energy_int=energy_int,
         energy_shares=energy_shares,
         energy_content=energy_content,
@@ -480,24 +495,34 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         demand_qty=demand_qty,
         stage_ref="IP3",
     )
-    
-    # Fixed plant-level internal electricity fraction
-    if inside_elec_ref > 1e-9:
-        f_internal = min(1.0, internal_elec / inside_elec_ref)
-    else:
-        f_internal = 0.0
-    
-    # Fixed internal electricity EF
-    ef_internal_electricity = (EF_process_gas / util_eff) if util_eff > 1e-9 else 0.0
 
-    # Apply/disable internal electricity credit
-    if credit_on:
-        energy_balance = adjust_energy_balance(energy_balance, internal_elec)
-    else:
-        internal_elec  = 0.0
-        total_gas_MJ   = 0.0
+    # Present boundary in-mill electricity demand (dynamic boundary)
+
+    def _inside_elec_present(eb):
+        if "Electricity" not in eb.columns:
+            return 0.0
+        idx = [p for p in eb.index if p not in ("TOTAL", "Utility Plant") and p not in OUTSIDE_MILL_PROCS]
+        return float(eb.loc[idx, "Electricity"].clip(lower=0).sum())
+
+    inside_elec_dyn = _inside_elec_present(energy_balance)
+
+    # Internal electricity potential (from recovered gas) you computed:
+    #   internal_elec = total_gas_MJ * util_eff
+    internal_used_dyn = min(internal_elec, inside_elec_dyn)  # actually available vs present demand
+
+    # DEBUG clarity: show both reference and present
+    print(f"[HP] Internal elec (present boundary): used={internal_used_dyn:.2f} MJ  demand={inside_elec_dyn:.2f} MJ")
+    print(f"[HP] Reference boundary (IP3): demand={inside_elec_ref:.2f} MJ  f_internal(fixed)={f_internal:.3f}")
+
+
+    # We will NOT mutate energy_balance here. Emissions will use f_internal & ef_internal_electricity.
+    # If the credit is disabled for this scenario, zero-out the internal terms only.
+    if not credit_on:
+        internal_elec = 0.0
+        total_gas_MJ = 0.0
         EF_process_gas = 0.0
-        # do not adjust energy_balance when credit is off
+    # (No call to adjust_energy_balance)
+
 
     # Load process-emissions yaml for direct process emissions (if needed)
     process_emissions_table = load_data_from_yaml(os.path.join(base, 'process_emissions.yml'))

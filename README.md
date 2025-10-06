@@ -7,13 +7,13 @@
 
 
 > **Reference this release:**  
-> This paper uses **FORGE v1.0.2** — Zenodo DOI: **10.5281/zenodo.XXXXXXX**  
+> This paper uses **FORGE v1.0.2** — Zenodo DOI: **10.5281/zenodo.17279849**  
 > Concept DOI (always points to latest): **10.5281/zenodo.17145189**
 
 ## How to cite
 Mosquim, R., Lima, P. S. P., Pastre, L., & Seabra, J. (2025).
 *FORGE — Flexible Optimization of Routes for GHG & Energy* (v1.0.2).
-Zenodo. https://doi.org/10.5281/zenodo.XXXXXXX
+Zenodo. https://doi.org/10.5281/zenodo.17279849
 
 For general reference to the project (latest version):  
 https://doi.org/10.5281/zenodo.17145189

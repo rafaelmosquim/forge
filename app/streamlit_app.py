@@ -30,19 +30,20 @@ import numpy as np
 from copy import deepcopy
 from types import SimpleNamespace
 import textwrap, json, yaml
-from steel_core_api_v2 import ScenarioInputs, run_scenario
+from forge_core.steel_core_api_v2 import ScenarioInputs, run_scenario
 
 
 # --- Core wrappers (no duplicate math here) ---
-from steel_core_api_v2 import (
+from forge_core.steel_core_api_v2 import (
     RouteConfig,
     ScenarioInputs,
     run_scenario,
     write_run_log,  # for simple JSON logging
 )
 
+
 # --- Original core imports for UI-building only (recipes graph & helpers) ---
-from steel_model_core import (
+from forge_core.steel_model_core import (
     Process,
     load_data_from_yaml,
     load_parameters,

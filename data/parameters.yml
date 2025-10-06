@@ -23,4 +23,15 @@ gas_recovery_rates:
 # Yield for finished steel stage
 finished_yield: 0.85
 
+utility:
+  dispatch_priority: ["steam", "direct", "power"]
+  boiler_eff: 0.85
+  power_eff: 0.35
+  allow_export: false
+  allow_flare: true
+  purchased_steam_carrier: "Steam"        # if modeled; else fallback rule (see below)
+  market_fuel_for_direct: "Natural Gas"   # fallback for direct heat shortfall
+  direct_heat_eligible_fraction: 0.0      # share of non-electric carriers eligible for gas IF Steam is not modeled
+
+
 

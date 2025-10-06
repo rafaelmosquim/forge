@@ -1,0 +1,10 @@
+[project]
+name = "forge-core"
+version = "1.0.0"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas>=2.2.2",
+  'numpy>=2.1; python_version >= "3.13"',
+  'numpy>=1.26.4,<2.0; python_version < "3.13"',
+  "pyyaml>=6",
+]

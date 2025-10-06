@@ -1,0 +1,2 @@
+streamlit>=1.36
+# any plotting/UI libs that the app (not the core) uses

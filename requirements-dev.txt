@@ -1,0 +1,5 @@
+-e .                 # editable install of the core package
+-r app/requirements.txt
+
+pytest
+# add linters/formatters if you use them: ruff, black, mypy, etc.

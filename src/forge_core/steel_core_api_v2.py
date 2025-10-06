@@ -19,11 +19,10 @@ from typing import Dict, Optional, Any, List, Tuple, Set
 from collections import deque
 from datetime import datetime
 import inspect
-
 import pandas as pd
 
 # Core functions & models from your existing engine
-from steel_model_core import (
+from forge_core.steel_model_core import (
     # IO
     load_data_from_yaml,
     load_parameters,
@@ -255,7 +254,7 @@ def write_run_log(log_dir: str, payload: Dict[str, Any]) -> str:
 
 
 # ==============================
-# Main API
+# Main API (rewritten block)
 # ==============================
 def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     """
@@ -266,9 +265,10 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
       3) Lock route preset; build route mask; enforce EAF feed
       4) Build production route from UI picks (or deterministically)
       5) Solve balances
-      6) Apply/disable internal-electricity credit per scenario
+      6) Dispatch process gas to steam/direct/power with internal-first policy
       7) Compute emissions (robust to signature)
     """
+    # ----------- Unpack scenario -----------
     scenario: Dict[str, Any] = scn.scenario or {}
     route_preset: str = scn.route.route_preset or "auto"
     stage_key: str = scn.route.stage_key
@@ -277,65 +277,71 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     pre_select_soft: Dict[str, int] = scn.route.pre_select_soft or {}
     country_code: Optional[str] = scn.country_code or None
 
-    # Flag for BF process-gas → electricity credit
+    # (Optional) BF process-gas → elec credit gate
     credit_on: bool = _credit_enabled(scenario)
 
-    # ---------- Load base data ----------
+    # ----------- Load base data -----------
     base = os.path.join(data_dir, "")
-    # allow scenario to select an alternate energy_int file
-    _ei_file = (scenario.get('energy_int_file') or 'energy_int.yml').strip()
-    # simple guard against weird inputs
-    _allowed = {'energy_int.yml', 'energy_int_min.yml', 'energy_int_max.yml', 'energy_int_likely.yml'}
+    _ei_file = (scenario.get("energy_int_file") or "energy_int.yml").strip()
+    _allowed = {
+        "energy_int.yml",
+        "energy_int_min.yml",
+        "energy_int_max.yml",
+        "energy_int_likely.yml",
+    }
     if _ei_file not in _allowed:
-        _ei_file = 'energy_int.yml'
-    energy_int = load_data_from_yaml(os.path.join(base, _ei_file))
-    # (optional) record in meta later
-    energy_shares  = load_data_from_yaml(os.path.join(base, 'energy_matrix.yml'))
-    energy_content = load_data_from_yaml(os.path.join(base, 'energy_content.yml'))
-    e_efs          = load_data_from_yaml(os.path.join(base, 'emission_factors.yml'))
-    params         = load_parameters      (os.path.join(base, 'parameters.yml'))
-    mkt_cfg        = load_market_config   (os.path.join(base, 'mkt_config.yml'))
-    elec_map       = load_electricity_intensity(os.path.join(base, 'electricity_intensity.yml')) or {}
+        _ei_file = "energy_int.yml"
 
-    # Country-driven Electricity EF (if provided in UI)
+    energy_int   = load_data_from_yaml(os.path.join(base, _ei_file))
+    energy_shares = load_data_from_yaml(os.path.join(base, "energy_matrix.yml"))
+    energy_content = load_data_from_yaml(os.path.join(base, "energy_content.yml"))
+    e_efs        = load_data_from_yaml(os.path.join(base, "emission_factors.yml"))
+    params       = load_parameters(os.path.join(base, "parameters.yml"))
+    mkt_cfg      = load_market_config(os.path.join(base, "mkt_config.yml"))
+    elec_map     = load_electricity_intensity(os.path.join(base, "electricity_intensity.yml")) or {}
+
+    # Country electricity EF override (UI)
     if country_code and country_code in elec_map:
         try:
-            e_efs['Electricity'] = float(elec_map[country_code])
+            e_efs["Electricity"] = float(elec_map[country_code])
         except Exception:
-            pass  # keep original if casting fails
+            pass
 
-    # Initial recipes
+    # Initial recipes (first pass)
     recipes = load_recipes_from_yaml(
-        os.path.join(base, 'recipes.yml'),
+        os.path.join(base, "recipes.yml"),
         params, energy_int, energy_shares, energy_content
     )
+
     # ---- Enforce route-locked energy_int override (defense-in-depth) ----
     allowed_proc_by_route = {
-        "BF-BOF":    "Blast Furnace",
-        "DRI-EAF":   "Direct Reduction Iron",
+        "BF-BOF": "Blast Furnace",
+        "DRI-EAF": "Direct Reduction Iron",
         "EAF-Scrap": "Electric Arc Furnace",
     }
     allowed_proc = allowed_proc_by_route.get(route_preset)
     if allowed_proc:
-        ei = scenario.get('energy_int')
+        ei = scenario.get("energy_int")
         if isinstance(ei, dict):
-            # keep only the allowed key; drop all others
-            scenario['energy_int'] = {k: v for k, v in ei.items() if k == allowed_proc and v is not None}
+            scenario["energy_int"] = {k: v for k, v in ei.items() if k == allowed_proc and v is not None}
         else:
-            scenario['energy_int'] = {}
+            scenario["energy_int"] = {}
     else:
-        # No overrides allowed for 'External'/'auto'
-        scenario['energy_int'] = {}
+        scenario["energy_int"] = {}
 
-    # ---------- Scenario overrides ----------
-    apply_fuel_substitutions(scenario.get('fuel_substitutions', {}), energy_shares, energy_int, energy_content, e_efs)
-    apply_dict_overrides(energy_int,     scenario.get('energy_int', {}))
-    apply_dict_overrides(energy_shares,  scenario.get('energy_matrix', {}))
-    apply_dict_overrides(energy_content, scenario.get('energy_content', {}))
-    apply_dict_overrides(e_efs,          scenario.get('emission_factors', {}))
+    # ----------- Apply scenario overrides -----------
+    apply_fuel_substitutions(
+        scenario.get("fuel_substitutions", {}),
+        energy_shares, energy_int, energy_content, e_efs
+    )
+    apply_dict_overrides(energy_int,     scenario.get("energy_int", {}))
+    apply_dict_overrides(energy_shares,  scenario.get("energy_matrix", {}))
+    apply_dict_overrides(energy_content, scenario.get("energy_content", {}))
+    apply_dict_overrides(e_efs,          scenario.get("emission_factors", {}))
 
-    # Parameters (light/deep merge)
+    # Parameters deep-merge into SimpleNamespace
     from types import SimpleNamespace
+
     def _recursive_ns_update(ns, patch):
         for k, v in (patch or {}).items():
             if isinstance(v, dict):
@@ -347,28 +353,31 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
             else:
                 setattr(ns, k, v)
 
-    _param_patch = scenario.get('param_overrides', None)
+    _param_patch = scenario.get("param_overrides", None)
     if _param_patch is None:
-        _param_patch = scenario.get('parameters', {})
+        _param_patch = scenario.get("parameters", {})
     _recursive_ns_update(params, _param_patch)
 
     # Re-load recipes to re-evaluate expressions with updated params; then recipe overrides
     recipes = load_recipes_from_yaml(
-        os.path.join(base, 'recipes.yml'),
+        os.path.join(base, "recipes.yml"),
         params, energy_int, energy_shares, energy_content
     )
-    recipes = apply_recipe_overrides(recipes, scenario.get('recipe_overrides', {}), params, energy_int, energy_shares, energy_content)
+    recipes = apply_recipe_overrides(
+        recipes,
+        scenario.get("recipe_overrides", {}),
+        params, energy_int, energy_shares, energy_content
+    )
 
-    # ---------- Route mask & feed enforcement ----------
+    # ----------- Route mask & feed enforcement -----------
     pre_mask = build_route_mask(route_preset, recipes)
     eaf_mode = _infer_eaf_mode(route_preset)
 
-    # Work on a copy for calculations (enforce feed)
     import copy
     recipes_calc = copy.deepcopy(recipes)
     enforce_eaf_feed(recipes_calc, eaf_mode)
 
-    # ---------- Build production route from picks ----------
+    # ----------- Build production route from picks -----------
     demand_mat = STAGE_MATS[stage_key]
     production_routes: Dict[str, int] = _build_routes_from_picks(
         recipes_calc,
@@ -378,13 +387,10 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         pre_select=pre_select_soft,
     )
 
-    # ---------- Solve balances ----------
+    # ----------- Solve balances -----------
     final_demand = {demand_mat: demand_qty}
-
     balance_matrix, prod_levels = calculate_balance_matrix(recipes_calc, final_demand, production_routes)
-    
     if balance_matrix is None:
-        # Return empty-ish structures with a message rather than crashing
         return RunOutputs(
             production_routes=production_routes,
             prod_levels={},
@@ -397,21 +403,22 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     # Ensure energy tables have rows for all active variants
     active_procs = [p for p, r in prod_levels.items() if r > 1e-9]
-    from steel_model_core import expand_energy_tables_for_active
+    from forge_core.steel_model_core import expand_energy_tables_for_active
     expand_energy_tables_for_active(active_procs, energy_shares, energy_int)
 
-    # Energy balance (base)
+    # ----------- Energy balance (base) -----------
     energy_balance = calculate_energy_balance(prod_levels, energy_int, energy_shares)
 
-    # --- Recovered process gas (BF, CP, BOF) via recovery rates ---
-    # params.yml:
-    # gas_recovery_rates:
-    #   Blast_Furnace: 0.266
-    #   Coke_Production: 0.181
-    #   Basic_Oxygen_Furnace: 0.573
+    # ----------- Present-boundary electricity demand -----------
+    def _inside_elec_present(eb: pd.DataFrame) -> float:
+        if "Electricity" not in eb.columns:
+            return 0.0
+        idx = [p for p in eb.index if p not in ("TOTAL", "Utility Plant") and p not in OUTSIDE_MILL_PROCS]
+        return float(eb.loc[idx, "Electricity"].clip(lower=0).sum())
 
-    from types import SimpleNamespace
+    inside_elec_dyn = _inside_elec_present(energy_balance)
 
+    # ----------- Recovered process gas (BF/COG/BOFG) -----------
     recipes_dict = {r.name: r for r in recipes_calc}
     recovery = getattr(params, "gas_recovery_rates", SimpleNamespace())
     rr = {
@@ -430,9 +437,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     gas_bf_MJ  = _proc_gas_MJ("Blast Furnace")
     gas_cp_MJ  = _proc_gas_MJ("Coke Production")
     gas_bof_MJ = _proc_gas_MJ("Basic Oxygen Furnace")
-
     total_gas_MJ = float(gas_bf_MJ + gas_cp_MJ + gas_bof_MJ)
-
 
     def _proc_gas_EF(proc_name: str) -> float:
         shares = dict(energy_shares.get(proc_name, {}))
@@ -442,51 +447,113 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         denom = sum(s for _, s in fuels) or 1e-12
         return sum(s * float(e_efs.get(c, 0.0)) for c, s in fuels) / denom
 
-    EF_bf   = _proc_gas_EF("Blast Furnace")
-    EF_cp   = _proc_gas_EF("Coke Production")
-    EF_bof  = _proc_gas_EF("Basic Oxygen Furnace")
+    EF_bf  = _proc_gas_EF("Blast Furnace")
+    EF_cp  = _proc_gas_EF("Coke Production")
+    EF_bof = _proc_gas_EF("Basic Oxygen Furnace")
+    EF_process_gas = (EF_bf * gas_bf_MJ + EF_cp * gas_cp_MJ + EF_bof * gas_bof_MJ) / total_gas_MJ if total_gas_MJ > 1e-9 else 0.0
 
-    if total_gas_MJ > 1e-9:
-        EF_process_gas = (EF_bf * gas_bf_MJ + EF_cp * gas_cp_MJ + EF_bof * gas_bof_MJ) / total_gas_MJ
-    else:
-        EF_process_gas = 0.0
+    # Dicts used by dispatch
+    gas_MJ_by_source = {"BF": gas_bf_MJ, "COG": gas_cp_MJ, "BOFG": gas_bof_MJ}
+    gas_ef_by_source = {"BF": EF_bf,      "COG": EF_cp,     "BOFG": EF_bof}
+    gas_pooled_ef_g_per_MJ = EF_process_gas
 
-
+    # Utility Plant (optional) electric efficiency if you keep it in recipes (for quick prints only)
     try:
-        util_eff = recipes_dict.get('Utility Plant', Process('',{},{})).outputs.get('Electricity', 0.0)
+        util_eff = recipes_dict.get("Utility Plant", Process("", {}, {})).outputs.get("Electricity", 0.0)
     except Exception:
         util_eff = 0.0
 
-    internal_elec = total_gas_MJ * util_eff  # potential internal electricity (MJ)
+    # ----------- Utility dispatch (internal-first) -----------
+    from forge_core.utility_dispatch import dispatch, DispatchParams, Demands
 
-    # --- QUICK HEALTH CHECK: Utility Plant gas→power path ---
-    def _hp(x): 
-        try: 
-            return f"{float(x):,.2f}"
-        except Exception:
-            return str(x)
+    # Steam demand (inside) if modeled
+    steam_col = "Steam"
+    steam_demand_MJ = 0.0
+    if steam_col in energy_balance.columns:
+        inside_mask = energy_balance.index.map(lambda p: p not in ("TOTAL", "Utility Plant") and p not in OUTSIDE_MILL_PROCS)
+        steam_demand_MJ = float(energy_balance.loc[inside_mask, steam_col].clip(lower=0.0).sum())
 
-    print("\n[HP] === Utility Plant quick check ===")
-    print(f"[HP] Gas components (MJ):  BF={_hp(gas_bf_MJ)}, CP={_hp(gas_cp_MJ)}, BOF={_hp(gas_bof_MJ)}")
-    print(f"[HP] Total recovered gas to Utility (MJ): { _hp(total_gas_MJ) }")
+    # Read utility config safely from params (SimpleNamespace)
+    u = getattr(params, "utility", SimpleNamespace())
+    utility_cfg = {
+        "dispatch_priority": getattr(u, "dispatch_priority", ["steam", "direct", "power"]),
+        "boiler_eff": getattr(u, "boiler_eff", 0.85),
+        "power_eff": getattr(u, "power_eff", 0.35),
+        "allow_export": getattr(u, "allow_export", False),
+        "allow_flare": getattr(u, "allow_flare", True),
+        "purchased_steam_carrier": getattr(u, "purchased_steam_carrier", "Steam"),
+        "market_fuel_for_direct": getattr(u, "market_fuel_for_direct", "Natural Gas"),
+        "direct_heat_eligible_fraction": getattr(u, "direct_heat_eligible_fraction", 0.0),
+    }
 
-    print(f"[HP] Utility Plant efficiency (MJ_e per MJ_gas): { _hp(util_eff) }")
-    print(f"[HP] Internal electricity produced (MJ): { _hp(internal_elec) }")
+    # Direct-heat eligible demand only when no explicit Steam is modeled
+    non_electric_cols = [c for c in energy_balance.columns if c not in ("Electricity", steam_col)]
+    direct_heat_eligible_MJ = 0.0
+    if steam_demand_MJ <= 0.0 and utility_cfg["direct_heat_eligible_fraction"] > 0.0 and non_electric_cols:
+        inside_mask = energy_balance.index.map(lambda p: p not in ("TOTAL", "Utility Plant") and p not in OUTSIDE_MILL_PROCS)
+        non_elec_sum = float(energy_balance.loc[inside_mask, non_electric_cols].clip(lower=0.0).sum().sum())
+        direct_heat_eligible_MJ = float(utility_cfg["direct_heat_eligible_fraction"]) * non_elec_sum
 
-    if total_gas_MJ <= 1e-9:
-        print("[HP][WARN] total_gas_MJ is ~0 → check gas_recovery_rates in parameters.yml and energy_int/energy_matrix rows for BF/CP/BOF.")
-    if util_eff <= 0.0:
-        print("[HP][WARN] Utility Plant 'Electricity' output is 0 or missing in recipes.yml (process name must be exactly 'Utility Plant').")
+    # Electricity demand (present boundary)
+    elec_demand_MJ = float(max(0.0, inside_elec_dyn))
 
-    # (Optional) show the plant row in the energy table (presentation only)
-    # from steel_model_core import adjust_energy_balance
-    # energy_balance = adjust_energy_balance(energy_balance, internal_elec)
+    # Gas sources + EFs for dispatch
+    pooled_gas_ef = float(max(0.0, gas_pooled_ef_g_per_MJ))
+    gas_sources = {
+        src: {"MJ": float(max(0.0, MJ)), "ef_g_per_MJ": float(max(0.0, gas_ef_by_source.get(src, pooled_gas_ef)))}
+        for src, MJ in gas_MJ_by_source.items()
+    }
+
+    dp = DispatchParams(
+        dispatch_priority=list(utility_cfg["dispatch_priority"]),
+        boiler_eff=float(utility_cfg["boiler_eff"]),
+        power_eff=float(utility_cfg["power_eff"]),
+        allow_export=bool(utility_cfg["allow_export"]),
+        allow_flare=bool(utility_cfg["allow_flare"]),
 
 
-    # FIXED PLANT-LEVEL CALCULATIONS (not dependent on user's stop-at-stage)
-    # Compute reference in-mill electricity (IP3 boundary)
-    inside_elec_ref, f_internal, ef_internal_electricity = compute_fixed_plant_elec_model(
-        recipes=recipes,                           # note: pass the base recipes (not calc copy)
+    )
+
+    res = dispatch(
+        gas_sources=gas_sources,
+        demands=Demands(
+            steam_MJ=steam_demand_MJ,
+            direct_heat_MJ=direct_heat_eligible_MJ,
+            electricity_MJ=elec_demand_MJ,
+        ),
+        params=dp,
+    )
+
+    # ----------- Apply market top-ups (Utility Plant row) -----------
+    utility_row_name = "Utility Plant"
+    if utility_row_name not in energy_balance.index:
+        energy_balance.loc[utility_row_name] = {c: 0.0 for c in energy_balance.columns}
+
+    # steam shortfall → purchased Steam (if modeled) else equivalent market fuel
+    purchased_steam_carrier = str(utility_cfg["purchased_steam_carrier"])
+    if res.shortfall_steam_MJ > 0.0:
+        if purchased_steam_carrier in energy_balance.columns:
+            energy_balance.loc[utility_row_name, purchased_steam_carrier] = \
+                float(energy_balance.loc[utility_row_name, purchased_steam_carrier]) + res.shortfall_steam_MJ
+        else:
+            market_fuel = str(utility_cfg["market_fuel_for_direct"])
+            gas_equiv = res.shortfall_steam_MJ / max(1e-12, dp.boiler_eff)
+            if market_fuel not in energy_balance.columns:
+                energy_balance[market_fuel] = 0.0
+            energy_balance.loc[utility_row_name, market_fuel] = \
+                float(energy_balance.loc[utility_row_name, market_fuel]) + gas_equiv
+
+    # direct-heat shortfall → market fuel
+    if res.shortfall_direct_MJ > 0.0:
+        market_fuel = str(utility_cfg["market_fuel_for_direct"])
+        if market_fuel not in energy_balance.columns:
+            energy_balance[market_fuel] = 0.0
+        energy_balance.loc[utility_row_name, market_fuel] = \
+            float(energy_balance.loc[utility_row_name, market_fuel]) + res.shortfall_direct_MJ
+
+    # ----------- Reference (fixed) plant electricity model for meta only -----------
+    inside_elec_ref_fixed, f_internal_fixed, ef_internal_fixed = compute_fixed_plant_elec_model(
+        recipes=recipes,  # base recipes
         energy_int=energy_int,
         energy_shares=energy_shares,
         energy_content=energy_content,
@@ -496,83 +563,91 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         stage_ref="IP3",
     )
 
-    # Present boundary in-mill electricity demand (dynamic boundary)
+    # ----------- Emissions: use DISPATCH results -----------
+    # internal electricity (MJ), internal fraction, and EF from dispatch
+    internal_elec_MJ = float(res.produced_electricity_MJ)
+    internal_fraction_plant = float(res.internal_electricity_fraction)
+    ef_internal_electricity = float(res.ef_internal_electricity_g_per_MJ)
 
-    def _inside_elec_present(eb):
-        if "Electricity" not in eb.columns:
-            return 0.0
-        idx = [p for p in eb.index if p not in ("TOTAL", "Utility Plant") and p not in OUTSIDE_MILL_PROCS]
-        return float(eb.loc[idx, "Electricity"].clip(lower=0).sum())
-
-    inside_elec_dyn = _inside_elec_present(energy_balance)
-
-    # Internal electricity potential (from recovered gas) you computed:
-    #   internal_elec = total_gas_MJ * util_eff
-    internal_used_dyn = min(internal_elec, inside_elec_dyn)  # actually available vs present demand
-
-    # DEBUG clarity: show both reference and present
-    print(f"[HP] Internal elec (present boundary): used={internal_used_dyn:.2f} MJ  demand={inside_elec_dyn:.2f} MJ")
-    print(f"[HP] Reference boundary (IP3): demand={inside_elec_ref:.2f} MJ  f_internal(fixed)={f_internal:.3f}")
-
-
-    # We will NOT mutate energy_balance here. Emissions will use f_internal & ef_internal_electricity.
-    # If the credit is disabled for this scenario, zero-out the internal terms only.
+    # If gas credit is disabled, zero out internal elec & process-gas meta to mimic "no credit"
     if not credit_on:
-        internal_elec = 0.0
+        internal_elec_MJ = 0.0
         total_gas_MJ = 0.0
         EF_process_gas = 0.0
-    # (No call to adjust_energy_balance)
+        internal_fraction_plant = 0.0
+        ef_internal_electricity = 0.0
 
+    process_emissions_table = load_data_from_yaml(os.path.join(base, "process_emissions.yml"))
 
-    # Load process-emissions yaml for direct process emissions (if needed)
-    process_emissions_table = load_data_from_yaml(os.path.join(base, 'process_emissions.yml'))
-
-    # Emissions (robust to differing signatures)
     emissions = _robust_call_calculate_emissions(
         calculate_emissions,
         mkt_cfg=mkt_cfg,
-        prod_lvl=prod_levels,            # some versions expect prod_lvl
-        prod_level=prod_levels,          # others expect prod_level
-        energy_balance=energy_balance,   # some versions expect energy_balance
-        energy_df=energy_balance,        # others expect energy_df
-        # emission factors
-        e_efs=e_efs,                     # some versions expect e_efs
-        energy_efs=e_efs,                # others expect energy_efs
-        # process emissions table
-        process_emissions_table=process_emissions_table,  # some versions expect this name
-        process_efs=process_emissions_table,              # others expect process_efs
-        internal_elec=internal_elec,
+        prod_lvl=prod_levels,
+        prod_level=prod_levels,
+        energy_balance=energy_balance,
+        energy_df=energy_balance,
+        e_efs=e_efs,
+        energy_efs=e_efs,
+        process_emissions_table=process_emissions_table,
+        process_efs=process_emissions_table,
+        internal_elec=internal_elec_MJ,                   # <- DISPATCH
         final_demand=final_demand,
-        total_gas_MJ=total_gas_MJ,
-        EF_process_gas=EF_process_gas,
-        # Fixed plant-level values
-        internal_fraction_plant=f_internal,
-        ef_internal_electricity=ef_internal_electricity,
+        total_gas_MJ=total_gas_MJ,                        # for reference/meta if your fn uses it
+        EF_process_gas=EF_process_gas,                    # pooled EF of the gas (not double-counted)
+        internal_fraction_plant=internal_fraction_plant,  # <- DISPATCH
+        ef_internal_electricity=ef_internal_electricity,  # <- DISPATCH
     )
 
-    # Ensure a TOTAL row if your function doesn't add it
+    # ----------- TOTAL CO2e (robust) -----------
     total_co2 = None
     try:
         if emissions is not None and not emissions.empty:
-            if 'TOTAL' not in emissions.index and 'TOTAL CO2e' in emissions.columns:
-                emissions.loc['TOTAL'] = emissions.sum()
-            if 'TOTAL' in emissions.index and 'TOTAL CO2e' in emissions.columns:
-                total_co2 = float(emissions.loc['TOTAL', 'TOTAL CO2e'])
-            elif 'TOTAL CO2e' in emissions.columns:
-                total_co2 = float(emissions['TOTAL CO2e'].sum())
+            if "TOTAL" not in emissions.index and "TOTAL CO2e" in emissions.columns:
+                emissions.loc["TOTAL"] = emissions.sum()
+            if "TOTAL" in emissions.index and "TOTAL CO2e" in emissions.columns:
+                total_co2 = float(emissions.loc["TOTAL", "TOTAL CO2e"])
+            elif "TOTAL CO2e" in emissions.columns:
+                total_co2 = float(emissions["TOTAL CO2e"].sum())
     except Exception:
         pass
-    fyield = float(getattr(params, "finished_yield", 0.85))    
-    meta = {
+
+    fyield = float(getattr(params, "finished_yield", 0.85))
+
+    # ----------- Meta (merge; keep dispatch block) -----------
+    meta: Dict[str, Any] = {
         "route_preset": route_preset,
         "stage_key": stage_key,
         "demand_qty": demand_qty,
         "country_code": country_code,
         "process_gas_credit_enabled": bool(credit_on),
-        "inside_elec_ref": inside_elec_ref,
-        "f_internal": f_internal,
-        "ef_internal_electricity": ef_internal_electricity,
-        "finished_yield": fyield
+        "inside_elec_ref_fixed": inside_elec_ref_fixed,
+        "f_internal_fixed": f_internal_fixed,
+        "ef_internal_electricity_fixed": ef_internal_fixed,
+        "finished_yield": fyield,
+        "dispatch": {
+            "gas_available_MJ": {
+                **{k: float(v) for k, v in gas_MJ_by_source.items()},
+                "TOTAL": float(sum(gas_MJ_by_source.values())),
+            },
+            "allocations_MJ": {
+                "to_steam": float(res.gas_to_steam_MJ),
+                "to_direct": float(res.gas_to_direct_MJ),
+                "to_power": float(res.gas_to_power_MJ),
+                "export": float(res.gas_export_MJ),
+                "flare": float(res.gas_flare_MJ),
+            },
+            "produced": {
+                "steam_MJ": float(res.produced_steam_MJ),
+                "electricity_MJ": float(res.produced_electricity_MJ),
+            },
+            "shortfalls_market": {
+                "steam_MJ": float(res.shortfall_steam_MJ),
+                "direct_MJ": float(res.shortfall_direct_MJ),
+                "electricity_MJ": float(res.shortfall_electricity_MJ),
+            },
+            "ef_internal_electricity": float(ef_internal_electricity),
+            "internal_electricity_fraction": float(internal_fraction_plant),
+        },
     }
 
     return RunOutputs(

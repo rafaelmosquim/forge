@@ -1,5 +1,5 @@
 ---
-title: 'FORGE: Flexible Optimization of Routes for GHG & Energy'
+title: 'FORGE: Flexible Optimization of Routes for GHG and Energy'
 tags:
   - Python
   - steel production
@@ -69,7 +69,6 @@ FORGE employs an interactive, web-based architecture to handle the inherent comp
 
 To validate FORGE against industry benchmarks, we configured the model with the "Likely" dataset and Brazil grid electricity (country code: BRA), then computed emissions at the crude steel stage ("Validation (as cast")) boundary. Table 1 compares these results with Worldsteel 2023 industry averages [@worldsteel2023].
 
-Table 1 compares FORGE results (Likely dataset, Brazil grid, crude steel boundary) with Worldsteel 2023 benchmarks.
 
 **Table 1. Model validation: FORGE vs. Worldsteel 2023 (tonne CO₂ per tonne crude steel).**
 
@@ -81,7 +80,7 @@ Table 1 compares FORGE results (Likely dataset, Brazil grid, crude steel boundar
 
 *Notes: FORGE simulations used the “Likely” dataset and Brazil grid electricity factor. Boundary: crude steel (as-cast), selected via “Validation (as cast)” option.*
 
-The validation shows strong agreement for BF-BOF. The EAF-Scrap and DRI-EAF routes routes show significantly lower emissions in FORGE due to Brazil's renewable-heavy electricity grid (84% renewable in 2023), compared to the global average grid mix reflected in Worldsteel data.
+The validation shows strong agreement for BF-BOF. The EAF-Scrap and DRI-EAF routes show significantly lower emissions in FORGE due to Brazil's renewable-heavy electricity grid (84% renewable in 2023), compared to the global average grid mix reflected in Worldsteel data.
 
 ## Model Configuration
 
@@ -96,7 +95,7 @@ validation by independent users.
 
 # Acknowledgements
 
-First author would like to thank the funding from \textit{Fundação de Desenvolvimento da Pesquisa} (FUNDEP), Project 27192*57 - Linha V Mover ''Do berço ao Portão''
+First author would like to thank the funding from Fundação de Desenvolvimento da Pesquisa (FUNDEP), Project 27192*57 - Linha V Mover ''Do berço ao Portão''
 
 ## Development Process
 
@@ -107,7 +106,7 @@ rigorous domain expertise and validation throughout.
 ### Development Workflow:
 
 1. **Mathematical Formulation**: The core steel production algorithms were 
-   first specified mathematically based on the established Excel model
+   first specified mathematically based on a previously validated Excel model.
 
 2. **AI-Assisted Implementation**: Python code was generated iteratively 
    through prompt engineering that incorporated domain-specific constraints

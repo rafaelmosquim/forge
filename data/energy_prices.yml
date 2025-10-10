@@ -1,0 +1,7 @@
+energy_prices:
+  Coal: 1  # US/MJ (example value)
+  Coke: 28.87  # MJ/kg
+  Gas: 49.76   # MJ/kg (natural gas equivalent)
+  Wood: 12.97  # MJ/kg
+  Charcoal: 28.40  # MJ/kg
+  Electricity: 1.99

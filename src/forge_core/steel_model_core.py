@@ -151,6 +151,7 @@ def load_electricity_intensity(filepath):
             pass
     return out
 
+
 # ===================================================================
 #                          Plot Builders
 # ===================================================================
@@ -562,6 +563,22 @@ def calculate_energy_balance(prod_level, energy_int, energy_shares):
     bal = pd.DataFrame(data, index=common, columns=all_carriers).fillna(0.0)
     bal.loc['TOTAL'] = bal.sum()
     return bal
+
+def analyze_energy_costs(bal_data, en_price):
+    """Calculate total energy costs from the balance data"""
+    total_cost = 0.0
+    
+    # Get the TOTAL row (sum of all products)
+    total_row = bal_data.loc['TOTAL']
+    
+    # Loop through each energy carrier in the balance
+    for carrier, energy_mj in total_row.items():
+        if carrier in en_price:  # Check if we have a price for this carrier
+            cost = energy_mj * en_price[carrier]
+            total_cost += cost
+            print(f"{carrier}: {energy_mj:.1f} MJ × ${en_price[carrier]:.2f}/MJ = ${cost:.2f}")
+    
+    return total_cost
 
 def adjust_energy_balance(energy_df, internal_elec):
     """
@@ -1135,12 +1152,13 @@ if __name__ == '__main__':
     scenario = load_data_from_yaml(sc_path, default_value=None, unwrap_single_key=False)
     print(f"[INFO] Scenario: {scenario.get('description','(no description)')}")
 
-    # ---------- base configs (load ONCE) ----------
+    # ---------- i  configs (load ONCE) ----------
     energy_int      = load_data_from_yaml(os.path.join(base,'energy_int.yml'))
     energy_shares   = load_data_from_yaml(os.path.join(base,'energy_matrix.yml'))
     energy_content  = load_data_from_yaml(os.path.join(base,'energy_content.yml'))
     e_efs           = load_data_from_yaml(os.path.join(base,'emission_factors.yml'))
     params          = load_parameters      (os.path.join(base,'parameters.yml'))
+    energy_prices   = load_data_from_yaml(os.path.join(base, 'energy_prices.yml'))
 
     # ---- country → electricity EF selection (first prompt) ----
     elec_map = load_electricity_intensity(os.path.join(base, 'electricity_intensity.yml'))
@@ -1301,6 +1319,10 @@ if __name__ == '__main__':
 
     # ---------- PRESENT energy balance ----------
     energy_balance = calculate_energy_balance(prod_lvl, energy_int, energy_shares)
+
+    # Total energy cost from carriers
+    total_cost = analyze_energy_costs(energy_balance, energy_prices)
+    print(f"Total energy cost: ${total_cost:.2f}")
 
     # Present in-mill electricity (MJ) — scales with the user's current boundary
     inside_idx_present = [p for p in energy_balance.index

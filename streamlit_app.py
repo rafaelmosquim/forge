@@ -581,6 +581,15 @@ with st.sidebar:
         scenario_name = "(no scenario)"
         st.warning("No scenario .yml files found in data/scenarios")
 
+    direct_use_fraction = st.slider(
+        "Direct Use Fraction", 
+        min_value=0.0, 
+        max_value=1.0, 
+        value=0.5,  # Default to 50/50
+        step=0.25,  # 0%, 25%, 50%, 75%, 100%
+        #format="%f0%%",  # Display as percentages
+        help="What percentage of recovered process gas should be used directly as fuel (the rest goes to electricity generation)"
+    )
 
     route = _route_from_scenario(scenario, scenario_name)
     #st.caption(f"Route preset: **{route}** (locked by scenario)")
@@ -1509,6 +1518,11 @@ if not IS_PAPER:
 if run_now:
     try:
         with st.spinner("Running model (core)…"):
+            scenario['gas_routing'] = {
+                'direct_use_fraction': direct_use_fraction,
+                'electricity_fraction': 1.0 - direct_use_fraction
+            }
+            
             route_cfg = RouteConfig(
                 route_preset=route,
                 stage_key=stage_key,

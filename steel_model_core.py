@@ -637,20 +637,55 @@ def analyze_energy_costs(bal_data, en_price):
 
 
 def analyze_material_costs(matrix_data, mat_price):
-    """ Calculate total energy cost from the balance data"""
+    """Calculate total material cost from all external purchase rows"""
     material_cost = 0.0
-
-    # Get the TOTAL row (sum of all products)
-    external_inputs_row = matrix_data.loc['External Inputs']
     
-    # Loop through each energy carrier in the balance
-    for material, quantity in external_inputs_row.items():
-        if material in mat_price: # Check if we have a price for this material
+    # Define exactly which rows represent external purchases based on your balance matrix
+    external_purchase_rows = [
+        'External Inputs',           # Iron Ore from Market
+        'Scrap Purchase',            # Scrap
+        'Limestone from Market',     # Limestone
+        'Burnt Lime from market',    # Burnt Lime
+        'Dolomite from market',      # Dolomite
+        'Nitrogen from market',      # Nitrogen
+        'Oxygen from market'         # Oxygen
+    ]
+    
+    print("Analyzing material costs from external purchase rows:")
+    
+    # Track all external purchases
+    total_external = defaultdict(float)
+    
+    for row_name in external_purchase_rows:
+        if row_name in matrix_data.index:
+            row_data = matrix_data.loc[row_name]
+            print(f"\n{row_name}:")
+            
+            for material, quantity in row_data.items():
+                if abs(quantity) > 1e-9:
+                    # For external purchase processes, we want POSITIVE quantities
+                    # These represent materials being brought into the system
+                    if quantity > 0:
+                        total_external[material] += quantity
+                        print(f"  {material}: {quantity:.4f} units")
+    
+    # Calculate total cost
+    print("\n" + "="*50)
+    print("TOTAL EXTERNAL MATERIAL PURCHASES:")
+    print("="*50)
+    
+    for material, quantity in sorted(total_external.items()):
+        if material in mat_price:
             cost = quantity * mat_price[material]
             material_cost += cost
-            print(f"{material}: {quantity:.1f} units x ${mat_price[material]:.2f} = ${cost:.2f}")
-
-    return material_cost    
+            print(f"{material:20} {quantity:10.4f} units x ${mat_price[material]:8.2f} = ${cost:12.2f}")
+        else:
+            print(f"{material:20} {quantity:10.4f} units - NO PRICE AVAILABLE")
+    
+    print("="*50)
+    print(f"{'TOTAL MATERIAL COST:':20} ${material_cost:12.2f}")
+    
+    return material_cost
 
 def calculate_internal_electricity(prod_level, recipes_dict, params):
     """

@@ -1,4 +1,9 @@
 material_prices:
   Iron Ore from Market: 1  # USD/kg
-  Limestone from Market: 1  # USD/kg
-  Scrap Purchase: 1   # USD/kg
+  Scrap: 1
+  Limestone: 1
+  Burnt Lime: 1
+  Dolomite: 1
+  Nitrogen: 1
+  Oxygen: 1
+

@@ -1,0 +1,10 @@
+description: "Base BF–BOF (no overrides)"
+
+route_overrides:
+  Blast Furnace: 1.0
+  Basic Oxygen Furnace: 1.0
+  Electric Arc Furnace: 0.0
+  Direct Reduction Iron: 0.0
+  Charcoal from Market: 0.0   # optional, to force Wood → kiln path
+  Charcoal Production: 1.0
+  Coke Production: 1.0

@@ -1,0 +1,78 @@
+processes:
+  "Manganese from Market": ~
+  "Chromium from Market": ~
+  "Nickel from Market": ~
+  "Molibdenium from Market": ~
+  "Copper from Market": ~
+  "Silicon from market": ~
+  "Vanadium from market": ~
+  "Titanium from market": ~
+  "Niobium from market": ~
+  "Aluminium from market": ~
+  "Zinc from Market": ~
+  "Limestone from Market": ~
+  "Process Gas": ~
+  "Fuel Oil from Market": ~
+  "Diesel from Market": ~
+  "Ethanol from Market": ~
+  "Biodiesel from Market": ~
+  "Natural gas from Market": ~
+  "LPG from Market": ~
+  "Biomethane from Market": ~
+  "Hydrogen (Electrolysis) from Market": ~
+  "Hydrogen (Methane reforming) from Market": ~
+  "Wood from Market": ~
+  "Charcoal from Market": ~
+  "Coal from Market": ~
+  "Anthracite Coal from Market": ~
+  "PCI Coal from Market": ~
+  "Coke Petroleum from Market": ~
+  "Coke Mineral from Market": ~
+  "Electricity from Market": ~
+  "Electricity Hydro from Market": ~
+  "Electricity Eolic from Market": ~
+  "Electricity Solar from Market": ~
+  "Electricity Biomass from Market": ~
+  "Electricity Production": ~
+  "Charcoal Production": ~
+  "Coke Production": 3.43
+  "Steam Production": ~
+  "Nitrogen from Market": ~
+  "Nitrogen Production": 4.94
+  "Oxygen from Market": ~
+  "Oxygen Production": 4.5
+  "Burnt Lime from Market": ~
+  "Burnt Lime Production": 6.61
+  "Dolomite from Market": ~
+  "Dolomite Production": 6.61
+  "Alloys Mix for Low Alloy Steel (LAS)": ~
+  "Alloys Mix for High Alloy Steel (HAS)": ~
+  "Scrap Purchase": ~
+  "Iron Ore from Market": ~
+  "Direct Iron ore": ~
+  "Sintering": 2.87
+  "Pelletizing": 1.1
+  "Blast Furnace": 13.6
+  "Direct Reduction Iron": 10.0
+  "Iron Foundry": 0.0
+  "Electric Arc Furnace": 4.0
+  "Basic Oxygen Furnace": 1.35
+  "Regular Steel": ~
+  "Steel Refining (Low Alloy)": 6.5
+  "Steel Refining (High Alloy)": 6.5
+  "Continuous Casting": 0.25
+  "Ingot Casting": 0.0
+  "Hot Rolling": 3.2
+  "Cold Rolling": 2.9
+  "Rod/bar/section Mill": 3.0
+  "Steel Thermal Treatment": 2.0
+  "Hot Dip Metal Coating": 2.5
+  "Electrolytic Metal Coating": 4.60
+  "Direct use of Basic Steel Products": ~
+  "Casting/Extrusion/Conformation": 1.0
+  "Stamping/calendering/lamination": 1.84
+  "Machining": 1.16
+  "No Coating": ~
+  "Hot Dip Metal Coating FP": 2.5
+  "Electrolytic Metal Coating FP": 4.60
+  "Organic or Sintetic Coating (painting)": 1.0

@@ -1,0 +1,79 @@
+processes:
+  "Manganese from Market": 3.95
+  "Chromium from Market": 9.07
+  "Nickel from Market": 24.22
+  "Molibdenium from Market": 17.22
+  "Copper from Market": 5.16
+  "Silicon from market": 6.53
+  "Vanadium from market": 21.07
+  "Titanium from market": 49.54
+  "Niobium from market": 17.21
+  "Aluminium from market": 21.85
+  "Zinc from Market": 5.45
+  "Limestone from Market": 0.44
+  "Process Gas": ~
+  "Fuel Oil from Market": 0.66
+  "Diesel from Market": 0.82
+  "Ethanol from Market": 0.78
+  "Biodiesel from Market": 0.71
+  "Natural gas from Market": 0.00
+  "LPG from Market": 0.98
+  "Biomethane from Market": 0.20
+  "Hydrogen (Electrolysis) from Market": 2.58
+  "Hydrogen (Methane reforming) from Market": 10.80
+  "Wood from Market": 0.10
+  "Charcoal from Market": 0.00
+  "Utility Plant": 0.00
+  "Coal from Market": 0.00
+  "Anthracite Coal from Market": 0.00
+  "PCI Coal from Market": 0.00
+  "Coke Petroleum from Market": 0.00
+  "Coke Mineral from Market": 0.00
+  "Electricity from Market": 0.14
+  "Electricity Hydro from Market": 0.07
+  "Electricity Eolic from Market": 0.01
+  "Electricity Solar from Market": 0.08
+  "Electricity Biomass from Market": 0.08
+  "Electricity Production": 0.00
+  "Charcoal Production": 1.75
+  "Coke Production": 0.87
+  "Steam Production": 0.00
+  "Nitrogen from Market": 0.44
+  "Nitrogen Production": 0.00
+  "Oxygen from Market": 1.09
+  "Oxygen Production": 0.00
+  "Burnt Lime from Market": 1.16
+  "Burnt Lime Production": 1.16
+  "Dolomite from Market": 0.13
+  "Dolomite Production": 0.09
+  "Alloys Mix for Low Alloy Steel (LAS)": 11.17
+  "Alloys Mix for High Alloy Steel (HAS)": 13.77
+  "Scrap Purchase": 0.01
+  "Iron Ore from Market": 0.01
+  "Direct Iron ore": 0.00
+  "Sintering": 0.42
+  "Pelletizing": 0.09
+  "Blast Furnace": 1.69
+  "Direct Reduction Iron": 1.93
+  "Iron Foundry": 1.83
+  "Electric Arc Furnace": 1.33
+  "Basic Oxygen Furnace": 2.24
+  "Regular Steel": 0.00
+  "Steel Refining (Low Alloy)": 2.24
+  "Steel Refining (High Alloy)": 2.20
+  "Continuous Casting": 0.00
+  "Ingot Casting": 0.00
+  "Hot Rolling": 0.28
+  "Cold Rolling": 0.64
+  "Rod/bar/section Mill": 0.17
+  "Steel Thermal Treatment": 0.00
+  "Hot Dip Metal Coating": 0.00
+  "Electrolytic Metal Coating": 0.00
+  "Direct use of Basic Steel Products": 0.00
+  "Casting/Extrusion/Conformation": 0.00
+  "Stamping/calendering/lamination": 0.00
+  "Machining": 0.00
+  "No Coating": 0.00
+  "Hot Dip Metal Coating FP": 0.00
+  "Electrolytic Metal Coating FP": 0.00
+  "Organic or Sintetic Coating (painting)": 0.00

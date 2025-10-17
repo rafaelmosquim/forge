@@ -1545,6 +1545,7 @@ if run_now:
         emissions        = getattr(out, "emissions", None)
         total            = getattr(out, "total_co2e_kg", None)
         total_cost       = getattr(out, "total_cost", None)
+        material_cost    = getattr(out, "material_cost", None)
 
         # Try to grab the material balance from out under common names
         balance_matrix = next(
@@ -1588,13 +1589,14 @@ if run_now:
             demand_kg  = float(demand_qty) if float(demand_qty) > 0 else 1000.0  # guard
             raw_per_t  = total_kg / (demand_kg / 1000.0)  # kg CO2e per tonne at current stage
             total_cost = float(getattr(out, "total_cost", 0.0) or 0.0)
+            material_cost = float(getattr(out, "material_cost", 0.0) or 0.0)
 
             # 3) EF per ton FINISHED (apply yield ONLY if current stage is not Finished)
             is_finished = str(stage_key) in ("Finished", "Finished steel")
             per_t_finished = raw_per_t if not is_finished else (raw_per_t / max(fyield, 1e-9))
 
             # 4) Display
-            c1, c2,c3 = st.columns(3)
+            c1, c2, c3, c4 = st.columns(4)
             with c1:
                 st.metric("EF (raw)", f"{raw_per_t:,.0f} kg CO₂e / t at {stage_key}",
                         help="No yield applied (equivalent to yield = 1.00).")
@@ -1604,6 +1606,8 @@ if run_now:
             with c3:
                 st.metric("Total Energy Cost", f"${total_cost:,.2f}")
 
+            with c4:
+                st.metric("Material Energy Cost", f"${material_cost:,.2f}")
 
             # Downloads
             df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")
@@ -1618,6 +1622,12 @@ if run_now:
                                    file_name="emissions.csv", mime="text/csv")
 
             # Tables
+            
+            if isinstance(balance_matrix, pd.DataFrame) and not balance_matrix.empty:
+                st.dataframe(balance_matrix)
+            else:
+                st.info("No per-process emissions table for this run.")
+
             if isinstance(emissions, pd.DataFrame) and not emissions.empty:
                 st.dataframe(emissions)
             else:

@@ -635,6 +635,23 @@ def analyze_energy_costs(bal_data, en_price):
 
     return total_cost    
 
+
+def analyze_material_costs(matrix_data, mat_price):
+    """ Calculate total energy cost from the balance data"""
+    material_cost = 0.0
+
+    # Get the TOTAL row (sum of all products)
+    external_inputs_row = matrix_data.loc['External Inputs']
+    
+    # Loop through each energy carrier in the balance
+    for material, quantity in external_inputs_row.items():
+        if material in mat_price: # Check if we have a price for this material
+            cost = quantity * mat_price[material]
+            material_cost += cost
+            print(f"{material}: {quantity:.1f} units x ${mat_price[material]:.2f} = ${cost:.2f}")
+
+    return material_cost    
+
 def calculate_internal_electricity(prod_level, recipes_dict, params):
     """
     Internal electricity from recovered gases: BF top-gas delta + Coke-oven gas,
@@ -1215,6 +1232,8 @@ if __name__ == '__main__':
     energy_content  = load_data_from_yaml(os.path.join(base,'energy_content.yml'))
     e_efs           = load_data_from_yaml(os.path.join(base,'emission_factors.yml'))
     energy_prices   = load_data_from_yaml(os.path.join(base, 'energy_prices.yml'))
+    material_prices = load_data_from_yaml(os.path.join(base, 'material_prices.yml'))
+
     params          = load_parameters      (os.path.join(base,'parameters.yml'))
 
     # ---- country → electricity EF selection (first prompt) ----
@@ -1428,6 +1447,8 @@ if __name__ == '__main__':
     total_cost = analyze_energy_costs(energy_balance, energy_prices)
     print(f"Total energy cost: ${total_cost:.2f}")
 
+    material_cost = analyze_material_costs(balance_matrix, material_prices)
+    print(f"Total material cost: ${material_cost:.2f}")
 
 
     # ---------- visibility ----------

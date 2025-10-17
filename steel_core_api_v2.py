@@ -44,6 +44,7 @@ from steel_model_core import (
     calculate_internal_electricity,
     calculate_energy_balance,
     adjust_energy_balance,
+    analyze_energy_costs,
     calculate_emissions,  # signature may vary; we guard below
     # Data classes/types
     Process,
@@ -114,6 +115,7 @@ class RunOutputs:
     energy_balance: pd.DataFrame
     emissions: Optional[pd.DataFrame]
     total_co2e_kg: Optional[float]
+    total_cost: Optional[float] = None
     balance_matrix: Optional[pd.DataFrame] = None   # ← add this line
     meta: Dict[str, Any] = field(default_factory=dict)
 
@@ -441,6 +443,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
             energy_balance=pd.DataFrame(),
             emissions=None,
             total_co2e_kg=None,
+            total_cost=None,
             balance_matrix=pd.DataFrame(),
             meta={"error": "Material balance failed"},
         )
@@ -650,6 +653,27 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     except Exception:
         pass
     fyield = float(getattr(params, "finished_yield", 0.85))    
+
+    # ----------- Energy Cost Calculation -----------
+    try:
+        # Load energy prices
+        energy_prices_path = os.path.join(base, 'energy_prices.yml')
+        energy_prices = load_data_from_yaml(energy_prices_path) or {}
+
+        # Debug: Check what we are working with
+        print(f"🔍 Energy prices loaded: {bool(energy_prices)}")
+        print(f"🔍 Energy prices keys: {list(energy_prices.keys()) if energy_prices else 'None'}")
+
+        # Calculate total cost using core function
+        total_cost = analyze_energy_costs(energy_balance, energy_prices)
+        print(f"🔍 Total cost calculated: {total_cost}")
+        
+    except Exception as e:
+        print(f"❌ Error in cost calculation: {e}")
+        import traceback
+        traceback.print_exc()
+        total_cost = 0.0  # Default to 0 instead of None
+
     meta = {
         "route_preset": route_preset,
         "stage_key": stage_key,
@@ -699,6 +723,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         energy_balance=energy_balance,
         emissions=emissions,
         total_co2e_kg=total_co2,
+        total_cost=total_cost,
         balance_matrix=balance_matrix,
         meta=meta,
     )

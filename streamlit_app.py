@@ -1544,6 +1544,7 @@ if run_now:
         energy_balance   = getattr(out, "energy_balance", None)
         emissions        = getattr(out, "emissions", None)
         total            = getattr(out, "total_co2e_kg", None)
+        total_cost       = getattr(out, "total_cost", None)
 
         # Try to grab the material balance from out under common names
         balance_matrix = next(
@@ -1586,19 +1587,22 @@ if run_now:
             total_kg   = float(getattr(out, "total_co2e_kg", 0.0) or 0.0)
             demand_kg  = float(demand_qty) if float(demand_qty) > 0 else 1000.0  # guard
             raw_per_t  = total_kg / (demand_kg / 1000.0)  # kg CO2e per tonne at current stage
+            total_cost = float(getattr(out, "total_cost", 0.0) or 0.0)
 
             # 3) EF per ton FINISHED (apply yield ONLY if current stage is not Finished)
             is_finished = str(stage_key) in ("Finished", "Finished steel")
             per_t_finished = raw_per_t if not is_finished else (raw_per_t / max(fyield, 1e-9))
 
             # 4) Display
-            c1, c2 = st.columns(2)
+            c1, c2,c3 = st.columns(3)
             with c1:
                 st.metric("EF (raw)", f"{raw_per_t:,.0f} kg CO₂e / t at {stage_key}",
                         help="No yield applied (equivalent to yield = 1.00).")
             with c2:
                 st.metric("EF (per t finished)", f"{per_t_finished:,.0f} kg CO₂e / t finished",
                         help=f"Computed from raw EF; if stage ≠ Finished, divide by yield = {fyield:.2f}.")
+            with c3:
+                st.metric("Total Energy Cost", f"${total_cost:,.2f}")
 
 
             # Downloads

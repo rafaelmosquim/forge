@@ -1,0 +1,7 @@
+energy_prices:
+  Coal: 0.0071  # USD/MJ
+  Coke: 0.0110  # USD/MJ
+  Gas: 0.020   # USD/MJ
+  Wood: 1  # USD/MJ
+  Charcoal: 0.008 # USD/MJ
+  Electricity: 0.0352 #USD/MJ

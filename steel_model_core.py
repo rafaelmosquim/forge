@@ -619,6 +619,22 @@ def adjust_energy_balance(energy_df, internal_elec):
     df.loc['Utility Plant', 'Electricity'] = -internal_elec
     return df
 
+def analyze_energy_costs(bal_data, en_price):
+    """ Calculate total energy cost from the balance data"""
+    total_cost = 0.0
+
+    # Get the TOTAL row (sum of all products)
+    total_row = bal_data.loc['TOTAL']
+
+    # Loop through each energy carrier in the balance
+    for carrier, energy_mj in total_row.items():
+        if carrier in en_price: # Check if we have a price for this carrier
+            cost = energy_mj * en_price[carrier]
+            total_cost += cost
+            print(f"{carrier}: {energy_mj:.1f} MJ x ${en_price[carrier]:.2f} = ${cost:.2f}")
+
+    return total_cost    
+
 def calculate_internal_electricity(prod_level, recipes_dict, params):
     """
     Internal electricity from recovered gases: BF top-gas delta + Coke-oven gas,
@@ -1198,6 +1214,7 @@ if __name__ == '__main__':
     energy_shares   = load_data_from_yaml(os.path.join(base,'energy_matrix.yml'))
     energy_content  = load_data_from_yaml(os.path.join(base,'energy_content.yml'))
     e_efs           = load_data_from_yaml(os.path.join(base,'emission_factors.yml'))
+    energy_prices   = load_data_from_yaml(os.path.join(base, 'energy_prices.yml'))
     params          = load_parameters      (os.path.join(base,'parameters.yml'))
 
     # ---- country → electricity EF selection (first prompt) ----
@@ -1406,6 +1423,12 @@ if __name__ == '__main__':
 
     # Apply internal electricity credit (accounting only)
     energy_balance = adjust_energy_balance(energy_balance, internal_used_present)
+
+    # Total energy cost from carriers
+    total_cost = analyze_energy_costs(energy_balance, energy_prices)
+    print(f"Total energy cost: ${total_cost:.2f}")
+
+
 
     # ---------- visibility ----------
     ef_grid = e_efs.get('Electricity', 0.0)

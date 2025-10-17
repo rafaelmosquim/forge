@@ -582,7 +582,7 @@ with st.sidebar:
         st.warning("No scenario .yml files found in data/scenarios")
 
     direct_use_fraction = st.slider(
-        "Direct Use Fraction", 
+        "Direct Gas Use Fraction", 
         min_value=0.0, 
         max_value=1.0, 
         value=0.5,  # Default to 50/50

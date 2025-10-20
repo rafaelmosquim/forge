@@ -546,7 +546,7 @@ with st.sidebar:
     # Choose which data folder to use
     data_choice = st.selectbox(
         "Data set",
-        ["Likely", "Optimistic (Low)", "Pessimistic (High)"],
+        ["Likely", "Optimistic (Low)", "Pessimistic (High)", "Usiminas"],
         index=0,
         help="Selects the appropriate data-set."
     )
@@ -554,6 +554,7 @@ with st.sidebar:
         "Likely": "data",
         "Optimistic (Low)": "data_min",
         "Pessimistic (High)": "data_max",
+        "Usiminas": "usiminas",
     }
     DATA_ROOT = _map[data_choice]
     st.session_state["DATA_ROOT"] = DATA_ROOT

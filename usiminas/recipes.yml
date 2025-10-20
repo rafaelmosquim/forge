@@ -1,0 +1,575 @@
+﻿# -----------------------------------------------------------------
+# Recipes for the production model (Materials Only)
+# -----------------------------------------------------------------
+# -----------------------------------------------------------------
+# Source Processes for Raw Materials
+# -----------------------------------------------------------------
+# -----------------------------------------------------------------
+# Alloying Elements
+# -----------------------------------------------------------------
+
+- process: Manganese from Market
+  inputs: {}
+  outputs:
+    Manganese: 1.0
+
+- process: Chromium from Market
+  inputs: {}
+  outputs:
+    Chromium: 1.0
+
+- process: Nickel from Market
+  inputs: {}
+  outputs:
+    Nickel: 1.0
+
+- process: Molibdenium from Market
+  inputs: {}
+  outputs:
+    Molibdenium: 1.0
+
+- process: Copper from Market
+  inputs: {}
+  outputs:
+    Copper: 1.0
+
+- process: Silicon from Market
+  inputs: {}
+  outputs:
+    Silicon: 1.0
+
+- process: Vanadium from market
+  inputs: {}
+  outputs:
+    Vanadium: 1.0
+
+- process: Titanium from market
+  inputs: {}
+  outputs:
+    Titanium: 1.0
+
+- process: Niobium from market
+  inputs: {}
+  outputs:
+    Niobium: 1.0
+
+- process: Aluminium from market
+  inputs: {}
+  outputs:
+    Aluminium: 1.0
+
+# -----------------------------------------------------------------
+# Primary Materials
+# -----------------------------------------------------------------
+
+- process: Zinc from Market
+  inputs: {}
+  outputs:
+    Zinc: 1.0
+
+- process: Limestone from Market
+  inputs: {}
+  outputs:
+    Limestone: 1.0
+
+# -----------------------------------------------------------------
+# Fuels and Energy Carriers
+# -----------------------------------------------------------------
+
+- process: Process Gas
+  inputs: {}
+  outputs:
+    Process Gas: 1.0
+
+- process: Fuel Oil from Market
+  inputs: {}
+  outputs:
+    FLF: 1.0
+
+- process: Diesel from Market
+  inputs: {}
+  outputs:
+    FLF: 1.0
+
+- process: Ethanol from Market
+  inputs: {}
+  outputs:
+    RLF: 1.0
+
+- process: Biodiesel from Market
+  inputs: {}
+  outputs:
+    RLF: 1.0
+
+- process: Natural gas from Market
+  inputs: {}
+  outputs:
+    Gas: 1.0
+
+- process: LPG from Market
+  inputs: {}
+  outputs:
+    Gas: 1.0
+
+- process: Biomethane from Market
+  inputs: {}
+  outputs:
+    Gas: 1.0
+
+- process: Hydrogen (Electrolysis) from Market
+  inputs: {}
+  outputs:
+    Gas: 1.0
+
+- process: Hydrogen (Methane reforming) from Market
+  inputs: {}
+  outputs:
+    Gas: 1.0
+
+# -----------------------------------------------------------------
+# Biomass and Solid Fuels
+# -----------------------------------------------------------------
+
+- process: Wood from Market
+  inputs: {}
+  outputs:
+    Wood: 1.0
+
+- process: Charcoal from Market
+  inputs: {}
+  outputs:
+    Charcoal: 1.0
+
+- process: Coal from Market
+  inputs: {}
+  outputs:
+    Coal: 1.0
+
+- process: Anthracite Coal from Market
+  inputs: {}
+  outputs:
+    Coal: 1.0
+
+- process: PCI Coal from Market
+  inputs: {}
+  outputs:
+    Coal: 1.0
+
+- process: Coke Petroleum from Market
+  inputs: {}
+  outputs:
+    Coke: 1.0
+
+- process: Coke Mineral from Market
+  inputs: {}
+  outputs:
+    Coke: 1.0
+
+# -----------------------------------------------------------------
+# Electricity Source Processes
+# -----------------------------------------------------------------
+
+- process: Electricity from Market
+  inputs: {}
+  outputs:
+    Electricity: 1.0
+
+- process: Electricity Hydro from Market
+  inputs: {}
+  outputs:
+    Electricity: 1.0
+
+- process: Electricity Eolic from Market
+  inputs: {}
+  outputs:
+    Electricity: 1.0
+
+- process: Electricity Solar from Market
+  inputs: {}
+  outputs:
+    Electricity: 1.0
+
+- process: Electricity Biomass from Market
+  inputs: {}
+  outputs:
+    Electricity: 1.0
+
+# -----------------------------------------------------------------
+# Processes
+# -----------------------------------------------------------------
+
+- process: Electricity Production
+  inputs: 
+    FLF: 0.38
+    RLF: 0.38
+    Gas: 0.40
+    Wood: 0.38
+    Coal: 0.38
+    Charcoal: 0.38
+    Coke: 0.38
+    Steam: 0.34
+  outputs:
+    Electricity: 1.0
+
+- process: Charcoal Production
+  inputs: 
+    Wood: 2.5226
+  outputs:
+    Charcoal: 1.0
+
+- process: Coke Production
+  inputs: 
+    Nitrogen: 0.005
+    Coal: 1.05 
+  outputs:
+    Coke: 1.0
+    Process Gas: "process_gas_coke * (inputs['Coal'] * energy_content['Coal'])" 
+
+- process: Steam Production
+  inputs: {}
+  outputs: {}
+
+- process: Utility Plant
+  inputs:
+    Process Gas: 1.0
+  outputs:
+    Electricity: 0.34  # 34% efficiency
+
+- process: Nitrogen Production
+  inputs: {}
+  outputs:
+    Nitrogen: 1.0
+
+- process: Oxygen Production
+  inputs: {}
+  outputs:
+    Oxygen: 1.0
+
+- process: Burnt Lime Production
+  inputs: 
+    Limestone: 1.78571
+  outputs:
+    Burnt Lime: 1.0
+
+- process: Dolomite Production
+  inputs: 
+    Limestone: 1.91667
+  outputs:
+    Dolomite: 1.0
+
+- process: Alloys Mix for Low Alloy Steel (LAS)
+  inputs:
+    Manganese: 0.414
+    Chromium: 0.083
+    Nickel: 0.221
+    Molibdenium: 0.055
+    Copper: 0.166
+    Silicon: 0.0
+    Vanadium: 0.028
+    Titanium: 0.014
+    Niobium: 0.014
+    Aluminium: 0.006
+  outputs:
+    Alloys Mix for Low Alloy Steel (LAS): 1.0
+
+- process: Alloys Mix for High Alloy Steel (HAS)
+  inputs:
+    Manganese: 0.061
+    Chromium: 0.545
+    Nickel: 0.303
+    Molibdenium: 0.061
+    Copper: 0.0
+    Silicon: 0.030
+    Vanadium: 0.0
+    Titanium: 0.0
+    Niobium: 0.0
+    Aluminium: 0.0    
+  outputs:
+    Alloys Mix for High Alloy Steel (HAS): 1.0
+
+- process: Scrap Purchase
+  inputs: {}
+  outputs:
+    Scrap: 1.0
+
+- process: Iron Ore from Market
+  inputs: 
+    Iron Ore from Market: 1.0*1.03
+  outputs:
+    Iron Ore: 1.0
+
+- process: Direct Iron Ore
+  inputs: {}
+  outputs: {}
+
+- process: Sintering
+  inputs:
+    Iron Ore: "feo3_sinter / feo3_lump"
+    Limestone: 0.140
+    Coke: >
+      energy_int['Sintering']
+      * energy_shares['Sintering']['Coke']
+      / energy_content['Coke']
+  outputs:
+    Sinter: 1.0
+
+- process: Pelletizing
+  inputs:
+    Iron Ore: "feo3_pellet / feo3_lump"
+    Limestone: 0.065
+    Burnt Lime: 0.01
+  outputs:
+    Pellet: 1.0
+
+- process: Blast Furnace
+  inputs:
+    Sinter: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.sinter"
+    Pellet: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.pellet"
+    Iron Ore: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.lump"
+    Nitrogen: 0.051
+    Oxygen: 0.067
+    Limestone: 0.0400
+    Coke: >
+      energy_int['Blast Furnace']
+      * energy_shares['Blast Furnace']['Coke']
+      / energy_content['Coke']
+    Coal: >
+      energy_int['Blast Furnace']
+      * energy_shares['Blast Furnace']['Coal']
+      / energy_content['Coal']
+  outputs:
+    Pig Iron: 1.0
+    #Process Gas: "0.275 * (inputs['Coal'] * energy_content['Coal'] + inputs['Coke'] * energy_content['Coke'])"
+
+- process: Direct Reduction Iron
+  inputs:
+    Sinter: "(1 / iron_content_pig_iron) * ( (blend.sinter/feo3_sinter) / ( (blend.sinter/feo3_sinter) + (blend.pellet/feo3_pellet) + (blend.lump/feo3_lump) ) )"
+    Pellet: "(1 / iron_content_pig_iron) * ( (blend.pellet/feo3_pellet) / ( (blend.sinter/feo3_sinter) + (blend.pellet/feo3_pellet) + (blend.lump/feo3_lump) ) )"
+    Iron Ore: "(1 / iron_content_pig_iron) * ( (blend.lump/feo3_lump) / ( (blend.sinter/feo3_sinter) + (blend.pellet/feo3_pellet) + (blend.lump/feo3_lump) ) )"
+
+    Gas: >
+      energy_int['Direct Reduction Iron']
+      * energy_shares['Direct Reduction Iron'].get('Gas', 0)
+      / energy_content['Gas']
+
+  outputs:
+    Pig Iron: 1.0
+
+- process: Ship Pig Iron (Exit)
+  inputs:  { Pig Iron: 1.0 }
+  outputs: { Pig Iron (Exit): 1.0 }
+
+- process: Iron Foundry (Exit)
+  inputs:  { Pig Iron: 1.0 }
+  outputs: { Cast Iron (Exit): 1.0 }
+
+- process: Electric Arc Furnace
+  inputs:
+    Nitrogen: 0.1130
+    Oxygen: 0.0250
+    Dolomite: 0.0120
+    Burnt Lime: 0.0410
+    Pig Iron: 1
+    Gas: >
+      energy_int['Electric Arc Furnace']
+      * energy_shares['Electric Arc Furnace'].get('Gas', 0)
+      / energy_content['Gas']
+  outputs:
+    Liquid Steel: 1.0
+
+- process: Basic Oxygen Furnace
+  inputs:
+    Nitrogen: 0.072
+    Oxygen: 0.078
+    Dolomite: 0.0050
+    Burnt Lime: 0.0450
+    Pig Iron:   0.9
+    Scrap:      0.1
+  outputs:
+    Liquid Steel: 1.0
+
+- process: Regular Steel
+  inputs:  { Liquid Steel: 1.0 }
+  outputs: { Liquid Steel R: 1.0 }
+
+- process: Steel Refining (Low Alloy)
+  inputs:
+    Liquid Steel: 1.0 - 0.035
+    Alloys Mix for Low Alloy Steel (LAS): 0.035
+    Nitrogen: 0.0070
+    Oxygen: 0.0250
+    Dolomite: 0.0050
+    Burnt Lime: 0.0300
+  outputs:
+    Liquid Steel L: 1.0
+
+- process: Steel Refining (High Alloy)
+  inputs:
+    Liquid Steel: 1.0 - 0.330
+    Alloys Mix for High Alloy Steel (HAS): 0.33
+    Nitrogen: 0.0070
+    Oxygen: 0.0250
+    Dolomite: 0.0050
+    Burnt Lime: 0.0300
+  outputs:
+    Liquid Steel H: 1.0
+
+# -------------------------
+# Liquid Steel exits & CC
+# -------------------------
+- process: Ingot Casting (R) - Exit
+  inputs:  { Liquid Steel R: 1.0 }
+  outputs: { Ingot (Exit): 1.0 }
+
+- process: Ingot Casting (L) - Exit
+  inputs:  { Liquid Steel L: 1.0 }
+  outputs: { Ingot (Exit): 1.0 }
+
+- process: Ingot Casting (H) - Exit
+  inputs:  { Liquid Steel H: 1.0 }
+  outputs: { Ingot (Exit): 1.0 }
+
+- process: Continuous Casting (R)
+  inputs:  { Liquid Steel R: 1.0 }
+  outputs: { Cast Steel (IP1): 1.0 }
+
+- process: Continuous Casting (L)
+  inputs:  { Liquid Steel L: 1.0 }
+  outputs: { Cast Steel (IP1): 1.0 }
+
+- process: Continuous Casting (H)
+  inputs:  { Liquid Steel H: 1.0 }
+  outputs: { Cast Steel (IP1): 1.0 }
+
+# -------------------------
+# Raw Products (inside mill)
+# -------------------------
+- process: Hot Rolling
+  inputs:  { Cast Steel (IP1): 1.0, Oxygen: 0.008  }
+  outputs: { Raw Products (types): 1.0 }
+
+- process: Rod/bar/section Mill
+  inputs:  { Cast Steel (IP1): 1.0 }
+  outputs: { Raw Products (types): 1.0 }
+
+
+# -------------------------
+# IP2: Cold Rolling (optional)
+# -------------------------
+- process: Cold Rolling
+  inputs:  { Raw Products (types): 1.0, Oxygen: 0.072 }
+  outputs: { Cold Raw Steel (IP2): 1.0 }
+
+# -------------------------
+# Exits (outside mill, before IP4)
+# -------------------------
+- process: Direct use of Basic Steel Products (Exit)
+  inputs:  { Raw Products (types): 1.0 }
+  outputs: { Basic Steel (Exit): 1.0 }
+
+- process: Direct use after Cold Rolling (Exit)
+  inputs:  { Cold Raw Steel (IP2): 1.0 }
+  outputs: { Basic Steel (Exit): 1.0 }
+
+# -------------------------
+# IP3 producers FROM RAW (no CR)
+# -------------------------
+- process: Steel Thermal Treatment
+  inputs:  { Raw Products (types): 1.0 }
+  outputs: { Intermediate Process 3: 1.0 }
+
+- process: Hot Dip Metal Coating
+  inputs:  { Raw Products (types): 1.0 }
+  outputs: { Intermediate Process 3: 1.0 }
+
+- process: Electrolytic Metal Coating
+  inputs:  { Raw Products (types): 1.0 }
+  outputs: { Intermediate Process 3: 1.0 }
+
+# -------------------------
+# IP3 producers FROM IP2 (after CR)
+# -------------------------
+- process: Steel Thermal Treatment (CR)
+  inputs:  { Cold Raw Steel (IP2): 1.0 }
+  outputs: { Intermediate Process 3: 1.0 }
+
+- process: Hot Dip Metal Coating (CR)
+  inputs:  { Cold Raw Steel (IP2): 1.0 }
+  outputs: { Intermediate Process 3: 1.0 }
+
+- process: Electrolytic Metal Coating (CR)
+  inputs:  { Cold Raw Steel (IP2): 1.0 }
+  outputs: { Intermediate Process 3: 1.0 }
+
+# -------------------------
+# Pass-throughs (no-treat options)
+# -------------------------
+- process: Bypass Raw→IP3
+  inputs:  { Raw Products (types): 1.0 }
+  outputs: { Intermediate Process 3: 1.0 }
+
+- process: Bypass CR→IP3
+  inputs:  { Cold Raw Steel (IP2): 1.0 }
+  outputs: { Intermediate Process 3: 1.0 }
+
+# -------------------------
+# IP4: Manufactured feed (inside mill)
+# -------------------------
+- process: Direct use of Basic Steel Products
+  inputs:  { Intermediate Process 3: 1.0 }
+  outputs: { Manufactured Feed (IP4): 1.0 }
+
+- process: Casting/Extrusion/Conformation
+  inputs:  { Intermediate Process 3: 1.0 }
+  outputs: { Manufactured Feed (IP4): 1.0 }
+
+- process: Stamping/calendering/lamination
+  inputs:  { Intermediate Process 3: 1.0 }
+  outputs: { Manufactured Feed (IP4): 1.0 }
+
+- process: Machining
+  inputs:  { Intermediate Process 3: 1.0 }
+  outputs: { Manufactured Feed (IP4): 1.0 }
+
+# -------------------------
+# Finished Products
+# -------------------------
+- process: No Coating
+  inputs:  { Manufactured Feed (IP4): 1.0 }
+  outputs: { Finished Products: 1.0 }
+
+- process: Hot Dip Metal Coating FP
+  inputs:  { Manufactured Feed (IP4): 1.0 }
+  outputs: { Finished Products: 1.0 }
+
+- process: Electrolytic Metal Coating FP
+  inputs:  { Manufactured Feed (IP4): 1.0 }
+  outputs: { Finished Products: 1.0 }
+
+- process: Organic or Sintetic Coating (painting)
+  inputs:  { Manufactured Feed (IP4): 1.0 }
+  outputs: { Finished Products: 1.0 }
+
+# -----------------------------------------------------------------
+# New material sources
+# -----------------------------------------------------------------
+
+- process: Nitrogen from market
+  inputs: {}
+  outputs:
+    Nitrogen: 1.0
+
+- process: Oxygen from market
+  inputs: {}
+  outputs:
+    Oxygen: 1.0
+
+- process: Dolomite from market
+  inputs: {}
+  outputs:
+    Dolomite: 1.0
+
+- process: Burnt Lime from market
+  inputs: {}
+  outputs:
+    Burnt Lime: 1.0

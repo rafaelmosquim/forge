@@ -1,0 +1,66 @@
+{
+  "prod_levels_sample": {
+    "Continuous Casting (R)": 1000.0,
+    "Regular Steel": 1000.0,
+    "Basic Oxygen Furnace": 1000.0,
+    "Nitrogen from market": 190.34027419170775,
+    "Oxygen from market": 162.0
+  },
+  "energy_balance_sample": {
+    "Charcoal": {
+      "Basic Oxygen Furnace": 0.0,
+      "Blast Furnace": 0.0,
+      "Coal from Market": 0.0
+    },
+    "Coal": {
+      "Basic Oxygen Furnace": 0.0,
+      "Blast Furnace": 2246.399999999999,
+      "Coal from Market": 0.0
+    },
+    "Coke": {
+      "Basic Oxygen Furnace": 0.0,
+      "Blast Furnace": 8985.6,
+      "Coal from Market": 0.0
+    },
+    "Electricity": {
+      "Basic Oxygen Furnace": 350.0,
+      "Blast Furnace": 635.8695652173914,
+      "Coal from Market": 0.0
+    },
+    "FLF": {
+      "Basic Oxygen Furnace": 0.0,
+      "Blast Furnace": 0.0,
+      "Coal from Market": 0.0
+    },
+    "Gas": {
+      "Basic Oxygen Furnace": 0.0,
+      "Blast Furnace": 0.0,
+      "Coal from Market": 0.0
+    },
+    "RLF": {
+      "Basic Oxygen Furnace": 0.0,
+      "Blast Furnace": 0.0,
+      "Coal from Market": 0.0
+    },
+    "Wood": {
+      "Basic Oxygen Furnace": 0.0,
+      "Blast Furnace": 0.0,
+      "Coal from Market": 0.0
+    },
+    "Process Gas": {
+      "Basic Oxygen Furnace": 0.0,
+      "Blast Furnace": 0.0,
+      "Coal from Market": 0.0
+    }
+  },
+  "energy_int_sample": {
+    "Manganese from Market": 0,
+    "Chromium from Market": 0,
+    "Nickel from Market": 0
+  },
+  "e_efs_sample": {
+    "Electricity": 38.5,
+    "FLF": 94.12,
+    "RLF": 23.58
+  }
+}

@@ -318,6 +318,17 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
       6) Apply/disable internal-electricity credit per scenario
       7) Compute emissions (robust to signature)
     """
+        # ADD THIS - it will show you the exact structure
+    print("🎯 SCENARIO STRUCTURE CAPTURED:")
+    print("Scenario keys:", list(scn.scenario.keys()))
+    print("Full scenario:")
+    import json
+    print(json.dumps(scn.scenario, indent=2, default=str))
+    
+    # Save to file for inspection
+    with open('DEBUG_scenario_structure.json', 'w') as f:
+        json.dump(scn.scenario, f, indent=2, default=str)
+        
     scenario: Dict[str, Any] = scn.scenario or {}
     route_preset: str = scn.route.route_preset or "auto"
     stage_key: str = scn.route.stage_key
@@ -436,6 +447,26 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     final_demand = {demand_mat: demand_qty}
 
     balance_matrix, prod_levels = calculate_balance_matrix(recipes_calc, final_demand, production_routes)
+
+    # ADD DEBUG CODE RIGHT HERE:
+    print("🎯 CORE INPUTS CAPTURED:")
+    print("1. final_demand:", final_demand)
+    print("2. production_routes sample:", dict(list(production_routes.items())[:3]))
+    print("3. recipes_calc count:", len(recipes_calc))
+    print("4. scenario keys:", list(scenario.keys()))
+
+    # Save what core actually receives
+    core_inputs = {
+        "final_demand": final_demand,
+        "production_routes": production_routes,
+        "scenario_dict": scenario,
+        "recipes_sample": [r.name for r in recipes_calc[:5]],  # Just names to avoid large output
+    }
+
+    with open('DEBUG_core_balance_inputs.json', 'w') as f:
+        json.dump(core_inputs, f, indent=2, default=str)
+
+    print("✅ Saved balance inputs to DEBUG_core_balance_inputs.json")
     
     if balance_matrix is None:
         # Return empty-ish structures with a message rather than crashing
@@ -619,6 +650,24 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     # Load process-emissions yaml for direct process emissions (if needed)
     process_emissions_table = load_data_from_yaml(os.path.join(base, 'process_emissions.yml'))
+
+    print("🎯 CORE ENERGY/EMISSIONS INPUTS:")
+    print("1. prod_levels sample:", dict(list(prod_levels.items())[:3]))
+    print("2. energy_balance shape:", energy_balance.shape)
+    print("3. energy_int sample:", dict(list(energy_int.items())[:3]))
+    print("4. e_efs sample:", dict(list(e_efs.items())[:3]))
+
+    emissions_inputs = {
+        "prod_levels_sample": dict(list(prod_levels.items())[:5]),
+        "energy_balance_sample": energy_balance.head(3).to_dict(),
+        "energy_int_sample": dict(list(energy_int.items())[:3]),
+        "e_efs_sample": dict(list(e_efs.items())[:3]),
+    }
+
+    with open('DEBUG_core_emissions_inputs.json', 'w') as f:
+        json.dump(emissions_inputs, f, indent=2, default=str)
+
+    print("✅ Saved emissions inputs to DEBUG_core_emissions_inputs.json")
 
     # Emissions (robust to differing signatures)
     emissions = _robust_call_calculate_emissions(

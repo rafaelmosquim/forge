@@ -51,6 +51,8 @@ from steel_model_core import (
     Process,
     OUTSIDE_MILL_PROCS,
     compute_inside_elec_reference_for_share,
+        compute_inside_gas_reference_for_share,
+        apply_gas_routing_and_credits,
 )
 
 # ==============================
@@ -513,141 +515,33 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     except Exception:
         pass  # if fields missing, skip the fix-up
 
-    # Compute recovered gas flows for dynamic EF (if needed by your emissions fn)
-    try:
-        gas_coke_MJ = prod_levels.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get('Process Gas', 0.0)
-    except Exception:
-        gas_coke_MJ = 0.0
-    try:
-        # If params store bf_adj_intensity / bf_base_intensity
-        bf_adj = float(getattr(params, 'bf_adj_intensity', 0.0))
-        bf_base = float(getattr(params, 'bf_base_intensity', 0.0))
-        gas_bf_MJ = (bf_adj - bf_base) * prod_levels.get('Blast Furnace', 0.0)
-    except Exception:
-        gas_bf_MJ = 0.0
-    total_gas_MJ = float(gas_coke_MJ + gas_bf_MJ)
-
-    # Dynamic EF for process gas based on energy shares & EF table
-    def _blend_EF(shares: Dict[str, float], efs: Dict[str, float]) -> float:
-        fuels = [(c, s) for c, s in shares.items() if c != 'Electricity' and s > 0]
-        if not fuels:
-            return 0.0
-        denom = sum(s for _, s in fuels) or 1e-12
-        return sum(s * float(efs.get(c, 0.0)) for c, s in fuels) / denom
-
-    # brute force ef
-    EF_coke_gas = 40 #_blend_EF(energy_shares.get('Coke Production', {}), e_efs)
-    EF_bf_gas   = 260 #_blend_EF(energy_shares.get('Blast Furnace', {}), e_efs)
-    EF_process_gas = EF_coke_gas if total_gas_MJ <= 1e-9 else (
-        (EF_coke_gas * (gas_coke_MJ / max(1e-12, total_gas_MJ))) + (EF_bf_gas * (gas_bf_MJ / max(1e-12, total_gas_MJ)))
-    )
-
-    # Utility efficiency for converting process gas to electricity
-    try:
-        util_eff = recipes_dict.get('Utility Plant', Process('',{},{})).outputs.get('Electricity', 0.0)
-    except Exception:
-        util_eff = 0.0
-
-    # NEW: Split gas 50% direct use, 50% electricity generation
-    gas_routing = scenario.get('gas_routing', {})
-    direct_use_fraction = gas_routing.get('direct_use_fraction', 0.5)
-    electricity_fraction = gas_routing.get('electricity_fraction', 0.5)
-    #direct_use_fraction = 0.5  # Hard-coded 50% for now
-    #electricity_fraction = 0.5
-
-    # Calculate split amounts
-    direct_use_gas_MJ = total_gas_MJ * direct_use_fraction
-    electricity_gas_MJ = total_gas_MJ * electricity_fraction
-
-    # Internal electricity from only the electricity portion
-    internal_elec = electricity_gas_MJ * util_eff
-
-    # FIXED PLANT-LEVEL CALCULATIONS (not dependent on user's stop-at-stage)
-    # Compute reference in-mill electricity (IP3 boundary)
-    # FIX: Check if this function exists, provide fallback
-    try:
-        inside_elec_ref = compute_inside_elec_reference_for_share(
-            recipes=recipes,
-            energy_int=energy_int,
-            energy_shares=energy_shares,
-            energy_content=energy_content,
-            params=params,
-            route_key=route_preset,
-            demand_qty=demand_qty,
-            stage_ref="IP3",
-        )
-    except NameError:
-        # Fallback if function doesn't exist
-        inside_elec_ref = energy_balance.get('Electricity', pd.Series([0])).sum()
-
-    # NEW: Compute plant-level total gas consumption (similar to electricity)
-    total_gas_consumption_plant = compute_inside_gas_reference_for_share(
-        recipes=recipes,
-        energy_int=energy_int,
-        energy_shares=energy_shares,
-        energy_content=energy_content,
+    # Delegate gas routing, EF blending and credit application to core helper
+    energy_balance, e_efs, gas_meta = apply_gas_routing_and_credits(
+        energy_balance=energy_balance,
+        recipes=recipes_calc,
+        prod_levels=prod_levels,
         params=params,
-        route_key=route_preset,
-        demand_qty=demand_qty,
-        stage_ref="IP3",  # Fixed reference point
+        energy_shares=energy_shares,
+        energy_int=energy_int,
+        energy_content=energy_content,
+        e_efs=e_efs,
+        scenario={
+            'gas_routing': scenario.get('gas_routing', {}),
+            'route_preset': route_preset,
+            'demand_qty': demand_qty,
+            'stage_ref': 'IP3',
+        },
+        credit_on=credit_on,
+        compute_inside_gas_reference_fn=compute_inside_gas_reference_for_share,
     )
 
-    # FIX: Calculate f_internal_gas HERE, before using it
-    if total_gas_consumption_plant > 1e-9:
-        f_internal_gas = min(1.0, direct_use_gas_MJ / total_gas_consumption_plant)
-    else:
-        f_internal_gas = 0.0
-
-    # Calculate blended emission factor for gas carrier
-    ef_natural_gas = e_efs.get('Gas', 0.0)  # Default purchased gas EF
-    ef_process_gas = EF_process_gas  # Our calculated process gas EF
-
-    # Blend based on internal fraction
-    ef_gas_blended = (f_internal_gas * ef_process_gas + 
-                    (1 - f_internal_gas) * ef_natural_gas)
-
-    # Update the emission factor for gas
-    e_efs['Gas'] = ef_gas_blended
-
-    # Also keep track of process gas separately if needed
-    e_efs['Process Gas'] = ef_process_gas
-
-    # Fixed plant-level internal electricity fraction
-    if inside_elec_ref > 1e-9:
-        f_internal = min(1.0, internal_elec / inside_elec_ref)
-    else:
-        f_internal = 0.0
-
-    # Fixed internal electricity EF
-    ef_internal_electricity = (EF_process_gas / util_eff) if util_eff > 1e-9 else 0.0
-
-    # Apply/disable internal electricity AND gas credit
-    if credit_on:
-        energy_balance = adjust_energy_balance(energy_balance, internal_elec)
-        
-        # NEW: Apply direct gas use using plant-level fixed consumption
-        if direct_use_gas_MJ > 0 and total_gas_consumption_plant > 1e-9:
-            # Apply this fraction to reduce purchased gas across all processes
-            for process_name in energy_balance.index:
-                if 'Gas' in energy_balance.columns:
-                    current_gas = energy_balance.loc[process_name, 'Gas']
-                    if current_gas > 0:
-                        # Reduce purchased gas by the internal fraction
-                        reduction = current_gas * f_internal_gas
-                        energy_balance.loc[process_name, 'Gas'] = current_gas - reduction
-                        
-                        # Track process gas usage (optional)
-                        if 'Process Gas' not in energy_balance.columns:
-                            energy_balance['Process Gas'] = 0.0
-                        energy_balance.loc[process_name, 'Process Gas'] += reduction
-    else:
-        # FIX: Move this else block to only disable when credit is off
-        internal_elec  = 0.0
-        total_gas_MJ   = 0.0
-        direct_use_gas_MJ = 0.0 # NEW: Also disable direct use when credit is off
-        EF_process_gas = 0.0
-        # do not adjust energy_balance when credit is off
-
+    # merge gas_meta into local variables for meta reporting
+    total_gas_MJ = gas_meta.get('total_process_gas_MJ', 0.0)
+    direct_use_gas_MJ = gas_meta.get('direct_use_gas_MJ', 0.0)
+    electricity_gas_MJ = gas_meta.get('electricity_gas_MJ', 0.0)
+    total_gas_consumption_plant = gas_meta.get('total_gas_consumption_plant', 0.0)
+    f_internal_gas = gas_meta.get('f_internal_gas', 0.0)
+    ef_gas_blended = gas_meta.get('ef_gas_blended', 0.0)
     # Load process-emissions yaml for direct process emissions (if needed)
     process_emissions_table = load_data_from_yaml(os.path.join(base, 'process_emissions.yml'))
 
@@ -669,6 +563,25 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     print("✅ Saved emissions inputs to DEBUG_core_emissions_inputs.json")
 
+    # ensure we have plant-level inside_elec_ref and fixed internal ef values
+    try:
+        inside_elec_ref = compute_inside_elec_reference_for_share(
+            recipes=recipes,
+            energy_int=energy_int,
+            energy_shares=energy_shares,
+            energy_content=energy_content,
+            params=params,
+            route_key=route_preset,
+            demand_qty=demand_qty,
+            stage_ref="IP3",
+        )
+    except Exception:
+        inside_elec_ref = 0.0
+
+    # Pull internal electricity diagnostics from gas_meta if available
+    f_internal = gas_meta.get('f_internal', 0.0)
+    ef_internal_electricity = gas_meta.get('ef_internal_electricity', 0.0)
+
     # Emissions (robust to differing signatures)
     emissions = _robust_call_calculate_emissions(
         calculate_emissions,
@@ -686,7 +599,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         internal_elec=internal_elec,
         final_demand=final_demand,
         total_gas_MJ=total_gas_MJ,
-        EF_process_gas=EF_process_gas,
+        EF_process_gas=gas_meta.get('EF_process_gas', 0.0),
         # Fixed plant-level values
         internal_fraction_plant=f_internal,
         ef_internal_electricity=ef_internal_electricity,
@@ -756,37 +669,43 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "f_internal": f_internal,
         "ef_internal_electricity": ef_internal_electricity,
         "finished_yield": fyield,
-        # NEW: Gas routing information with plant-level logic
-        "total_process_gas_MJ": total_gas_MJ,
-        "direct_use_gas_MJ": direct_use_gas_MJ,
-        "electricity_gas_MJ": electricity_gas_MJ,
-        "total_gas_consumption_plant": total_gas_consumption_plant,
-        "f_internal_gas": f_internal_gas,
-        "ef_gas_blended": ef_gas_blended,
-        "direct_use_fraction": direct_use_fraction,
-        "electricity_fraction": electricity_fraction
+        # NEW: Gas routing information with plant-level logic (from gas_meta)
+        "total_process_gas_MJ": gas_meta.get('total_process_gas_MJ', 0.0),
+        "gas_coke_MJ": gas_meta.get('gas_coke_MJ', 0.0),
+        "gas_bf_MJ": gas_meta.get('gas_bf_MJ', 0.0),
+        "direct_use_gas_MJ": gas_meta.get('direct_use_gas_MJ', 0.0),
+        "electricity_gas_MJ": gas_meta.get('electricity_gas_MJ', 0.0),
+        "total_gas_consumption_plant": gas_meta.get('total_gas_consumption_plant', 0.0),
+        "f_internal_gas": gas_meta.get('f_internal_gas', 0.0),
+        "ef_gas_blended": gas_meta.get('ef_gas_blended', 0.0),
+        "EF_coke_gas": gas_meta.get('EF_coke_gas', 0.0),
+        "EF_bf_gas": gas_meta.get('EF_bf_gas', 0.0),
+        "EF_process_gas": gas_meta.get('EF_process_gas', 0.0),
+        "util_eff": gas_meta.get('util_eff', 0.0),
+        "direct_use_fraction": gas_meta.get('direct_use_fraction', 0.5),
+        "electricity_fraction": gas_meta.get('electricity_fraction', 0.5),
     }
 
     # Debug prints for emission factors
     print("\n=== EMISSION FACTOR DEBUG ===")
     print(f"ELECTRICITY:")
     print(f"  Grid EF: {e_efs.get('Electricity', 0.0):.2f} kg CO2e/MJ")
-    print(f"  Internal EF: {ef_internal_electricity:.2f} kg CO2e/MJ") 
+    print(f"  Internal EF: {ef_internal_electricity:.2f} kg CO2e/MJ")
     print(f"  Internal Fraction: {f_internal:.3f}")
     print(f"  Blended EF: {f_internal * ef_internal_electricity + (1 - f_internal) * e_efs.get('Electricity', 0.0):.2f} kg CO2e/MJ")
 
     print(f"\nGAS:")
-    print(f"  Natural Gas EF: {ef_natural_gas:.2f} kg CO2e/MJ")
-    print(f"  Process Gas EF: {ef_process_gas:.2f} kg CO2e/MJ")
-    print(f"  Internal Fraction: {f_internal_gas:.3f}")
-    print(f"  Blended EF: {ef_gas_blended:.2f} kg CO2e/MJ")
+    print(f"  Natural Gas EF: {gas_meta.get('Gas', e_efs.get('Gas',0.0)):.2f} kg CO2e/MJ")
+    print(f"  Process Gas EF: {gas_meta.get('EF_process_gas', 0.0):.2f} kg CO2e/MJ")
+    print(f"  Internal Fraction: {gas_meta.get('f_internal_gas', 0.0):.3f}")
+    print(f"  Blended EF: {gas_meta.get('ef_gas_blended', 0.0):.2f} kg CO2e/MJ")
 
     print(f"\nPROCESS GAS BREAKDOWN:")
-    print(f"  Coke Gas: {gas_coke_MJ:.1f} MJ (EF: {EF_coke_gas:.1f})")
-    print(f"  BF Gas: {gas_bf_MJ:.1f} MJ (EF: {EF_bf_gas:.1f})")
-    print(f"  Total: {total_gas_MJ:.1f} MJ (EF: {EF_process_gas:.1f})")
-    print(f"  Direct Use: {direct_use_gas_MJ:.1f} MJ")
-    print(f"  Electricity: {electricity_gas_MJ:.1f} MJ")
+    print(f"  Coke Gas: {gas_meta.get('gas_coke_MJ',0.0):.1f} MJ (EF: {gas_meta.get('EF_coke_gas',0.0):.1f})")
+    print(f"  BF Gas: {gas_meta.get('gas_bf_MJ',0.0):.1f} MJ (EF: {gas_meta.get('EF_bf_gas',0.0):.1f})")
+    print(f"  Total: {gas_meta.get('total_process_gas_MJ',0.0):.1f} MJ (EF: {gas_meta.get('EF_process_gas',0.0):.1f})")
+    print(f"  Direct Use: {gas_meta.get('direct_use_gas_MJ',0.0):.1f} MJ")
+    print(f"  Electricity: {gas_meta.get('electricity_gas_MJ',0.0):.1f} MJ")
     print("============================\n")
 
     return RunOutputs(

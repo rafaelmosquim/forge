@@ -24,6 +24,7 @@ from typing import Dict
 import logging
 logger = logging.getLogger(__name__)
 
+
 # ===================================================================
 #                           Data Models
 # ===================================================================
@@ -108,12 +109,23 @@ def load_recipes_from_yaml(filepath, params, energy_int, energy_shares, energy_c
         if not name:
             continue
 
+        # Restricted eval: use eval but with no builtins to reduce risk while preserving expressions
+        def _restricted_eval(expr: str, ctx: dict):
+            # Prepare globals mapping with empty builtins, then inject ctx as names
+            g = {"__builtins__": {}}
+            # Copy ctx entries into globals so names resolve as before
+            if ctx:
+                for k, v in ctx.items():
+                    g[k] = v
+            # Evaluate expression using restricted globals
+            return eval(expr, g)
+
         # Evaluate inputs
         inputs, outputs = {}, {}
         for mat, formula in (item.get('inputs') or {}).items():
             if isinstance(formula, str):
                 try:
-                    inputs[mat] = float(eval(formula, context))
+                    inputs[mat] = float(_restricted_eval(formula, context))
                 except Exception as e:
                     logger.warning("Error evaluating input %s for %s: %s", mat, name, e)
                     inputs[mat] = 0.0
@@ -125,7 +137,7 @@ def load_recipes_from_yaml(filepath, params, energy_int, energy_shares, energy_c
             if isinstance(formula, str):
                 out_ctx = {**context, 'inputs': inputs}
                 try:
-                    outputs[mat] = float(eval(formula, out_ctx))
+                    outputs[mat] = float(_restricted_eval(formula, out_ctx))
                 except Exception as e:
                     logger.warning("Error evaluating output %s for %s: %s", mat, name, e)
                     outputs[mat] = 0.0
@@ -956,6 +968,8 @@ def calculate_emissions(
     EF_process_gas,
     internal_fraction_plant=None,
     ef_internal_electricity=None,
+    outside_mill_procs: set | None = None,
+    allow_direct_onsite: set | None = None,
 ):
     """
     Enforces mutual exclusivity:
@@ -975,16 +989,23 @@ def calculate_emissions(
         # Common naming you use for purchases
         return (" from market" in n) or (" purchase" in n)
 
-    # If your code defines OUTSIDE_MILL_PROCS elsewhere, we reuse it.
-    # If not present for any reason, fall back to empty set.
-    try:
-        outside_set = OUTSIDE_MILL_PROCS
-    except NameError:
-        outside_set = set()
+    # Determine outside-mill processes (those that should ALWAYS use grid EF)
+    if outside_mill_procs is not None:
+        outside_set = set(outside_mill_procs)
+    else:
+        # Try to infer from market config or process_efs naming conventions
+        try:
+            outside_set = set(mkt_cfg.get('outside_mill_procs', [])) if isinstance(mkt_cfg, dict) else set()
+        except Exception:
+            outside_set = set()
+        # add any processes that look like market purchases
+        for name in list(process_efs.keys()):
+            n = name.lower()
+            if ' from market' in n or ' purchase' in n:
+                outside_set.add(name)
 
-    # Allow a *very small* whitelist of onsite processes you truly want to keep as direct
-    # (e.g., real process chemistry). Keep empty to make onsite = energy-only everywhere.
-    ALLOW_DIRECT_ONSITE = set()  # e.g., {"Burnt Lime Production"} if you decide so.
+    # Direct onsite emissions whitelist (process chemistry that should be direct)
+    ALLOW_DIRECT_ONSITE = set(allow_direct_onsite or [])
 
     f_internal = float(internal_fraction_plant or 0.0)
     ef_grid    = float(energy_efs.get("Electricity", 0.0))

@@ -1,0 +1,8 @@
+description: Simple aluminum scenario for testing
+grid_country: USA
+recipe_file: aluminum/recipes.yml
+energy_int_file: aluminum/energy_int.yml
+energy_matrix_file: aluminum/energy_matrix.yml
+emission_factors:
+  Electricity: 100.0
+  Diesel: 73.0

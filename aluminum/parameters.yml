@@ -1,0 +1,4 @@
+process_gas: 0.05
+bf_adj_intensity: 0.0
+bf_base_intensity: 0.0
+finished_yield: 1.0

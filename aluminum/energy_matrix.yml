@@ -1,0 +1,16 @@
+Bauxite Mining:
+  Diesel: 0.8
+  Electricity: 0.2
+
+Alumina Refining (Bayer):
+  Electricity: 0.9
+  Process Gas: 0.1
+
+Aluminum Smelting (Electrolysis):
+  Electricity: 1.0
+
+Casting & Finishing:
+  Electricity: 1.0
+
+Utility Plant:
+  Process Gas: 1.0

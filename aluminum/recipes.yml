@@ -1,0 +1,39 @@
+- process: Bauxite Mining
+  inputs:
+    Diesel: 0.5
+    Electricity: 0.1
+  outputs:
+    Bauxite Ore: 1.0
+
+- process: Alumina Refining (Bayer)
+  inputs:
+    Bauxite Ore: 2.0
+    Caustic Soda: 0.2
+    Electricity: 5.0
+  outputs:
+    Alumina: 1.0
+    Red Mud: 1.0
+    Process Gas: 0.5
+
+- process: Aluminum Smelting (Electrolysis)
+  inputs:
+    Alumina: 1.0
+    Electricity: 50.0
+    Carbon Anode: 0.05
+  outputs:
+    Aluminum Ingot: 1.0
+    CO2: 1.5
+
+- process: Casting & Finishing
+  inputs:
+    Aluminum Ingot: 1.0
+    Electricity: 1.0
+  outputs:
+    Finished Aluminum: 1.0
+    Finished Products: 1.0
+
+- process: Utility Plant
+  inputs:
+    Process Gas: 1.0
+  outputs:
+    Electricity: 0.2

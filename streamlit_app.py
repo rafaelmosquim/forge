@@ -19,7 +19,7 @@ import base64
 import math
 import copy as _copy
 import json
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Optional
 from collections import defaultdict, deque
 from datetime import datetime
 from pathlib import Path
@@ -63,6 +63,15 @@ from steel_model_core import (
     STAGE_MATS,
     build_route_mask,
     enforce_eaf_feed,
+)
+
+from sector_descriptor import load_sector_descriptor, StageMenuItem
+from scenario_resolver import (
+    build_route_mask_for_descriptor,
+    build_stage_material_map,
+    match_route,
+    match_route_in_name,
+    resolve_feed_mode,
 )
 
 st.set_page_config(
@@ -268,32 +277,49 @@ def _total_energy_mj_boundary(energy_balance_df: pd.DataFrame) -> float:
         total -= prim_in_elec
     return max(total, 0.0)
 
-def _route_from_scenario(scenario: dict | None, scenario_name: str) -> str:
+def _route_from_scenario(
+    scenario: dict | None,
+    scenario_name: str,
+    descriptor = None,
+) -> str:
     """Infer the route preset from scenario dict or its filename."""
+
     if scenario:
-        for k in ("route_preset", "route", "preset"):
-            v = scenario.get(k)
-            if isinstance(v, str) and v.strip():
-                v2 = v.strip().lower().replace("_", "-")
-                if "dri-eaf" in v2 or v2 in {"drieaf", "dri"}:
-                    return "DRI-EAF"
-                if "eaf-scrap" in v2 or v2 in {"eafscrap"}:
-                    return "EAF-Scrap"
-                if "bf-bof" in v2 or "bf" in v2 or "bof" in v2:
-                    return "BF-BOF"
-                if "external" in v2:
-                    return "External"
-    name = (scenario_name or "").lower()
-    if "dri" in name and "eaf" in name: return "DRI-EAF"
-    if "eaf" in name and "scrap" in name: return "EAF-Scrap"
-    if "bf" in name or "bof" in name:    return "BF-BOF"
-    if "external" in name:               return "External"
+        for key in ("route_preset", "route", "preset"):
+            value = scenario.get(key)
+            if isinstance(value, str) and value.strip():
+                matched = match_route(descriptor, value)
+                if matched:
+                    return matched
+
+    matched = match_route_in_name(descriptor, scenario_name)
+    if matched:
+        return matched
+
+    if descriptor is None:
+        # legacy heuristics fallback
+        name = (scenario_name or "").lower()
+        if "dri" in name and "eaf" in name:
+            return "DRI-EAF"
+        if "eaf" in name and "scrap" in name:
+            return "EAF-Scrap"
+        if "bf" in name or "bof" in name:
+            return "BF-BOF"
+        if "external" in name:
+            return "External"
+
     return "auto"
 
 from pathlib import Path
 
 def _route_label_for_file(fname: str) -> str:
     stem = Path(fname).stem.lower()
+
+    descriptor = st.session_state.get("sector_descriptor")
+    if descriptor:
+        matched = match_route_in_name(descriptor, stem)
+        if matched and matched in descriptor.routes:
+            return descriptor.routes[matched].label
 
     # Base route
     if ("bf" in stem and "bof" in stem):
@@ -315,65 +341,13 @@ def _route_label_for_file(fname: str) -> str:
     return label
 
 
-def _detect_stage_keys() -> Dict[str, str]:
-    """
-    Map stage roles to the keys in STAGE_MATS:
-      pig_iron          : BF hot metal
-      liquid_steel      : after BOF/EAF, before CC
-      as_cast           : crude steel as-cast (post-CC)
-      after_cr          : after cold rolling (IP2)
-      finished          : finished products
-    """
-    found = {}
-    for k, mat in STAGE_MATS.items():
-        m = str(mat).lower()
-
-        # pig iron / hot metal
-        if ("pig iron" in m) or ("hot metal" in m) or ("hot-metal" in m) or ("hotmetal" in m):
-            found.setdefault("pig_iron", k)
-
-        # liquid steel (tap) – before CC
-        if (("liquid" in m and "steel" in m) or ("ingot" in m)) and ("finished" not in m):
-            found.setdefault("liquid_steel", k)
-
-        # crude steel (as-cast) – right after CC (IP1), not Raw Products
-        if ("(ip1)" in m) or ("cast steel" in m) or ("as-cast" in m) or ("continuous casting" in m and "cast" in m):
-            found.setdefault("as_cast", k)
-
-        # after cold rolling (often IP2)
-        if ("cold raw steel" in m) or ("after cold rolling" in m) or ("cold rolling" in m) or ("(ip2)" in m):
-            found.setdefault("after_cr", k)
-
-        # finished
-        if "finished" in m:
-            found.setdefault("finished", k)
-
-    # Fallbacks (conservative, keep previous behavior if missing)
-    if "pig_iron" not in found:
-        found["pig_iron"] = sorted(STAGE_MATS.keys())[0]
-        
-    if "liquid_steel" not in found:
-        lk = next((k for k, v in STAGE_MATS.items()
-                   if isinstance(v, str) and (("liquid" in v.lower() and "steel" in v.lower()) or ("ingot" in v.lower()))), None)
-        found["liquid_steel"] = lk or found["pig_iron"]
-        
-    if "as_cast" not in found:
-        ak = next((k for k, v in STAGE_MATS.items()
-                   if isinstance(v, str) and "(ip1)" in v.lower()), None)
-        found["as_cast"] = ak or found.get("liquid_steel", sorted(STAGE_MATS.keys())[0])
-        
-    if "after_cr" not in found:
-        ik = next((k for k in STAGE_MATS if "ip2" in str(k).lower()), None)
-        found["after_cr"] = ik or found["as_cast"]
-        
-    if "finished" not in found:
-        fk = next((k for k, v in STAGE_MATS.items() if isinstance(v, str) and ("finished" in v.lower())), None)
-        found["finished"] = fk or list(STAGE_MATS.keys())[-1]
-
-    return found
-
-
-def _load_for_picks(data_dir: str, route_preset: str, stage_key: str, scenario: dict):
+def _load_for_picks(
+    data_dir: str,
+    route_preset: str,
+    stage_key: str,
+    scenario: dict,
+    descriptor,
+):
     """
     Build a UI-ready recipe graph consistent with the scenario and route,
     without re-doing model math. This mirrors the light preprocessing the core
@@ -429,13 +403,14 @@ def _load_for_picks(data_dir: str, route_preset: str, stage_key: str, scenario: 
     recipes = apply_recipe_overrides(recipes, scenario.get('recipe_overrides', {}), params, energy_int, energy_shares, energy_content)
 
     # Route mask + EAF feed mode (for UI)
-    pre_mask = build_route_mask(route_preset, recipes)
+    pre_mask = build_route_mask_for_descriptor(descriptor, route_preset, recipes) or build_route_mask(route_preset, recipes)
     import copy
     recipes_for_ui = copy.deepcopy(recipes)
-    eaf_mode = {"EAF-Scrap":"scrap","DRI-EAF":"dri","BF-BOF":None,"External":None,"auto":None}.get(route_preset)
+    eaf_mode = resolve_feed_mode(descriptor, route_preset)
     enforce_eaf_feed(recipes_for_ui, eaf_mode)
 
-    demand_mat = STAGE_MATS[stage_key]
+    stage_materials = build_stage_material_map(descriptor)
+    demand_mat = stage_materials.get(stage_key, stage_key)
     return recipes_for_ui, pre_mask, demand_mat
 
 
@@ -560,6 +535,12 @@ with st.sidebar:
     }
     DATA_ROOT = _map[data_choice]
     st.session_state["DATA_ROOT"] = DATA_ROOT
+    try:
+        descriptor = load_sector_descriptor(DATA_ROOT)
+    except FileNotFoundError as exc:
+        st.error(str(exc))
+        st.stop()
+    st.session_state["sector_descriptor"] = descriptor
     st.caption(f"Using data folder: {DATA_ROOT}/")
 
 
@@ -583,53 +564,64 @@ with st.sidebar:
         scenario_name = "(no scenario)"
         st.warning("No scenario .yml files found in data/scenarios")
 
+    default_direct_fraction = descriptor.gas.default_direct_use_fraction
+    if default_direct_fraction is None:
+        default_direct_fraction = 0.5
+
     direct_use_fraction = st.slider(
         "Direct Gas Use Fraction", 
         min_value=0.0, 
         max_value=1.0, 
-        value=0.5,  # Default to 50/50
+        value=float(default_direct_fraction),
         step=0.25,  # 0%, 25%, 50%, 75%, 100%
         #format="%f0%%",  # Display as percentages
         help="What percentage of recovered process gas should be used directly as fuel (the rest goes to electricity generation)"
     )
 
-    route = _route_from_scenario(scenario, scenario_name)
+    route = _route_from_scenario(scenario, scenario_name, descriptor)
     #st.caption(f"Route preset: **{route}** (locked by scenario)")
     if route == "auto":
         st.warning("Scenario does not specify a route; using AUTO (no preset mask).")
         
         
         
-     # Cleaned "Stop at stage" (Pig iron / Liquid steel / Finished)
-    stage_keys = _detect_stage_keys()
-    stage_menu = {
-        #"Pig iron": stage_keys["pig_iron"],
-        #"Liquid steel": stage_keys["liquid_steel"],
-        "Crude steel": stage_keys["as_cast"],
-        "Validation (as cast)": stage_keys["as_cast"],
-        #"Steel-mill steel": stage_keys["after_cr"],
-        "Finished": stage_keys["finished"],
-    }
-    default_stage_label = "Validation (as cast)"
-    
+    # Cleaned "Stop at stage" driven by sector descriptor
+    stage_items = list(descriptor.stage_menu)
+    if not stage_items:
+        stage_items = [
+            StageMenuItem(key="finished", stage_id="Finished", label="Finished")
+        ]
+
+    help_lines = [
+        f"• {item.label}: {item.description}"
+        for item in stage_items
+        if item.description
+    ]
+    help_text = "\n".join(help_lines) if help_lines else None
+
+    try:
+        default_idx = next(
+            idx for idx, item in enumerate(stage_items) if (item.key or "").lower() == "validation"
+        )
+    except StopIteration:
+        default_idx = 0
+
     stage_label = st.radio(
         "Product",
-        options=list(stage_menu.keys()),
-        index=list(stage_menu.keys()).index(default_stage_label),
-        help=(
-            #• "Pig iron: hot metal after Blast Furnace/DRI.\n"
-            #"• Liquid steel: after BOF/EAF (before continuous casting).\n"
-            "• Crude steel: after continuous casting.\n"
-            "• Validation (as cast): same as crude steel, upstream choices pre-selected.\n"
-            #"Steel-mill steel: plant boundary.\n"
-            "• Finished: may include off-site processing."
-        ),
+        options=[item.label for item in stage_items],
+        index=min(default_idx, len(stage_items) - 1),
+        help=help_text,
     )
-    stage_key = stage_menu[stage_label]
-    is_as_cast  = (stage_label == "Crude steel")
-    is_after_cr = (stage_label == "Steel-mill steel")
-    is_validation = (stage_label == "Validation (as cast)")
-    is_finished = (stage_label == "Finished")
+    stage_item = next(item for item in stage_items if item.label == stage_label)
+    stage_key = stage_item.stage_id
+    stage_role = (stage_item.key or "").lower()
+
+    stage_is_validation = (stage_role == "validation")
+    stage_is_as_cast = stage_role in {"crude", "validation"}
+    stage_is_after_cr = stage_role in {"after_cr", "post_cr"}
+    stage_is_finished = (stage_role == "finished") or (stage_key.lower() == "finished")
+
+    stage_material_map = build_stage_material_map(descriptor)
     
     demand_qty = 1000
     
@@ -647,7 +639,13 @@ with tab_main:
     top_metrics = st.empty()
     main_after_run = st.container() 
     try:
-        recipes_for_ui, pre_mask, demand_mat = _load_for_picks(DATA_ROOT, route, stage_key, scenario)
+        recipes_for_ui, pre_mask, demand_mat = _load_for_picks(
+            DATA_ROOT,
+            route,
+            stage_key,
+            scenario,
+            descriptor,
+        )
     except Exception as e:
         st.error("Setup failed while preparing route/treatments UI.")
         st.exception(e)
@@ -658,7 +656,7 @@ with tab_main:
     # ---------------------------------
     # Read Post-CC values (no UI here)
     # ---------------------------------
-    enable_post_cc = (is_after_cr or is_finished)
+    enable_post_cc = (stage_is_after_cr or stage_is_finished)
     
     
     if enable_post_cc:
@@ -676,13 +674,13 @@ with tab_main:
     forced_pre_select = {}
     
     # 1) Lock CRUDE STEEL to Regular (R) and remove any lingering post-CC picks
-    if is_as_cast or is_validation:
+    if stage_is_as_cast or stage_is_validation:
         forced_pre_select["Cast Steel (IP1)"] = "Continuous Casting (R)"
         pbm = st.session_state.setdefault("picks_by_material", {})
         for k in ("Raw Products (types)", "Intermediate Process 3"):
             pbm.pop(k, None)
     # 1b) Validation upstream defaults (pre-selects hide those radios)
-    if is_validation:
+    if stage_is_validation:
         forced_pre_select.update({
             "Nitrogen":   "Nitrogen from market",
             "Oxygen":     "Oxygen from market",
@@ -697,7 +695,7 @@ with tab_main:
             forced_pre_select["Raw Products (types)"] = cc_choice_val
     
         # Also pin the IP3 bypass so the flow continues beyond CC
-        if is_after_cr or is_finished:
+        if stage_is_after_cr or stage_is_finished:
             forced_pre_select["Intermediate Process 3"] = (
                 "Bypass CR→IP3" if (cc_choice_val == "Hot Rolling" and cr_toggle_val)
                 else "Bypass Raw→IP3"
@@ -808,7 +806,7 @@ with tab_main:
     
     # Group ambiguous by stage
     groups = defaultdict(list)
-    if is_as_cast:
+    if stage_is_as_cast:
         groups.pop("IP1", None)   # no Alloying column for crude steel
     for mat, options in ambiguous:
         groups[_stage_label_for(mat)].append((mat, options))
@@ -897,7 +895,7 @@ with tab_main:
     
     # 1) Alloying (IP1)
     #'_render_group("IP1", cols[0])' if False else None  # placeholder to avoid accidental edits
-    if not is_as_cast:
+    if not stage_is_as_cast:
         _render_group("IP1", cols[0])
     
     with cols[1]:
@@ -1593,8 +1591,8 @@ if run_now:
             material_cost = float(getattr(out, "material_cost", 0.0) or 0.0)
 
             # 3) EF per ton FINISHED (apply yield ONLY if current stage is not Finished)
-            is_finished = str(stage_key) in ("Finished", "Finished steel")
-            per_t_finished = raw_per_t if not is_finished else (raw_per_t / max(fyield, 1e-9))
+            finished_for_metric = stage_is_finished or str(stage_key) in ("Finished", "Finished steel")
+            per_t_finished = raw_per_t if not finished_for_metric else (raw_per_t / max(fyield, 1e-9))
 
             # 4) Display
             c1, c2, c3, c4 = st.columns(4)
@@ -1602,8 +1600,11 @@ if run_now:
                 st.metric("EF (raw)", f"{raw_per_t:,.0f} kg CO₂e / t at {stage_key}",
                         help="No yield applied (equivalent to yield = 1.00).")
             with c2:
-                st.metric("EF (per t finished)", f"{per_t_finished:,.0f} kg CO₂e / t finished",
-                        help=f"Computed from raw EF; if stage ≠ Finished, divide by yield = {fyield:.2f}.")
+                st.metric(
+                    "EF (per t finished)",
+                    f"{per_t_finished:,.0f} kg CO₂e / t finished",
+                    help=f"Raw EF adjusted by yield when the selected stage is finished (yield = {fyield:.2f}).",
+                )
             with c3:
                 st.metric("Total Energy Cost", f"${total_cost:,.2f}")
 

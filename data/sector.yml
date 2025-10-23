@@ -1,0 +1,122 @@
+sector_key: steel
+sector_name: Steelmaking
+
+stage_menu:
+  - key: validation
+    stage_id: IP3
+    label: 'Validation (as cast)'
+    description: 'Reference chain up to IP3.'
+  - key: crude
+    stage_id: Cast
+    label: 'Crude steel'
+    description: 'As-cast steel after continuous casting.'
+  - key: finished
+    stage_id: Finished
+    label: 'Finished'
+    description: 'Finished steel products.'
+
+stages:
+  Finished:
+    material: 'Finished Products'
+  IP4:
+    material: 'Manufactured Feed (IP4)'
+  IP3:
+    material: 'Intermediate Process 3'
+  Raw:
+    material: 'Raw Products (types)'
+  Cast:
+    material: 'Cast Steel (IP1)'
+  Liquid:
+    material: 'Liquid Steel'
+  PigIron:
+    material: 'Pig Iron'
+  GradeR:
+    material: 'Liquid Steel R'
+  GradeL:
+    material: 'Liquid Steel L'
+  GradeH:
+    material: 'Liquid Steel H'
+  PigIronExit:
+    material: 'Pig Iron (Exit)'
+  IngotExit:
+    material: 'Ingot (Exit)'
+  DirectExit:
+    material: 'Basic Steel (Exit)'
+
+routes:
+  - id: BF-BOF
+    label: 'BF-BOF'
+    aliases: ['bf', 'bof', 'bf-bof', 'blast furnace']
+    disable:
+      - 'Electric Arc Furnace'
+      - 'Direct Reduction Iron'
+    enable:
+      - 'Blast Furnace'
+      - 'Basic Oxygen Furnace'
+  - id: DRI-EAF
+    label: 'DRI-EAF'
+    aliases: ['dri', 'dri-eaf', 'dri eaf']
+    disable:
+      - 'Blast Furnace'
+    enable:
+      - 'Direct Reduction Iron'
+      - 'Electric Arc Furnace'
+    feed_mode: 'dri'
+  - id: EAF-Scrap
+    label: 'EAF-Scrap'
+    aliases: ['scrap', 'eaf-scrap', 'eaf scrap']
+    disable:
+      - 'Blast Furnace'
+      - 'Basic Oxygen Furnace'
+      - 'Direct Reduction Iron'
+    enable:
+      - 'Electric Arc Furnace'
+    feed_mode: 'scrap'
+  - id: External
+    label: 'External'
+    aliases: ['external']
+    disable:
+      - 'Blast Furnace'
+      - 'Basic Oxygen Furnace'
+      - 'Direct Reduction Iron'
+      - 'Electric Arc Furnace'
+      - 'Coke Production'
+
+process_roles:
+  Blast Furnace:
+    - primary
+    - gas_source
+  Basic Oxygen Furnace:
+    - primary
+  Direct Reduction Iron:
+    - primary
+  Electric Arc Furnace:
+    - primary
+  Coke Production:
+    - gas_source
+  Utility Plant:
+    - utility
+
+costing:
+  external_purchase_rows:
+    - 'External Inputs'
+    - 'Scrap Purchase'
+    - 'Limestone from Market'
+    - 'Burnt Lime from market'
+    - 'Dolomite from market'
+    - 'Nitrogen from market'
+    - 'Oxygen from market'
+
+gas:
+  process_gas_carrier: 'Process Gas'
+  natural_gas_carrier: 'Gas'
+  utility_process: 'Utility Plant'
+  reference_stage_id: IP3
+  default_direct_use_fraction: 0.5
+balance_fallback_materials: []
+prefer_internal_processes:
+  Nitrogen from market: Nitrogen Production
+  Oxygen from market: Oxygen Production
+  Dolomite from market: Dolomite Production
+  Burnt Lime from market: Burnt Lime Production
+  Coke from market: Coke Production

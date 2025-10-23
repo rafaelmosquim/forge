@@ -1,0 +1,43 @@
+sector_key: aluminum
+sector_name: Aluminum
+
+stage_menu:
+  - key: finished
+    stage_id: Finished
+    label: "Finished aluminum"
+    description: "Finished aluminum products."
+
+stages:
+  Finished:
+    material: "Finished Products"
+
+routes:
+  - id: Primary
+    label: "Primary aluminum"
+    aliases: ["primary", "aluminum"]
+
+process_roles:
+  Bauxite Mining:
+    - upstream
+  Alumina Refining (Bayer):
+    - conversion
+    - gas_source
+  Aluminum Smelting (Electrolysis):
+    - primary
+  Casting & Finishing:
+    - downstream
+  Utility Plant:
+    - utility
+
+costing:
+  external_purchase_rows:
+    - "External Inputs"
+
+gas:
+  process_gas_carrier: "Process Gas"
+  natural_gas_carrier: "Gas"
+  utility_process: "Utility Plant"
+  reference_stage_id: Finished
+  default_direct_use_fraction: 0.0
+balance_fallback_materials:
+  - "Electricity"

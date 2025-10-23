@@ -463,9 +463,29 @@ def apply_gas_routing_and_credits(
     # Prepare recipes dict
     recipes_dict = {r.name: r for r in recipes}
 
-    # Compute process gas volumes
+    gas_config = scenario.get('gas_config', {}) or {}
+    process_roles = scenario.get('process_roles', {}) or {}
+    fallback_materials = set(scenario.get('fallback_materials', []))
+
+    process_gas_carrier = gas_config.get('process_gas_carrier') or 'Process Gas'
+    natural_gas_carrier = gas_config.get('natural_gas_carrier') or 'Gas'
+    utility_process_name = gas_config.get('utility_process') or 'Utility Plant'
+
+    def _roles_for(proc_name: str) -> set:
+        roles = process_roles.get(proc_name, set())
+        if isinstance(roles, dict):
+            iterable = roles.keys()
+        elif isinstance(roles, (list, tuple, set)):
+            iterable = roles
+        elif roles:
+            iterable = [roles]
+        else:
+            iterable = []
+        return {str(r).lower() for r in iterable}
+
+    # Compute process gas volumes (legacy steel logic)
     try:
-        gas_coke_MJ = prod_levels.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get('Process Gas', 0.0)
+        gas_coke_MJ = prod_levels.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get(process_gas_carrier, 0.0)
     except Exception:
         gas_coke_MJ = 0.0
     try:
@@ -490,15 +510,77 @@ def apply_gas_routing_and_credits(
         (EF_coke_gas * (gas_coke_MJ / max(1e-12, total_gas_MJ))) + (EF_bf_gas * (gas_bf_MJ / max(1e-12, total_gas_MJ)))
     )
 
+    gas_source_names = gas_config.get('gas_sources')
+    if not gas_source_names:
+        gas_source_names = [
+            name for name in recipes_dict.keys()
+            if 'gas_source' in _roles_for(name)
+        ]
+    gas_source_names = list(dict.fromkeys(gas_source_names))
+
+    gas_sources_MJ = 0.0
+    ef_weighted = 0.0
+    weight_sum = 0.0
+    for src in gas_source_names:
+        proc = recipes_dict.get(src)
+        if not proc:
+            continue
+        gas_output = float(proc.outputs.get(process_gas_carrier, 0.0) or 0.0)
+        if gas_output <= 0:
+            continue
+        runs = float(prod_levels.get(src, 0.0) or 0.0)
+        contribution = runs * gas_output
+        if contribution <= 1e-12:
+            continue
+        gas_sources_MJ += contribution
+        shares = energy_shares.get(src, {})
+        ef_source = _blend_EF(shares, e_efs)
+        if ef_source <= 0:
+            ef_source = float(e_efs.get(process_gas_carrier, 0.0))
+        ef_weighted += ef_source * contribution
+        weight_sum += contribution
+
+    if gas_sources_MJ > 0:
+        total_gas_MJ = float(gas_sources_MJ)
+        gas_coke_MJ = 0.0
+        gas_bf_MJ = 0.0
+        EF_coke_gas = 0.0
+        EF_bf_gas = 0.0
+        if weight_sum > 0:
+            EF_process_gas = ef_weighted / weight_sum
+        else:
+            EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
+    else:
+        gas_sources_MJ = 0.0
+        if total_gas_MJ <= 1e-9:
+            EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
+
     try:
-        util_eff = recipes_dict.get('Utility Plant', Process('',{},{})).outputs.get('Electricity', 0.0)
+        util_eff = recipes_dict.get(utility_process_name, Process('',{},{})).outputs.get('Electricity', 0.0)
     except Exception:
         util_eff = 0.0
+    if util_eff <= 0 and utility_process_name != 'Utility Plant':
+        try:
+            util_eff = recipes_dict.get('Utility Plant', Process('',{},{})).outputs.get('Electricity', 0.0)
+        except Exception:
+            util_eff = 0.0
 
     # Read gas routing from scenario
     gas_routing = scenario.get('gas_routing', {})
-    direct_use_fraction = gas_routing.get('direct_use_fraction', 0.5)
-    electricity_fraction = gas_routing.get('electricity_fraction', max(0.0, 1.0 - direct_use_fraction))
+    default_direct = gas_config.get('default_direct_use_fraction')
+    if default_direct is None:
+        default_direct = 0.5
+    direct_use_fraction = gas_routing.get('direct_use_fraction', default_direct)
+    if direct_use_fraction is None:
+        direct_use_fraction = default_direct
+    direct_use_fraction = max(0.0, min(1.0, float(direct_use_fraction)))
+    electricity_fraction = gas_routing.get('electricity_fraction')
+    if electricity_fraction is None:
+        electricity_fraction = max(0.0, 1.0 - direct_use_fraction)
+    else:
+        electricity_fraction = max(0.0, min(1.0, float(electricity_fraction)))
+    if direct_use_fraction + electricity_fraction > 1.0:
+        electricity_fraction = max(0.0, 1.0 - direct_use_fraction)
 
     direct_use_gas_MJ = total_gas_MJ * direct_use_fraction
     electricity_gas_MJ = total_gas_MJ * electricity_fraction
@@ -527,13 +609,13 @@ def apply_gas_routing_and_credits(
     f_internal_gas = (min(1.0, direct_use_gas_MJ / total_gas_consumption_plant)
                       if total_gas_consumption_plant > 1e-9 else 0.0)
 
-    ef_natural_gas = e_efs.get('Gas', 0.0)
+    ef_natural_gas = e_efs.get(natural_gas_carrier, 0.0)
     ef_gas_blended = (f_internal_gas * EF_process_gas + (1 - f_internal_gas) * ef_natural_gas)
 
     # update emission factors
     e_efs = dict(e_efs)
-    e_efs['Gas'] = ef_gas_blended
-    e_efs['Process Gas'] = EF_process_gas
+    e_efs[natural_gas_carrier] = ef_gas_blended
+    e_efs[process_gas_carrier] = EF_process_gas
 
     # Internal electricity fraction at plant-level
     # compute a inside reference for electricity if provided in scenario or compute fallback 0
@@ -548,7 +630,7 @@ def apply_gas_routing_and_credits(
                 params=params,
                 route_key=scenario.get('route_preset', None) or '',
                 demand_qty=float(scenario.get('demand_qty', 1000.0)),
-                stage_ref='IP3',
+                stage_ref=scenario.get('stage_ref', 'IP3'),
             )
         except Exception:
             inside_elec_ref = 0.0
@@ -563,24 +645,27 @@ def apply_gas_routing_and_credits(
 
         if direct_use_gas_MJ > 0 and total_gas_consumption_plant > 1e-9:
             for process_name in eb.index:
-                if 'Gas' in eb.columns:
-                    current_gas = eb.loc[process_name, 'Gas']
+                if natural_gas_carrier in eb.columns:
+                    current_gas = eb.loc[process_name, natural_gas_carrier]
                     if current_gas > 0:
                         reduction = current_gas * f_internal_gas
-                        eb.loc[process_name, 'Gas'] = current_gas - reduction
-                        if 'Process Gas' not in eb.columns:
-                            eb['Process Gas'] = 0.0
-                        eb.loc[process_name, 'Process Gas'] += reduction
+                        eb.loc[process_name, natural_gas_carrier] = current_gas - reduction
+                        if process_gas_carrier not in eb.columns:
+                            eb[process_gas_carrier] = 0.0
+                        eb.loc[process_name, process_gas_carrier] += reduction
     else:
         internal_elec = 0.0
         total_gas_MJ = 0.0
         direct_use_gas_MJ = 0.0
+        electricity_gas_MJ = 0.0
+        gas_sources_MJ = 0.0
         EF_process_gas = 0.0
 
     meta = {
         'total_process_gas_MJ': total_gas_MJ,
         'gas_coke_MJ': gas_coke_MJ,
         'gas_bf_MJ': gas_bf_MJ,
+        'gas_sources_MJ': gas_sources_MJ,
         'direct_use_gas_MJ': direct_use_gas_MJ,
         'electricity_gas_MJ': electricity_gas_MJ,
         'total_gas_consumption_plant': total_gas_consumption_plant,
@@ -594,6 +679,10 @@ def apply_gas_routing_and_credits(
         'electricity_fraction': electricity_fraction,
         'f_internal': f_internal,
         'ef_internal_electricity': ef_internal_electricity,
+        'process_gas_carrier': process_gas_carrier,
+        'natural_gas_carrier': natural_gas_carrier,
+        'utility_process': utility_process_name,
+        'fallback_materials': list(fallback_materials),
     }
 
     return eb, e_efs, meta
@@ -608,14 +697,32 @@ INHOUSE_FORCE = {
     "Coke Production":         "Coke from market",
 }
 
+PREFER_INTERNAL_OVERRIDE: Dict[str, str] = {}
 
-def apply_inhouse_clamp(pre_select: dict | None, pre_mask: dict | None):
-    """Prefer in-house 'XX Production' and ban 'XX from market' (harmless if missing)."""
+
+def set_prefer_internal_processes(mapping: dict | None) -> None:
+    """Override default in-house preference mapping (descriptor-driven)."""
+    global PREFER_INTERNAL_OVERRIDE
+    if not mapping:
+        PREFER_INTERNAL_OVERRIDE = {}
+        return
+    PREFER_INTERNAL_OVERRIDE = {str(k): str(v) for k, v in mapping.items()}
+
+
+def apply_inhouse_clamp(pre_select: dict | None, pre_mask: dict | None, prefer_map: dict | None = None):
+    """Prefer in-house production processes and ban market purchases.
+    prefer_map comes from sector descriptor; defaults to INHOUSE_FORCE."""
     ps = dict(pre_select or {})
-    pm = dict(pre_mask   or {})
-    for prod_proc, market_proc in INHOUSE_FORCE.items():
-        ps[prod_proc] = 1  # prefer production
-        pm[market_proc] = 0  # ban market
+    pm = dict(pre_mask or {})
+    if prefer_map and len(prefer_map) > 0:
+        mapping = prefer_map
+    elif PREFER_INTERNAL_OVERRIDE:
+        mapping = PREFER_INTERNAL_OVERRIDE
+    else:
+        mapping = INHOUSE_FORCE
+    for prod_proc, market_proc in mapping.items():
+        ps[prod_proc] = 1
+        pm[market_proc] = 0
     return ps, pm
 
 def build_pre_for_route(route_key):
@@ -878,26 +985,26 @@ def analyze_energy_costs(bal_data, en_price):
     return total_cost    
 
 
-def analyze_material_costs(matrix_data, mat_price):
-    """Calculate total material cost from all external purchase rows"""
+def analyze_material_costs(matrix_data, mat_price, external_rows=None):
+    """Calculate total material cost from all external purchase rows."""
     material_cost = 0.0
-    
-    # Define exactly which rows represent external purchases based on your balance matrix
-    external_purchase_rows = [
-        'External Inputs',           # Iron Ore from Market
-        'Scrap Purchase',            # Scrap
-        'Limestone from Market',     # Limestone
-        'Burnt Lime from market',    # Burnt Lime
-        'Dolomite from market',      # Dolomite
-        'Nitrogen from market',      # Nitrogen
-        'Oxygen from market'         # Oxygen
+
+    default_rows = [
+        'External Inputs',
+        'Scrap Purchase',
+        'Limestone from Market',
+        'Burnt Lime from market',
+        'Dolomite from market',
+        'Nitrogen from market',
+        'Oxygen from market',
     ]
-    
+    external_purchase_rows = list(external_rows) if external_rows else default_rows
+
     logger.debug("Analyzing material costs from external purchase rows")
-    
+
     # Track all external purchases
     total_external = defaultdict(float)
-    
+
     for row_name in external_purchase_rows:
         if row_name in matrix_data.index:
             row_data = matrix_data.loc[row_name]

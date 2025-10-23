@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+- Generalized core/app via sector descriptors (multi-industry datasets).
+- Added dataset-specific `sector.yml` configs and descriptor loader module.
+- Enabled fallback external supplies to avoid loops when internal utilities absent.
+- Updated cost/emissions calculations to honor descriptor metadata.
+
 ## v1.0.2 — 2025-10-06
 - JOSS submission snapshot.
 - Availability section updated (archive DOI placeholder).

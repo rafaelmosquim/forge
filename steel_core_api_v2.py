@@ -19,6 +19,7 @@ from typing import Dict, Optional, Any, List, Tuple, Set
 from collections import deque
 from datetime import datetime
 import inspect
+from functools import partial
 
 import pandas as pd
 
@@ -51,8 +52,18 @@ from steel_model_core import (
     Process,
     OUTSIDE_MILL_PROCS,
     compute_inside_elec_reference_for_share,
-        compute_inside_gas_reference_for_share,
-        apply_gas_routing_and_credits,
+    compute_inside_gas_reference_for_share,
+    apply_gas_routing_and_credits,
+    set_prefer_internal_processes,
+)
+
+from sector_descriptor import load_sector_descriptor
+from scenario_resolver import (
+    build_stage_material_map,
+    build_route_mask_for_descriptor,
+    reference_stage_for_gas,
+    resolve_feed_mode,
+    resolve_stage_material,
 )
 
 # ==============================
@@ -168,6 +179,7 @@ def _build_routes_from_picks(
     picks_by_material: Dict[str, str],
     pre_mask: Optional[Dict[str, int]] = None,
     pre_select: Optional[Dict[str, int]] = None,
+    fallback_materials: Optional[Set[str]] = None,
 ) -> Dict[str, int]:
     """
     Traverse upstream from demand_mat and build a 0/1 mask of chosen processes.
@@ -178,6 +190,7 @@ def _build_routes_from_picks(
     """
     pre_mask = pre_mask or {}
     pre_select = pre_select or {}
+    fallback_set: Set[str] = set(fallback_materials or [])
     producers = _build_producers_index(recipes)
     chosen: Dict[str, int] = {}
     visited_mats: Set[str] = set()
@@ -190,6 +203,10 @@ def _build_routes_from_picks(
         visited_mats.add(mat)
 
         cand = producers.get(mat, [])
+        if fallback_set and mat in fallback_set:
+            for r in cand:
+                chosen[r.name] = 0
+            continue
         enabled = [r for r in cand if pre_mask.get(r.name, 1) > 0 and pre_select.get(r.name, 1) > 0]
         if not enabled:
             continue
@@ -216,6 +233,25 @@ def _build_routes_from_picks(
                 q.append(im)
 
     return chosen
+
+
+def _ensure_fallback_processes(
+    recipes: List[Process],
+    production_routes: Dict[str, int],
+    fallback_materials: Optional[Set[str]],
+) -> None:
+    if not fallback_materials:
+        return
+    fallback_set = {str(mat).strip() for mat in (fallback_materials or set()) if str(mat).strip()}
+    if not fallback_set:
+        return
+    existing = {r.name for r in recipes}
+    for mat in fallback_set:
+        proc_name = f"External {mat} (auto)"
+        if proc_name not in existing:
+            recipes.append(Process(proc_name, inputs={}, outputs={mat: 1.0}))
+            existing.add(proc_name)
+        production_routes.setdefault(proc_name, 1)
 
 
 def _infer_eaf_mode(route_preset: str) -> Optional[str]:
@@ -268,7 +304,10 @@ def compute_inside_gas_reference_for_share(
     params: Any,
     route_key: str,
     demand_qty: float,
-    stage_ref: str = "IP3"
+    stage_ref: str = "IP3",
+    stage_lookup: Optional[Dict[str, str]] = None,
+    gas_carrier: str = "Gas",
+    fallback_materials: Optional[Set[str]] = None,
 ) -> float:
     """
     Compute total plant-level gas consumption for the entire production route.
@@ -278,7 +317,10 @@ def compute_inside_gas_reference_for_share(
     from steel_model_core import build_route_mask, calculate_balance_matrix
     
     pre_mask = build_route_mask(route_key, recipes)
-    demand_mat = STAGE_MATS[stage_ref]
+    stage_map = stage_lookup or STAGE_MATS
+    if stage_ref not in stage_map:
+        raise KeyError(f"Stage '{stage_ref}' not found while computing gas reference.")
+    demand_mat = stage_map[stage_ref]
     
     # Build production route deterministically (no picks)
     production_routes_full = _build_routes_from_picks(
@@ -286,11 +328,15 @@ def compute_inside_gas_reference_for_share(
         demand_mat,
         picks_by_material={},  # Use defaults
         pre_mask=pre_mask,
+        fallback_materials=fallback_materials,
     )
     
     final_demand_full = {demand_mat: demand_qty}
+    import copy as _copy
+    recipes_full = _copy.deepcopy(recipes)
+    _ensure_fallback_processes(recipes_full, production_routes_full, fallback_materials)
     balance_matrix_full, prod_levels_full = calculate_balance_matrix(
-        recipes, final_demand_full, production_routes_full
+        recipes_full, final_demand_full, production_routes_full
     )
     
     if balance_matrix_full is None:
@@ -301,8 +347,8 @@ def compute_inside_gas_reference_for_share(
     
     # Sum all gas consumption across the plant
     total_gas_consumption = 0.0
-    if 'Gas' in energy_balance_full.columns:
-        total_gas_consumption = energy_balance_full['Gas'].sum()
+    if gas_carrier in energy_balance_full.columns:
+        total_gas_consumption = float(energy_balance_full[gas_carrier].sum())
     
     return total_gas_consumption
 # ==============================
@@ -339,11 +385,43 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     pre_select_soft: Dict[str, int] = scn.route.pre_select_soft or {}
     country_code: Optional[str] = scn.country_code or None
 
+    scenario.setdefault('gas_routing', {})
+
     # Flag for BF process-gas → electricity credit
     credit_on: bool = _credit_enabled(scenario)
 
     # ---------- Load base data ----------
     base = os.path.join(data_dir, "")
+    descriptor = load_sector_descriptor(base)
+    stage_material_map = build_stage_material_map(descriptor)
+    STAGE_MATS.update(stage_material_map)
+    fallback_materials = set(descriptor.balance_fallback_materials or set())
+    scenario['fallback_materials'] = list(fallback_materials)
+    prefer_internal_map = dict(descriptor.prefer_internal_processes or {})
+    scenario['prefer_internal_processes'] = prefer_internal_map
+    external_purchase_rows = list(descriptor.costing.external_purchase_rows or [])
+    scenario['external_purchase_rows'] = external_purchase_rows
+    set_prefer_internal_processes(prefer_internal_map)
+    gas_reference_stage = reference_stage_for_gas(descriptor)
+    gas_config = {
+        "process_gas_carrier": descriptor.gas.process_gas_carrier or "Process Gas",
+        "natural_gas_carrier": descriptor.gas.natural_gas_carrier or "Gas",
+        "utility_process": descriptor.gas.utility_process,
+        "default_direct_use_fraction": descriptor.gas.default_direct_use_fraction,
+    }
+    gas_sources = [
+        name for name, roles in descriptor.process_roles.items()
+        if any(str(r).lower() == 'gas_source' for r in roles)
+    ]
+    if gas_sources:
+        gas_config['gas_sources'] = gas_sources
+    process_gas_carrier = gas_config["process_gas_carrier"]
+    natural_gas_carrier = gas_config["natural_gas_carrier"]
+    if (
+        'direct_use_fraction' not in scenario['gas_routing']
+        and gas_config["default_direct_use_fraction"] is not None
+    ):
+        scenario['gas_routing']['direct_use_fraction'] = gas_config["default_direct_use_fraction"]
     # allow scenario to select an alternate energy_int file
     _ei_file = (scenario.get('energy_int_file') or 'energy_int.yml').strip()
     # simple guard against weird inputs
@@ -427,8 +505,13 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     recipes = apply_recipe_overrides(recipes, scenario.get('recipe_overrides', {}), params, energy_int, energy_shares, energy_content)
 
     # ---------- Route mask & feed enforcement ----------
-    pre_mask = build_route_mask(route_preset, recipes)
-    eaf_mode = _infer_eaf_mode(route_preset)
+    pre_mask = (
+        build_route_mask_for_descriptor(descriptor, route_preset, recipes)
+        or build_route_mask(route_preset, recipes)
+    )
+    eaf_mode = resolve_feed_mode(descriptor, route_preset)
+    if eaf_mode is None:
+        eaf_mode = _infer_eaf_mode(route_preset)
 
     # Work on a copy for calculations (enforce feed)
     import copy
@@ -436,14 +519,17 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     enforce_eaf_feed(recipes_calc, eaf_mode)
 
     # ---------- Build production route from picks ----------
-    demand_mat = STAGE_MATS[stage_key]
+    demand_mat = resolve_stage_material(descriptor, stage_key)
     production_routes: Dict[str, int] = _build_routes_from_picks(
         recipes_calc,
         demand_mat,
         picks_by_material,
         pre_mask=pre_mask,
         pre_select=pre_select_soft,
+        fallback_materials=fallback_materials,
     )
+
+    _ensure_fallback_processes(recipes_calc, production_routes, fallback_materials)
 
     # ---------- Solve balances ----------
     final_demand = {demand_mat: demand_qty}
@@ -516,6 +602,13 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         pass  # if fields missing, skip the fix-up
 
     # Delegate gas routing, EF blending and credit application to core helper
+    gas_reference_fn = partial(
+        compute_inside_gas_reference_for_share,
+        stage_lookup=stage_material_map,
+        gas_carrier=natural_gas_carrier,
+        fallback_materials=fallback_materials,
+    )
+
     energy_balance, e_efs, gas_meta = apply_gas_routing_and_credits(
         energy_balance=energy_balance,
         recipes=recipes_calc,
@@ -529,10 +622,14 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
             'gas_routing': scenario.get('gas_routing', {}),
             'route_preset': route_preset,
             'demand_qty': demand_qty,
-            'stage_ref': 'IP3',
+            'stage_ref': gas_reference_stage,
+            'gas_config': gas_config,
+            'process_roles': descriptor.process_roles,
+            'stage_lookup': stage_material_map,
+            'fallback_materials': list(fallback_materials),
         },
         credit_on=credit_on,
-        compute_inside_gas_reference_fn=compute_inside_gas_reference_for_share,
+        compute_inside_gas_reference_fn=gas_reference_fn,
     )
 
     # merge gas_meta into local variables for meta reporting
@@ -626,8 +723,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         energy_prices = load_data_from_yaml(energy_prices_path) or {}
 
         # Debug: Check what we are working with
-        print(f"🔍 Energy prices loaded: {bool(energy_prices)}")
-        print(f"🔍 Energy prices keys: {list(energy_prices.keys()) if energy_prices else 'None'}")
+        print(f"🔍 Material prices loaded: {bool(energy_prices)}")
+        print(f"🔍 Material prices keys: {list(energy_prices.keys()) if energy_prices else 'None'}")
 
         # Calculate total cost using core function
         total_cost = analyze_energy_costs(energy_balance, energy_prices)
@@ -646,11 +743,11 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         material_prices = load_data_from_yaml(material_prices_path) or {}
 
         # Debug: Check what we are working with
-        print(f"🔍 Energy prices loaded: {bool(material_prices)}")
-        print(f"🔍 Energy prices keys: {list(material_prices.keys()) if material_prices else 'None'}")
+        print(f"🔍 Material prices loaded: {bool(material_prices)}")
+        print(f"🔍 Material prices keys: {list(material_prices.keys()) if material_prices else 'None'}")
 
         # Calculate total cost using core function
-        material_cost = analyze_material_costs(balance_matrix, material_prices)
+        material_cost = analyze_material_costs(balance_matrix, material_prices, external_rows=external_purchase_rows)
         print(f"🔍 Material cost calculated: {material_cost}")
         
     except Exception as e:
@@ -662,17 +759,25 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     meta = {
         "route_preset": route_preset,
         "stage_key": stage_key,
+        "sector_key": descriptor.key,
+        "sector_name": descriptor.name,
         "demand_qty": demand_qty,
+        "demand_material": demand_mat,
         "country_code": country_code,
         "process_gas_credit_enabled": bool(credit_on),
         "inside_elec_ref": inside_elec_ref,
         "f_internal": f_internal,
         "ef_internal_electricity": ef_internal_electricity,
         "finished_yield": fyield,
+        "gas_reference_stage": gas_reference_stage,
+        "fallback_materials": list(fallback_materials),
+        "prefer_internal_processes": prefer_internal_map,
+        "external_purchase_rows": external_purchase_rows,
         # NEW: Gas routing information with plant-level logic (from gas_meta)
         "total_process_gas_MJ": gas_meta.get('total_process_gas_MJ', 0.0),
         "gas_coke_MJ": gas_meta.get('gas_coke_MJ', 0.0),
         "gas_bf_MJ": gas_meta.get('gas_bf_MJ', 0.0),
+        "gas_sources_MJ": gas_meta.get('gas_sources_MJ', 0.0),
         "direct_use_gas_MJ": gas_meta.get('direct_use_gas_MJ', 0.0),
         "electricity_gas_MJ": gas_meta.get('electricity_gas_MJ', 0.0),
         "total_gas_consumption_plant": gas_meta.get('total_gas_consumption_plant', 0.0),
@@ -684,6 +789,9 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "util_eff": gas_meta.get('util_eff', 0.0),
         "direct_use_fraction": gas_meta.get('direct_use_fraction', 0.5),
         "electricity_fraction": gas_meta.get('electricity_fraction', 0.5),
+        "process_gas_carrier": gas_meta.get('process_gas_carrier', None),
+        "natural_gas_carrier": gas_meta.get('natural_gas_carrier', None),
+        "utility_process": gas_meta.get('utility_process', None),
     }
 
     # Debug prints for emission factors

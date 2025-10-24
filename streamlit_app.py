@@ -214,6 +214,7 @@ def render_sidebar_logos(
 def _snapshot_current_setup_for_sweep(
     route_preset: str,
     stage_key: str,
+    stage_role: str | None,
     demand_qty: float,
     country_code: str | None,
     scenario: dict,
@@ -226,6 +227,7 @@ def _snapshot_current_setup_for_sweep(
     snap = {
         "route_preset": route_preset,
         "stage_key": stage_key,
+        "stage_role": stage_role,
         "demand_qty": float(demand_qty),
         "country_code": (country_code or None),
         "scenario": _copy.deepcopy(scenario),
@@ -345,6 +347,7 @@ def _load_for_picks(
     data_dir: str,
     route_preset: str,
     stage_key: str,
+    stage_role: str | None,
     scenario: dict,
     descriptor,
 ):
@@ -404,6 +407,11 @@ def _load_for_picks(
 
     # Route mask + EAF feed mode (for UI)
     pre_mask = build_route_mask_for_descriptor(descriptor, route_preset, recipes) or build_route_mask(route_preset, recipes)
+    stage_role_norm = (stage_role or "").strip().lower()
+    if stage_role_norm == "validation":
+        # Disable onsite auxiliaries so UI stays aligned with validation clamps
+        for proc in ("Nitrogen Production", "Oxygen Production", "Dolomite Production", "Burnt Lime Production"):
+            pre_mask[proc] = 0
     import copy
     recipes_for_ui = copy.deepcopy(recipes)
     eaf_mode = resolve_feed_mode(descriptor, route_preset)
@@ -643,6 +651,7 @@ with tab_main:
             DATA_ROOT,
             route,
             stage_key,
+            stage_role,
             scenario,
             descriptor,
         )
@@ -712,6 +721,17 @@ with tab_main:
         "auto":      set(),
     }.get(route, set())
     pre_select_soft = {p: 0 for p in route_disable if p in UPSTREAM_CORE}
+    if stage_is_validation:
+        pre_select_soft.update({
+            "Nitrogen Production": 0,
+            "Oxygen Production": 0,
+            "Dolomite Production": 0,
+            "Burnt Lime Production": 0,
+            "Nitrogen from market": 1,
+            "Oxygen from market": 1,
+            "Dolomite from market": 1,
+            "Burnt Lime from market": 1,
+        })
     
     # # Force picks derived from Post-CC controls (use session values)
     # forced_pre_select = {}
@@ -775,17 +795,18 @@ with tab_main:
     
     # UI-only renames for producers (optional niceties)
     PROC_RENAMES.update({
-        "Nitrogen Production": "Onsite",
-        "Nitrogen from market": "Purchase",
-        "Oxygen Production": "Onsite",
-        "Oxygen from market": "Purchase",
-        "Coke Production": "Onsite",
-        "Coke Petroleum from Market": "Purchase (pet)",
-        "Coke Mineral from Market": "Purchase (raw)",
-        "Dolomite Production": "Onsite",
-        "Dolomite from market": "Purchase",
-        "Burnt Lime Production": "Onsite",
-        "Burnt Lime from market": "Purchase",
+        # For validation stage, force market purchase options
+        "Nitrogen Production": "Onsite N₂",
+        "Nitrogen from market": "Market N₂",
+        "Oxygen Production": "Onsite O₂",
+        "Oxygen from market": "Market O₂",
+        "Coke Production": "Onsite Coke",
+        "Coke Petroleum from Market": "Market Coke (pet)",
+        "Coke Mineral from Market": "Market Coke (raw)",
+        "Dolomite Production": "Onsite Dolomite",
+        "Dolomite from market": "Market Dolomite",
+        "Burnt Lime Production": "Onsite Lime",
+        "Burnt Lime from market": "Market Lime",
         "Coal from Market": "Coking Coal",
         "Anthracite Coal from Market": "Anthracite",
         "PCI Coal from Market": "Pulverized"
@@ -960,6 +981,7 @@ if not IS_PAPER:
                 st.session_state["sweep_snapshot"] = _snapshot_current_setup_for_sweep(
                     route_preset=route,
                     stage_key=stage_key,
+                    stage_role=stage_role,
                     demand_qty=float(demand_qty),
                     country_code=(country_code or None),
                     scenario=scenario,
@@ -1098,6 +1120,7 @@ if not IS_PAPER:
                 route_cfg = RouteConfig(
                     route_preset=snap["route_preset"],
                     stage_key=snap["stage_key"],
+                    stage_role=snap.get("stage_role"),
                     demand_qty=float(snap["demand_qty"]),
                     picks_by_material=_copy.deepcopy(snap["picks_by_material"]),
                     pre_select_soft=_copy.deepcopy(snap["pre_select_soft"]),
@@ -1220,6 +1243,7 @@ if not IS_PAPER:
                 route_cfg = RouteConfig(
                     route_preset=snap["route_preset"],
                     stage_key=snap["stage_key"],
+                    stage_role=snap.get("stage_role"),
                     demand_qty=float(snap["demand_qty"]),
                     picks_by_material=deepcopy(snap["picks_by_material"]),
                     pre_select_soft=deepcopy(snap["pre_select_soft"]),
@@ -1526,6 +1550,7 @@ if run_now:
             route_cfg = RouteConfig(
                 route_preset=route,
                 stage_key=stage_key,
+                stage_role=stage_role,
                 demand_qty=float(demand_qty),
                 picks_by_material=dict(st.session_state.picks_by_material),
                 pre_select_soft=pre_select_soft,
@@ -1646,4 +1671,3 @@ if run_now:
         st.stop()
 
 st.caption("© 2025 UNICAMP – Faculdade de Engenharia Mecânica. App v1.2 (scenario-locked route, core-calculated, clean stage selector)")
-

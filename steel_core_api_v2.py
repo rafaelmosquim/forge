@@ -77,6 +77,7 @@ class RouteConfig:
     Args:
         route_preset: Steel production route ('BF-BOF', 'DRI-EAF', etc.); avoids unreal routes by pre-selecting;
         stage_key: Production stage to stop at (key from STAGE_MATS); ensures no downstream process is used if not asked;
+        stage_role: Descriptor menu key (e.g. 'validation', 'crude'); disambiguates shared stage_ids like 'Cast';
         demand_qty: Quantity demanded at the specified stage; locked at 1000 kg to ease comparisons; 
         picks_by_material: User selections for material producers; resolves ambiguity (i.e. N2 produced in house or bought);
         pre_select_soft: Processes to enable/disable by default
@@ -84,6 +85,7 @@ class RouteConfig:
     route_preset: str               # 'BF-BOF' | 'DRI-EAF' | 'EAF-Scrap' | 'External' | 'auto'
     stage_key: str                  # key in STAGE_MATS
     demand_qty: float               # demand at stage
+    stage_role: Optional[str] = None
     picks_by_material: Dict[str, str] = field(default_factory=dict)
     pre_select_soft: Optional[Dict[str, int]] = None  # processes softly disabled (0/1)
 
@@ -254,6 +256,21 @@ def _build_routes_from_picks(
     return chosen
 
 
+def _resolve_stage_role(descriptor, stage_key: str, provided_role: Optional[str]) -> str:
+    """Derive the stage role key ('validation', 'crude', etc.) when possible."""
+    stage_role = (provided_role or "").strip().lower()
+    if stage_role:
+        return stage_role
+    matches = [
+        (item.key or "").strip().lower()
+        for item in descriptor.stage_menu
+        if str(item.stage_id).strip().lower() == str(stage_key).strip().lower()
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    return stage_role
+
+
 def _ensure_fallback_processes(
     recipes: List[Process],
     production_routes: Dict[str, int],
@@ -399,6 +416,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     scenario: Dict[str, Any] = scn.scenario or {}
     route_preset: str = scn.route.route_preset or "auto"
     stage_key: str = scn.route.stage_key
+    stage_role_input: str = (scn.route.stage_role or "").strip().lower()
     demand_qty: float = float(scn.route.demand_qty)
     picks_by_material: Dict[str, str] = scn.route.picks_by_material or {}
     pre_select_soft: Dict[str, int] = scn.route.pre_select_soft or {}
@@ -414,15 +432,58 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     descriptor = load_sector_descriptor(base)
     stage_material_map = build_stage_material_map(descriptor)
     STAGE_MATS.update(stage_material_map)
+    
+    stage_role = _resolve_stage_role(descriptor, stage_key, stage_role_input)
+    is_validation = (stage_role == 'validation')
+    os.environ['STEEL_MODEL_STAGE'] = 'validation' if is_validation else ''
+    print(
+        f"🔍 Stage key: {stage_key}, Stage role: {stage_role or '(unspecified)'}, "
+        f"Environment stage: {os.environ.get('STEEL_MODEL_STAGE', '')}"
+    )
+
+    # For validation stage, override any user picks for auxiliaries
+    if is_validation:
+        # Force market purchases for auxiliaries
+        picks_by_material.update({
+            'Nitrogen': 'Nitrogen from market',
+            'Oxygen': 'Oxygen from market',
+            'Dolomite': 'Dolomite from market',
+            'Burnt Lime': 'Burnt Lime from market'
+        })
+        # Ensure these cannot be overridden
+        pre_select_soft.update({
+            'Nitrogen Production': 0,
+            'Oxygen Production': 0,
+            'Dolomite Production': 0,
+            'Burnt Lime Production': 0,
+            'Nitrogen from market': 1,
+            'Oxygen from market': 1,
+            'Dolomite from market': 1,
+            'Burnt Lime from market': 1
+        })
+
     fallback_materials = set(descriptor.balance_fallback_materials or set())
     scenario['fallback_materials'] = list(fallback_materials)
-    raw_prefer_internal = descriptor.prefer_internal_processes or {}
-    prefer_internal_map: Dict[str, List[str]] = {}
-    for market_proc, internal_proc in raw_prefer_internal.items():
-        if not internal_proc:
-            continue
-        internal_key = str(internal_proc)
-        prefer_internal_map.setdefault(internal_key, []).append(str(market_proc))
+    # Determine process preferences based on stage
+    if is_validation:
+        # For validation stage, force market purchases
+        prefer_internal_map = {
+            "Nitrogen Production": ["Nitrogen from market"],
+            "Oxygen Production": ["Oxygen from market"],
+            "Dolomite Production": ["Dolomite from market"],
+            "Burnt Lime Production": ["Burnt Lime from market"]
+        }
+    else:
+        # For other stages, use descriptor preferences
+        raw_prefer_internal = descriptor.prefer_internal_processes or {}
+        prefer_internal_map = {}
+        for market_proc, internal_proc in raw_prefer_internal.items():
+            if not internal_proc:
+                continue
+            internal_key = str(internal_proc)
+            prefer_internal_map.setdefault(internal_key, []).append(str(market_proc))
+    
+    # Set the preferences in the scenario
     scenario['prefer_internal_processes'] = prefer_internal_map
     external_purchase_rows = list(descriptor.costing.external_purchase_rows or [])
     scenario['external_purchase_rows'] = external_purchase_rows
@@ -529,16 +590,73 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     )
     recipes = apply_recipe_overrides(recipes, scenario.get('recipe_overrides', {}), params, energy_int, energy_shares, energy_content)
 
-    # ---------- Route mask & feed enforcement ----------
-    pre_mask = (
-        build_route_mask_for_descriptor(descriptor, route_preset, recipes)
-        or build_route_mask(route_preset, recipes)
-    )
-    eaf_mode = resolve_feed_mode(descriptor, route_preset)
-    if eaf_mode is None:
-        eaf_mode = _infer_eaf_mode(route_preset)
-    # Ensure in-house auxiliaries are preferred (match CLI behaviour)
-    pre_select_soft, pre_mask = apply_inhouse_clamp(pre_select_soft, pre_mask, prefer_internal_map)
+    # ---------- Build route constraints ----------
+    # For validation stage, we want to:
+    # 1. Only clamp auxiliary processes (nitrogen, oxygen, etc) to be market-purchased
+    # 2. Keep other route choices (BF/EAF etc) flexible according to picks
+    # 3. Not apply the fixed downstream path from build_pre_for_route
+    if is_validation:
+        print("🔍 Applying validation stage constraints")
+        # For validation stage, explicitly force market purchases
+        pre_mask = {
+            "Nitrogen Production": 0,
+            "Oxygen Production": 0,
+            "Dolomite Production": 0,
+            "Burnt Lime Production": 0
+        }
+        # Forcibly enable market purchases AND add to picks
+        market_purchases = {
+            "Nitrogen from market": 1,
+            "Oxygen from market": 1,
+            "Dolomite from market": 1,
+            "Burnt Lime from market": 1
+        }
+        pre_select_soft.update(market_purchases)
+        # Also force these in picks_by_material
+        picks_by_material.update({
+            'Nitrogen': 'Nitrogen from market',
+            'Oxygen': 'Oxygen from market',
+            'Dolomite': 'Dolomite from market',
+            'Burnt Lime': 'Burnt Lime from market'
+        })
+        
+        # Add EAF feed mode for validation if needed
+        eaf_mode = resolve_feed_mode(descriptor, route_preset)
+        if eaf_mode is None:
+            eaf_mode = _infer_eaf_mode(route_preset)
+            
+        # Ensure validation stage is set in environment
+        os.environ['STEEL_MODEL_STAGE'] = 'validation'
+    else:
+        # Non-validation: apply full route masks and in-house preferences
+        pre_mask = (
+            build_route_mask_for_descriptor(descriptor, route_preset, recipes)
+            or build_route_mask(route_preset, recipes)
+        )
+        eaf_mode = resolve_feed_mode(descriptor, route_preset)
+        if eaf_mode is None:
+            eaf_mode = _infer_eaf_mode(route_preset)
+
+        # Apply in-house preferences for auxiliaries based on stage
+        if is_validation:
+            # For validation, force market purchase of auxiliaries
+            aux_mask = {
+                "Nitrogen Production": 0,
+                "Oxygen Production": 0,
+                "Dolomite Production": 0,
+                "Burnt Lime Production": 0,
+            }
+            aux_select = {
+                "Nitrogen from market": 1,
+                "Oxygen from market": 1,
+                "Dolomite from market": 1,
+                "Burnt Lime from market": 1,
+            }
+            pre_mask.update(aux_mask)
+            pre_select_soft.update(aux_select)
+        else:
+            # Apply normal in-house clamp for non-validation stages
+            pre_select_soft, pre_mask = apply_inhouse_clamp(pre_select_soft, pre_mask, prefer_internal_map)
 
     # Work on a copy for calculations (enforce feed)
     import copy
@@ -786,6 +904,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     meta = {
         "route_preset": route_preset,
         "stage_key": stage_key,
+        "stage_role": stage_role,
         "sector_key": descriptor.key,
         "sector_name": descriptor.name,
         "demand_qty": demand_qty,

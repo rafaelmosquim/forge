@@ -698,7 +698,9 @@ def apply_gas_routing_and_credits(
 # Force in-house producers (nitrogen, oxygen, dolomite, burnt lime, coke)
 # --------------------------------------------------------------
 INHOUSE_FORCE = {
-    "Nitrogen Production":     "Nitrogen from market",
+    # Note: Nitrogen is intentionally NOT forced in-house here so the
+    # default remains the market-supplied route. Other auxiliaries that
+    # should prefer internal production remain forced below.
     "Oxygen Production":       "Oxygen from market",
     "Dolomite Production":     "Dolomite from market",
     "Burnt Lime Production":   "Burnt Lime from market",
@@ -730,9 +732,27 @@ def set_prefer_internal_processes(mapping: dict | None) -> None:
 
 def apply_inhouse_clamp(pre_select: dict | None, pre_mask: dict | None, prefer_map: dict | None = None):
     """Prefer in-house production processes and ban market purchases.
-    prefer_map comes from sector descriptor; defaults to INHOUSE_FORCE."""
+    prefer_map comes from sector descriptor; defaults to INHOUSE_FORCE.
+    In validation stage, ensure auxiliaries are purchased from market."""
     ps = dict(pre_select or {})
     pm = dict(pre_mask or {})
+    
+    stage = os.environ.get('STEEL_MODEL_STAGE', '')
+    
+    if stage == 'validation':
+        # Force auxiliaries to be market-purchased
+        aux_rules = {
+            "Nitrogen Production": ("Nitrogen from market", 0),
+            "Oxygen Production": ("Oxygen from market", 0),
+            "Dolomite Production": ("Dolomite from market", 0),
+            "Burnt Lime Production": ("Burnt Lime from market", 0)
+        }
+        for prod_proc, (market_proc, _) in aux_rules.items():
+            pm[prod_proc] = 0  # disable production
+            ps[market_proc] = 1  # enable market purchase
+        return ps, pm
+        
+    # For non-validation stages, apply normal rules
     if prefer_map and len(prefer_map) > 0:
         mapping = prefer_map
     elif PREFER_INTERNAL_OVERRIDE:
@@ -791,9 +811,7 @@ def build_pre_for_route(route_key):
     else:
         raise ValueError(f"Unknown route '{route_key}'")
 
-    # Force in-house basic auxiliaries (N2/O2/Dolomite/Burnt Lime/Coke)
-    pre_select, pre_mask = apply_inhouse_clamp(pre_select, pre_mask)
-
+    # Note: don't apply inhouse clamp here, let API control that based on stage
     # CC (R) upstream implies 'regular' grade chain into IP1 → matches your requirement
     return pre_select, pre_mask, recipe_overrides
 
@@ -1250,21 +1268,32 @@ def compute_fixed_plant_elec_model(
     except Exception:
         pre_select_ref, recipe_overrides_ref = {}, {}
 
-    # Force in-house auxiliaries (N2/O2/Dolomite/Burnt Lime/Coke)
-    pre_select_ref, pre_mask_ref = apply_inhouse_clamp(pre_select_ref, pre_mask_ref)
+    # Guard: reference-chain prep should behave as regular (non-validation) run
+    _stage_env_prev = os.environ.get('STEEL_MODEL_STAGE')
+    _reset_stage_env = (_stage_env_prev == 'validation')
+    if _reset_stage_env:
+        os.environ['STEEL_MODEL_STAGE'] = ''
 
-    if recipe_overrides_ref:
-        recipes_ref = apply_recipe_overrides(
-            recipes_ref, recipe_overrides_ref, params, energy_int_ref, energy_shares_ref, energy_content
+    try:
+        # Note: In validation stage, skip forcing auxiliaries in-house
+        if stage_ref != 'validation':
+            pre_select_ref, pre_mask_ref = apply_inhouse_clamp(pre_select_ref, pre_mask_ref)
+
+        if recipe_overrides_ref:
+            recipes_ref = apply_recipe_overrides(
+                recipes_ref, recipe_overrides_ref, params, energy_int_ref, energy_shares_ref, energy_content
+            )
+
+        demand_mat_ref = STAGE_MATS[stage_ref]
+        final_demand_ref = {demand_mat_ref: float(demand_qty)}
+
+        # Unique path without prompts
+        production_routes_ref = build_routes_interactive(
+            recipes_ref, demand_mat_ref, pre_select=pre_select_ref, pre_mask=pre_mask_ref, interactive=False
         )
-
-    demand_mat_ref = STAGE_MATS[stage_ref]
-    final_demand_ref = {demand_mat_ref: float(demand_qty)}
-
-    # Unique path without prompts
-    production_routes_ref = build_routes_interactive(
-        recipes_ref, demand_mat_ref, pre_select=pre_select_ref, pre_mask=pre_mask_ref, interactive=False
-    )
+    finally:
+        if _reset_stage_env:
+            os.environ['STEEL_MODEL_STAGE'] = _stage_env_prev
 
     # Solve and compute energy
     balance_ref, prod_ref = calculate_balance_matrix(recipes_ref, final_demand_ref, production_routes_ref)
@@ -1429,7 +1458,23 @@ def build_routes_interactive(recipes, demand_mat, pre_select=None, pre_mask=None
     - pre_select: dict {process_name: 0/1} initial picks/bans
     - pre_mask:   dict {process_name: 0/1} hard bans/forces (overrides pre_select)
     - interactive: if False, raise on ambiguity instead of prompting.
+    
+    Note: In validation stage, auxiliary materials (N2, O2, etc.) must be purchased from market.
     """
+    stage = os.environ.get('STEEL_MODEL_STAGE', '')
+    if stage == 'validation':
+        # Add auxiliary market purchase requirements to pre_mask and pre_select
+        pre_mask = dict(pre_mask or {})
+        pre_select = dict(pre_select or {})
+        aux_rules = {
+            "Nitrogen Production": "Nitrogen from market",
+            "Oxygen Production": "Oxygen from market",
+            "Dolomite Production": "Dolomite from market",
+            "Burnt Lime Production": "Burnt Lime from market"
+        }
+        for prod_proc, market_proc in aux_rules.items():
+            pre_mask[prod_proc] = 0  # disable production
+            pre_select[market_proc] = 1  # force market purchase
     from collections import defaultdict, deque
 
     # material -> [Process,...]
@@ -1792,8 +1837,10 @@ if __name__ == '__main__':
     print(f"[INFO] Route preset: {args.route}")
     print(f"[INFO] Demand: {args.demand} at stage {args.stage} → {STAGE_MATS[args.stage]}")
 
-    # Force in-house auxiliaries (N2/O2/Dolomite/Burnt Lime/Coke)
-    pre_select, pre_mask = apply_inhouse_clamp(pre_select, pre_mask)
+    # Apply inhouse preferences for auxiliaries only in non-validation stages
+    stage = os.environ.get('STEEL_MODEL_STAGE', '')
+    if stage != 'validation':
+        pre_select, pre_mask = apply_inhouse_clamp(pre_select, pre_mask)
 
     # Build the route mask interactively with these clamps in place
     production_routes = build_routes_interactive(
@@ -1944,4 +1991,3 @@ if __name__ == '__main__':
         fig_energy_ranked.write_html(outdir / "energy_to_process_sankey.html", include_plotlyjs="cdn")
 
     logger.info("Saved Sankey diagrams to: %s", outdir.resolve())
-

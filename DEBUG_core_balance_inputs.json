@@ -92,13 +92,13 @@
       ]
     },
     "external_purchase_rows": [
-      "External Inputs",
-      "Scrap Purchase",
       "Nitrogen from market",
       "Limestone from Market",
-      "Oxygen from market",
+      "Burnt Lime from market",
+      "External Inputs",
+      "Scrap Purchase",
       "Dolomite from market",
-      "Burnt Lime from market"
+      "Oxygen from market"
     ]
   },
   "recipes_sample": [

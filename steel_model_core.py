@@ -1340,7 +1340,7 @@ def compute_fixed_plant_elec_model(
     # EF of coke-oven gas (exclude 'Electricity' share)
     cp_shares = energy_shares_ref.get('Coke Production', {})
     fuels_cp = [c for c in cp_shares if c != 'Electricity' and cp_shares[c] > 0]
-    e_efs_local = load_data_from_yaml(os.path.join('data', 'emission_factors.yml'))  # local read
+    e_efs_local = load_data_from_yaml(os.path.join('datasets', 'steel', 'likely', 'emission_factors.yml'))  # local read
     EF_coke_gas = (sum(cp_shares[c] * e_efs_local.get(c, 0.0) for c in fuels_cp) /
                    max(1e-12, sum(cp_shares[c] for c in fuels_cp))) if fuels_cp else 0.0
 
@@ -1668,7 +1668,7 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser()
 
     p.add_argument('-s', '--scenario', default='DRI_EAF.yml',
-                   help='file name inside data/scenarios (or a full path)')
+                   help='file name inside datasets/steel/likely/scenarios (or a full path)')
     p.add_argument('--stage', choices=list(STAGE_MATS.keys()), default='Finished',
                    help='Where to stop the chain (default: Finished)')
     p.add_argument('--demand', type=float, default=1000.0,
@@ -1681,8 +1681,8 @@ if __name__ == '__main__':
     )
     args = p.parse_args()
 
-    base = os.path.join('data', '')
-    # Allow either "path_demo.yml" or "data/scenarios/path_demo.yml"
+    base = os.path.join('datasets', 'steel', 'likely', '')
+    # Allow either "path_demo.yml" or "datasets/.../scenarios/path_demo.yml"
     if os.path.sep in args.scenario or '/' in args.scenario:
         sc_path = pathlib.Path(args.scenario)
     else:

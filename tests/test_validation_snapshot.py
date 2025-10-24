@@ -48,7 +48,7 @@ def test_crude_steel_validation_likely_bra(repo_root):
     if candidates[1]:
         # illustrative wiring; adjust to your real constructor/params:
         model = candidates[1](
-            data_path=str(repo_root / "data"),
+            data_path=str(repo_root / "datasets" / "steel" / "likely"),
             dataset="Likely",
             grid="BRA",
             boundary="validation_as_cast",

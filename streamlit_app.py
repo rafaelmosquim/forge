@@ -82,7 +82,8 @@ st.set_page_config(
 
 APP_PROFILE = os.getenv("APP_PROFILE", "dev").lower()
 IS_PAPER = (APP_PROFILE == "paper")
-DATA_ROOT = st.session_state.get("DATA_ROOT", "data")
+DEFAULT_DATA_ROOT = "datasets/steel/likely"
+DATA_ROOT = st.session_state.get("DATA_ROOT", DEFAULT_DATA_ROOT)
 
 
 
@@ -94,6 +95,26 @@ from pathlib import Path
 APP_DIR = Path(__file__).parent
 ASSETS  = APP_DIR / "assets"
 MAP_PNG = ASSETS / "process_map.png"
+
+SECTOR_CONFIG = {
+    "Steel": {
+        "datasets": {
+            "Likely": "datasets/steel/likely",
+            "Optimistic (Low)": "datasets/steel/optimistic_low",
+            "Pessimistic (High)": "datasets/steel/pessimistic_high",
+            "Usiminas": "datasets/steel/usiminas",
+        },
+        "default_dataset": "Likely",
+        "preferred_scenario": "BF_BOF_coal.yml",
+    },
+    "Aluminum": {
+        "datasets": {
+            "Baseline": "datasets/aluminum/baseline",
+        },
+        "default_dataset": "Baseline",
+        "preferred_scenario": "scenario_aluminum.yml",
+    },
+}
 
 def _render_svg(path: Path, width_px: int = 100):
     """Inline an SVG in Streamlit via data URI."""
@@ -129,6 +150,40 @@ def _pick(o, name, default=None):
     if isinstance(o, dict): return o.get(name, default)
     return getattr(o, name, default)
 
+
+def _reset_sector_state():
+    """Clear session keys tied to sector-specific configuration."""
+    for key in (
+        "sector_choice",
+        "DATA_ROOT",
+        "picks_by_material",
+        "pre_select_soft",
+        "sweep_snapshot",
+    ):
+        if key in st.session_state:
+            del st.session_state[key]
+    for dyn_key in list(st.session_state.keys()):
+        if str(dyn_key).startswith("dataset_select_") or str(dyn_key) == "sector_gate_selection":
+            del st.session_state[dyn_key]
+
+
+def _ensure_sector_choice() -> str:
+    """Render an initial gate asking the user to select the industrial sector."""
+    sector = st.session_state.get("sector_choice")
+    if sector in SECTOR_CONFIG:
+        return sector
+
+    st.markdown('<div style="text-align:center;"><h3>FORGE  - Flexible Optimization of Routes for GHG & Energy</h3></div>', unsafe_allow_html=True)
+    st.subheader("Select industrial sector")
+    st.write("Choose the industrial sector to configure the model interface.")
+    options = list(SECTOR_CONFIG.keys())
+    with st.form("sector_gate_form", clear_on_submit=False):
+        selected = st.radio("Sector", options, index=0, key="sector_gate_selection")
+        proceed = st.form_submit_button("Continue", type="primary")
+    if proceed:
+        st.session_state["sector_choice"] = selected
+        st.stop()
+    st.stop()
 def _finished_yield_from_data(data_root: str) -> float:
     p = load_parameters(os.path.join(data_root, "parameters.yml"))
     try:
@@ -484,6 +539,9 @@ def gather_ambiguous_chain_materials(
 # Page setup
 # -----------------------------
 
+SECTOR_KEY = _ensure_sector_choice()
+SECTOR_CFG = SECTOR_CONFIG[SECTOR_KEY]
+
 st.markdown("""
 <style>
 :root { --primary-color: #2563eb; }
@@ -498,7 +556,7 @@ button[kind="primary"]:hover, [data-testid="baseButton-primary"]:hover { backgro
 
 st.markdown('<div style="text-align:center;"><h3>FORGE  - Flexible Optimization of Routes for GHG & Energy</h3></div>', unsafe_allow_html=True)
 st.markdown(
-    '<div style="text-align:center;"><h6>A steel plant energy & emissions model</h6></div>',
+    f'<div style="text-align:center;"><h6>{SECTOR_KEY} sector energy & emissions model</h6></div>',
     unsafe_allow_html=True
 )
 
@@ -525,28 +583,41 @@ run_now = False
 render_sidebar_logos(width_px=80, middle_svg="fgv-logo.png", middle_width_px=120)
 with st.sidebar:
     st.header("Main options")
-    # Scenario picker (from data/scenarios)
+    # Scenario picker (from dataset/scenarios)
     def list_scenarios(data_dir: str) -> List[str]:
-        sc_dir = pathlib.Path(data_dir) / "scenarios"
-        if not sc_dir.exists():
-            return []
-        return sorted([p.name for p in sc_dir.glob("*.yml")])
+        base_path = pathlib.Path(data_dir)
+        names: List[str] = []
+        sc_dir = base_path / "scenarios"
+        if sc_dir.exists():
+            names.extend(sorted(p.name for p in sc_dir.glob("*.yml")))
+        top_level = sorted(p.name for p in base_path.glob("scenario_*.yml"))
+        for name in top_level:
+            if name not in names:
+                names.append(name)
+        return names
+
+    st.markdown(f"**Sector:** {SECTOR_KEY}")
+    if st.button("Change sector", key="btn_change_sector"):
+        _reset_sector_state()
+        st.stop()
     
     # Choose which data folder to use
+    dataset_map = SECTOR_CFG["datasets"]
+    dataset_names = list(dataset_map.keys())
+    dataset_widget_key = f"dataset_select_{SECTOR_KEY.lower()}"
+    default_dataset_name = SECTOR_CFG.get("default_dataset")
+    if default_dataset_name not in dataset_names and dataset_names:
+        default_dataset_name = dataset_names[0]
+    default_index = dataset_names.index(default_dataset_name) if default_dataset_name in dataset_names else 0
     data_choice = st.selectbox(
         "Data set",
-        ["Likely", "Optimistic (Low)", "Pessimistic (High)", "Usiminas", "Aluminum"],
-        index=0,
+        dataset_names,
+        index=default_index,
+        key=dataset_widget_key,
         help="Selects the appropriate data-set."
     )
-    _map = {
-        "Likely": "data",
-        "Optimistic (Low)": "data_min",
-        "Pessimistic (High)": "data_max",
-        "Usiminas": "usiminas",
-        "Aluminum": "aluminum",
-    }
-    DATA_ROOT = _map[data_choice]
+    DATA_ROOT = dataset_map[data_choice]
+    st.session_state["sector_choice"] = SECTOR_KEY
     st.session_state["DATA_ROOT"] = DATA_ROOT
     try:
         descriptor = load_sector_descriptor(DATA_ROOT)
@@ -554,12 +625,15 @@ with st.sidebar:
         st.error(str(exc))
         st.stop()
     st.session_state["sector_descriptor"] = descriptor
-    st.caption(f"Using data folder: {DATA_ROOT}/")
+    st.caption(f"Using data folder: {DATA_ROOT}")
 
 
     available = list_scenarios(DATA_ROOT)
-    PREFERRED = "BF_BOF_coal.yml"
-    default_idx = available.index(PREFERRED) if PREFERRED in available else 0
+    preferred = SECTOR_CFG.get("preferred_scenario")
+    if available and preferred and preferred in available:
+        default_idx = available.index(preferred)
+    else:
+        default_idx = 0
 
     if available:
         scenario_choice = st.selectbox(
@@ -569,13 +643,27 @@ with st.sidebar:
             format_func=_route_label_for_file,
         )
         scenario_path = pathlib.Path(DATA_ROOT) / "scenarios" / scenario_choice
+        if not scenario_path.exists():
+            scenario_path = pathlib.Path(DATA_ROOT) / scenario_choice
         scenario = load_data_from_yaml(str(scenario_path), default_value=None, unwrap_single_key=False)
         scenario_name = scenario_choice
     else:
-        scenario_choice = None
-        scenario = {}
-        scenario_name = "(no scenario)"
-        st.warning("No scenario .yml files found in data/scenarios")
+        fallback_name = preferred
+        fallback_path = None
+        if fallback_name:
+            fallback_path = pathlib.Path(DATA_ROOT) / "scenarios" / fallback_name
+            if not fallback_path.exists():
+                fallback_path = pathlib.Path(DATA_ROOT) / fallback_name
+        if fallback_path and fallback_path.exists():
+            scenario_choice = fallback_name
+            scenario = load_data_from_yaml(str(fallback_path), default_value=None, unwrap_single_key=False)
+            scenario_name = fallback_name
+            st.info(f"Using default scenario '{fallback_name}'.")
+        else:
+            scenario_choice = None
+            scenario = {}
+            scenario_name = "(no scenario)"
+            st.warning(f"No scenario .yml files found in {DATA_ROOT}/scenarios")
 
     default_direct_fraction = descriptor.gas.default_direct_use_fraction
     if default_direct_fraction is None:

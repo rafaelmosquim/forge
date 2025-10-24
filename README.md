@@ -30,6 +30,10 @@ https://doi.org/10.5281/zenodo.17145189
 - 1-D sensitivity sweeps + Monte Carlo with pinned seeds
 - Streamlit UI for picks (AND/OR recipe graph) and charts
 
+## Data bundles
+- Datasets now live under `datasets/<sector>/<variant>/` (e.g., `datasets/steel/likely`, `datasets/aluminum/baseline`).
+- The Streamlit app opens with a sector gate so you can select *Steel* or *Aluminum* before choosing a dataset variant.
+
 ## Install
 Requires **Python ≥ 3.10**.
 streamlit run streamlit_app.py
@@ -51,7 +55,8 @@ pip install -r requirements.txt
 streamlit run streamlity_app.py
 ```
 In the main UI:
-1. Sidebar → Dataset = Likely, Grid = BRA, Product = Validation (as-cast)
+1. Landing screen → Sector = Steel, click Continue
+2. Sidebar → Dataset = Likely, Grid = BRA, Product = Validation (as-cast)
 2. Sidebar → pick a Route (BF-BOF / DRI-EAF / EAF-scrap)
 3. Main → Tab = Main Model → Run model
 4. Reported Crude steel (as-cast) CO₂e matches Table 1 in the paper.

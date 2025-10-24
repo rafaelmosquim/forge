@@ -1,6 +1,6 @@
 import glob, pathlib, re, pytest, yaml
 
-GLOB = "data*/scenarios/*_resolved.yml"
+GLOB = "datasets/steel/*/scenarios/*_resolved.yml"
 BAD = re.compile(r"\b(or|one of|choice|alt)\b", flags=re.IGNORECASE)
 
 def _normalized_text(p: pathlib.Path) -> str:

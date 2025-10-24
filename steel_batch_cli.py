@@ -51,7 +51,7 @@ from steel_core_api_v2 import (
     write_run_log,
 )
 
-DEFAULT_DATA_DIR = Path("data")
+DEFAULT_DATA_DIR = Path("datasets/steel/likely")
 
 
 # -----------------------------
@@ -518,7 +518,7 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run", help="Execute one or more scenarios.")
     run_parser.add_argument("--spec", type=Path, help="YAML/JSON file describing scenario runs.")
     run_parser.add_argument("--scenario", type=str, help="Scenario YAML/JSON for a single run (shortcut instead of --spec).")
-    run_parser.add_argument("--data-dir", type=str, default=str(DEFAULT_DATA_DIR), help="Data directory (default: data).")
+    run_parser.add_argument("--data-dir", type=str, default=str(DEFAULT_DATA_DIR), help="Data directory (default: datasets/steel/likely).")
     run_parser.add_argument("--route", dest="route_preset", default="auto", help="Route preset (default: auto).")
     run_parser.add_argument("--stage-key", default="Finished", help="Stage key to demand (default: Finished).")
     run_parser.add_argument("--stage-role", default=None, help="Optional stage role (validation/crude/etc).")

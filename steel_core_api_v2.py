@@ -563,7 +563,13 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     # Country-driven Electricity EF (if provided in UI)
     if country_code and country_code in elec_map:
         try:
-            e_efs['Electricity'] = float(elec_map[country_code])
+            e_val = float(elec_map[country_code])
+            e_efs['Electricity'] = e_val
+            ef_overrides = scenario.get('emission_factors')
+            if isinstance(ef_overrides, dict) and 'Electricity' in ef_overrides:
+                ef_overrides = dict(ef_overrides)
+                ef_overrides.pop('Electricity', None)
+                scenario['emission_factors'] = ef_overrides
         except Exception:
             pass  # keep original if casting fails
 

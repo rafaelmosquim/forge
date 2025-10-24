@@ -1,6 +1,6 @@
 import glob, yaml, pathlib
 
-YAML_GLOBS = ["data/**/*.yml", "data/**/*.yaml", "configs/**/*.yml", "configs/**/*.yaml"]
+YAML_GLOBS = ["datasets/**/*.yml", "datasets/**/*.yaml", "configs/**/*.yml", "configs/**/*.yaml"]
 
 def _all_yaml_paths():
     paths = []

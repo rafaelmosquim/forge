@@ -1,7 +1,7 @@
 """
 Sector descriptor loader for industry-agnostic configuration.
 
-Each dataset folder (e.g. ``data/`` for steel or ``aluminum/``) provides a
+Each dataset folder (e.g. ``datasets/steel/likely/`` or ``datasets/aluminum/baseline/``) provides a
 ``sector.yml`` file describing stage mappings, route presets, process roles,
 and other knobs that were previously hard-coded for steel.
 

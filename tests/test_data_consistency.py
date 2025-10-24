@@ -35,7 +35,7 @@ def norm_num(x):
 @pytest.fixture
 def data_dir():
     # Adjust if your data lives elsewhere
-    return Path("data")
+    return Path("datasets/steel/likely")
 
 @pytest.fixture
 def yload():

@@ -767,8 +767,14 @@ def apply_inhouse_clamp(pre_select: dict | None, pre_mask: dict | None, prefer_m
             else [market_proc]
         )
         for target in targets:
-            if target:
-                pm[target] = 0
+            if not target:
+                continue
+            # keep market options available; remove any hard bans added by defaults
+            if pm.get(target) == 0:
+                pm.pop(target, None)
+            # only set default enable when caller did not specify otherwise
+            if target not in ps:
+                ps[target] = 1
     return ps, pm
 
 def build_pre_for_route(route_key):

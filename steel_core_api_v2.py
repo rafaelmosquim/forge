@@ -176,6 +176,11 @@ DEFAULT_PRODUCER_PRIORITY: Tuple[str, ...] = (
     "Electric Arc Furnace",
     "Bypass Raw→IP3",
     "Bypass CR→IP3",
+    "Nitrogen Production",
+    "Oxygen Production",
+    "Dolomite Production",
+    "Burnt Lime Production",
+    "Coke Production",
 )
 
 

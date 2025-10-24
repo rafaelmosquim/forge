@@ -1,61 +1,36 @@
 {
   "prod_levels_sample": {
-    "Continuous Casting (R)": 1000.0,
-    "Regular Steel": 1000.0,
-    "Basic Oxygen Furnace": 1000.0,
-    "Nitrogen Production": 190.34027419170775,
-    "Oxygen Production": 162.0
+    "Casting & Finishing": 1000.0,
+    "Aluminum Smelting (Electrolysis)": 1000.0,
+    "External Electricity (auto)": 56200.0,
+    "Alumina Refining (Bayer)": 1000.0,
+    "Bauxite Mining": 2000.0
   },
   "energy_balance_sample": {
-    "Charcoal": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
-    },
-    "Coal": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 2246.399999999999
-    },
-    "Coke": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 8985.6
+    "Diesel": {
+      "Bauxite Mining": 16000.0,
+      "Alumina Refining (Bayer)": 0.0,
+      "Aluminum Smelting (Electrolysis)": 0.0
     },
     "Electricity": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 350.0,
-      "Blast Furnace": 635.8695652173914
+      "Bauxite Mining": 4000.0,
+      "Alumina Refining (Bayer)": 45000.0,
+      "Aluminum Smelting (Electrolysis)": 250000.0
     },
-    "FLF": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
-    },
-    "Gas": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
-    },
-    "RLF": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
-    },
-    "Wood": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
+    "Process Gas": {
+      "Bauxite Mining": 0.0,
+      "Alumina Refining (Bayer)": 5000.0,
+      "Aluminum Smelting (Electrolysis)": 0.0
     }
   },
   "energy_int_sample": {
-    "Manganese from Market": 0,
-    "Chromium from Market": 0,
-    "Nickel from Market": 0
+    "Bauxite Mining": 10.0,
+    "Alumina Refining (Bayer)": 50.0,
+    "Aluminum Smelting (Electrolysis)": 250.0
   },
   "e_efs_sample": {
-    "Electricity": 38.5,
-    "FLF": 94.12,
-    "RLF": 23.58
+    "Coal": 25.0,
+    "Gas": 50.0,
+    "Electricity": 38.5
   }
 }

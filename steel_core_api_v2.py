@@ -55,6 +55,7 @@ from steel_model_core import (
     compute_inside_gas_reference_for_share,
     apply_gas_routing_and_credits,
     set_prefer_internal_processes,
+    apply_inhouse_clamp,
 )
 
 from sector_descriptor import load_sector_descriptor
@@ -165,6 +166,17 @@ def _credit_enabled(scn: dict | None) -> bool:
     return True
 
 
+DEFAULT_PRODUCER_PRIORITY: Tuple[str, ...] = (
+    "Continuous Casting (R)",
+    "Hot Rolling",
+    "Cold Rolling",
+    "Basic Oxygen Furnace",
+    "Electric Arc Furnace",
+    "Bypass Raw→IP3",
+    "Bypass CR→IP3",
+)
+
+
 def _build_producers_index(recipes: List[Process]) -> Dict[str, List[Process]]:
     prod = {}
     for r in recipes:
@@ -217,7 +229,14 @@ def _build_routes_from_picks(
         else:
             pick_name = picks_by_material.get(mat)
             if pick_name is None:
-                pick = enabled[0]  # deterministic default
+                def _score(proc):
+                    try:
+                        idx = DEFAULT_PRODUCER_PRIORITY.index(proc.name)
+                        return (0, idx, proc.name)
+                    except ValueError:
+                        return (1, proc.name)
+
+                pick = min(enabled, key=_score)
             else:
                 pick = next((r for r in enabled if r.name == pick_name), enabled[0])
 
@@ -397,7 +416,13 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     STAGE_MATS.update(stage_material_map)
     fallback_materials = set(descriptor.balance_fallback_materials or set())
     scenario['fallback_materials'] = list(fallback_materials)
-    prefer_internal_map = dict(descriptor.prefer_internal_processes or {})
+    raw_prefer_internal = descriptor.prefer_internal_processes or {}
+    prefer_internal_map: Dict[str, List[str]] = {}
+    for market_proc, internal_proc in raw_prefer_internal.items():
+        if not internal_proc:
+            continue
+        internal_key = str(internal_proc)
+        prefer_internal_map.setdefault(internal_key, []).append(str(market_proc))
     scenario['prefer_internal_processes'] = prefer_internal_map
     external_purchase_rows = list(descriptor.costing.external_purchase_rows or [])
     scenario['external_purchase_rows'] = external_purchase_rows
@@ -512,6 +537,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     eaf_mode = resolve_feed_mode(descriptor, route_preset)
     if eaf_mode is None:
         eaf_mode = _infer_eaf_mode(route_preset)
+    # Ensure in-house auxiliaries are preferred (match CLI behaviour)
+    pre_select_soft, pre_mask = apply_inhouse_clamp(pre_select_soft, pre_mask, prefer_internal_map)
 
     # Work on a copy for calculations (enforce feed)
     import copy

@@ -3,9 +3,9 @@ sector_name: Steelmaking
 
 stage_menu:
   - key: validation
-    stage_id: IP3
+    stage_id: Cast
     label: 'Validation (as cast)'
-    description: 'Reference chain up to IP3.'
+    description: 'Reference chain up to continuous casting.'
   - key: crude
     stage_id: Cast
     label: 'Crude steel'
@@ -120,3 +120,5 @@ prefer_internal_processes:
   Dolomite from market: Dolomite Production
   Burnt Lime from market: Burnt Lime Production
   Coke from market: Coke Production
+  Coke Mineral from Market: Coke Production
+  Coke Petroleum from Market: Coke Production

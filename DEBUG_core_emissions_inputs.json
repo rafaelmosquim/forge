@@ -3,54 +3,49 @@
     "Continuous Casting (R)": 1000.0,
     "Regular Steel": 1000.0,
     "Basic Oxygen Furnace": 1000.0,
-    "Nitrogen from market": 190.34027419170775,
-    "Oxygen from market": 162.0
+    "Nitrogen Production": 190.34027419170775,
+    "Oxygen Production": 162.0
   },
   "energy_balance_sample": {
     "Charcoal": {
+      "Anthracite Coal from Market": 0.0,
       "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0,
-      "Coal from Market": 0.0
+      "Blast Furnace": 0.0
     },
     "Coal": {
+      "Anthracite Coal from Market": 0.0,
       "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 2246.399999999999,
-      "Coal from Market": 0.0
+      "Blast Furnace": 2246.399999999999
     },
     "Coke": {
+      "Anthracite Coal from Market": 0.0,
       "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 8985.6,
-      "Coal from Market": 0.0
+      "Blast Furnace": 8985.6
     },
     "Electricity": {
+      "Anthracite Coal from Market": 0.0,
       "Basic Oxygen Furnace": 350.0,
-      "Blast Furnace": 635.8695652173914,
-      "Coal from Market": 0.0
+      "Blast Furnace": 635.8695652173914
     },
     "FLF": {
+      "Anthracite Coal from Market": 0.0,
       "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0,
-      "Coal from Market": 0.0
+      "Blast Furnace": 0.0
     },
     "Gas": {
+      "Anthracite Coal from Market": 0.0,
       "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0,
-      "Coal from Market": 0.0
+      "Blast Furnace": 0.0
     },
     "RLF": {
+      "Anthracite Coal from Market": 0.0,
       "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0,
-      "Coal from Market": 0.0
+      "Blast Furnace": 0.0
     },
     "Wood": {
+      "Anthracite Coal from Market": 0.0,
       "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0,
-      "Coal from Market": 0.0
-    },
-    "Process Gas": {
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0,
-      "Coal from Market": 0.0
+      "Blast Furnace": 0.0
     }
   },
   "energy_int_sample": {

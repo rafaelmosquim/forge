@@ -384,6 +384,10 @@ def compute_inside_gas_reference_for_share(
     route_key: str,
     demand_qty: float,
     stage_ref: str = "IP3",
+    stage_lookup=None,
+    gas_carrier=None,
+    fallback_materials=None,
+    **_,
 ):
     """
     Compute total plant-level gas consumption (MJ) for a fixed reference chain
@@ -521,6 +525,7 @@ def apply_gas_routing_and_credits(
     gas_sources_MJ = 0.0
     ef_weighted = 0.0
     weight_sum = 0.0
+    gas_source_details: Dict[str, float] = {}
     for src in gas_source_names:
         proc = recipes_dict.get(src)
         if not proc:
@@ -533,6 +538,7 @@ def apply_gas_routing_and_credits(
         if contribution <= 1e-12:
             continue
         gas_sources_MJ += contribution
+        gas_source_details[src] = contribution
         shares = energy_shares.get(src, {})
         ef_source = _blend_EF(shares, e_efs)
         if ef_source <= 0:
@@ -540,19 +546,20 @@ def apply_gas_routing_and_credits(
         ef_weighted += ef_source * contribution
         weight_sum += contribution
 
-    if gas_sources_MJ > 0:
+    use_descriptor_sources = (
+        gas_sources_MJ > 0 and abs(gas_sources_MJ - total_gas_MJ) <= 1e-6
+    )
+    if use_descriptor_sources:
         total_gas_MJ = float(gas_sources_MJ)
-        gas_coke_MJ = 0.0
-        gas_bf_MJ = 0.0
-        EF_coke_gas = 0.0
-        EF_bf_gas = 0.0
         if weight_sum > 0:
             EF_process_gas = ef_weighted / weight_sum
         else:
             EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
+        # keep per-source values if provided; fall back to legacy values otherwise
+        gas_coke_MJ = float(gas_source_details.get('Coke Production', gas_coke_MJ))
+        gas_bf_MJ = float(gas_source_details.get('Blast Furnace', gas_bf_MJ))
     else:
-        gas_sources_MJ = 0.0
-        if total_gas_MJ <= 1e-9:
+        if gas_sources_MJ <= 0 and total_gas_MJ <= 1e-9:
             EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
 
     try:
@@ -666,6 +673,7 @@ def apply_gas_routing_and_credits(
         'gas_coke_MJ': gas_coke_MJ,
         'gas_bf_MJ': gas_bf_MJ,
         'gas_sources_MJ': gas_sources_MJ,
+        'gas_source_details': gas_source_details,
         'direct_use_gas_MJ': direct_use_gas_MJ,
         'electricity_gas_MJ': electricity_gas_MJ,
         'total_gas_consumption_plant': total_gas_consumption_plant,
@@ -694,10 +702,14 @@ INHOUSE_FORCE = {
     "Oxygen Production":       "Oxygen from market",
     "Dolomite Production":     "Dolomite from market",
     "Burnt Lime Production":   "Burnt Lime from market",
-    "Coke Production":         "Coke from market",
+    "Coke Production":         [
+        "Coke from market",
+        "Coke Mineral from Market",
+        "Coke Petroleum from Market",
+    ],
 }
 
-PREFER_INTERNAL_OVERRIDE: Dict[str, str] = {}
+PREFER_INTERNAL_OVERRIDE: Dict[str, object] = {}
 
 
 def set_prefer_internal_processes(mapping: dict | None) -> None:
@@ -706,7 +718,14 @@ def set_prefer_internal_processes(mapping: dict | None) -> None:
     if not mapping:
         PREFER_INTERNAL_OVERRIDE = {}
         return
-    PREFER_INTERNAL_OVERRIDE = {str(k): str(v) for k, v in mapping.items()}
+    converted: Dict[str, object] = {}
+    for k, v in mapping.items():
+        key = str(k)
+        if isinstance(v, (list, tuple, set)):
+            converted[key] = [str(item) for item in v]
+        else:
+            converted[key] = str(v)
+    PREFER_INTERNAL_OVERRIDE = converted
 
 
 def apply_inhouse_clamp(pre_select: dict | None, pre_mask: dict | None, prefer_map: dict | None = None):
@@ -722,7 +741,14 @@ def apply_inhouse_clamp(pre_select: dict | None, pre_mask: dict | None, prefer_m
         mapping = INHOUSE_FORCE
     for prod_proc, market_proc in mapping.items():
         ps[prod_proc] = 1
-        pm[market_proc] = 0
+        targets = (
+            list(market_proc)
+            if isinstance(market_proc, (list, tuple, set))
+            else [market_proc]
+        )
+        for target in targets:
+            if target:
+                pm[target] = 0
     return ps, pm
 
 def build_pre_for_route(route_key):

@@ -25,8 +25,8 @@
       "effective_gas_ef_gco2_per_MJ": 50.0
     },
     "gas_routing": {
-      "direct_use_fraction": 0.0,
-      "electricity_fraction": 1.0
+      "direct_use_fraction": 0.5,
+      "electricity_fraction": 0.5
     },
     "fallback_materials": [
       "Electricity"

@@ -5,6 +5,10 @@
 - Added dataset-specific `sector.yml` configs and descriptor loader module.
 - Enabled fallback external supplies to avoid loops when internal utilities absent.
 - Updated cost/emissions calculations to honor descriptor metadata.
+- Validation (as-cast) stage now clamps auxiliaries to market purchases while other stages respect user picks.
+- Restored deterministic internal-electricity reference so validation routing doesn’t skew emission factors.
+- Upstream clamp logic relaxed so radios control onsite vs market choices outside validation.
+- Restored BF-BOF charcoal scenario behaviour and clarified scenario labels; kept biomethane optional by lowering its priority.
 
 ## v1.0.2 — 2025-10-06
 - JOSS submission snapshot.

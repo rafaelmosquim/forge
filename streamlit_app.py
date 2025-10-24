@@ -321,7 +321,12 @@ def _route_label_for_file(fname: str) -> str:
     if descriptor:
         matched = match_route_in_name(descriptor, stem)
         if matched and matched in descriptor.routes:
-            return descriptor.routes[matched].label
+            preset = descriptor.routes[matched]
+            label = preset.label
+            # include friendly suffix when alias disambiguates
+            if matched == "BF-BOF" and "charcoal" in stem:
+                return f"{label} (Charcoal)"
+            return label
 
     # Base route
     if ("bf" in stem and "bof" in stem):

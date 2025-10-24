@@ -181,6 +181,11 @@ DEFAULT_PRODUCER_PRIORITY: Tuple[str, ...] = (
     "Dolomite Production",
     "Burnt Lime Production",
     "Coke Production",
+    "Natural gas from Market",
+    "LPG from Market",
+    "Biomethane from Market",
+    "Hydrogen (Methane reforming) from Market",
+    "Hydrogen (Electrolysis) from Market",
 )
 
 
@@ -274,6 +279,33 @@ def _resolve_stage_role(descriptor, stage_key: str, provided_role: Optional[str]
     if len(matches) == 1:
         return matches[0]
     return stage_role
+
+
+def _apply_route_overrides(
+    pre_select: Dict[str, int],
+    pre_mask: Dict[str, int],
+    overrides: Optional[Dict[str, Any]],
+) -> Tuple[Dict[str, int], Dict[str, int]]:
+    """Blend scenario route_overrides into the current pre-select/mask dictionaries."""
+    if not overrides:
+        return pre_select, pre_mask
+    ps = dict(pre_select or {})
+    pm = dict(pre_mask or {})
+    for proc, raw in overrides.items():
+        key = str(proc)
+        try:
+            val = float(raw)
+        except Exception:
+            val = 1.0 if bool(raw) else 0.0
+        enabled = 1 if val > 0.0 else 0
+        ps[key] = enabled
+        if enabled:
+            # remove hard bans when scenario explicitly forces enable
+            if pm.get(key, 1) == 0:
+                pm.pop(key, None)
+        else:
+            pm[key] = 0
+    return ps, pm
 
 
 def _ensure_fallback_processes(
@@ -662,6 +694,13 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         else:
             # Apply normal in-house clamp for non-validation stages
             pre_select_soft, pre_mask = apply_inhouse_clamp(pre_select_soft, pre_mask, prefer_internal_map)
+
+    # Apply explicit route overrides from scenario (defensive copy)
+    pre_select_soft, pre_mask = _apply_route_overrides(
+        pre_select_soft,
+        pre_mask,
+        scenario.get('route_overrides'),
+    )
 
     # Work on a copy for calculations (enforce feed)
     import copy

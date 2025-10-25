@@ -21,14 +21,11 @@ By participating, you agree to abide by the project’s Code of Conduct (see `CO
 4. **Run the app locally** (typical workflow)  
    `streamlit run streamlit_app.py`
 
-### Verifying changes (current practice)
-FORGE’s logic is exercised via the Streamlit UI (route disambiguation happens interactively).  
-Until scripted tests are added, please verify locally by reproducing the validation preset:
-
-- In the UI: **Validation → “Validation (as cast)” → Dataset = Likely → Grid = BRA**  
-- Export the results and visually confirm values match those in the paper/README.
-
-*(If you add a script or tests, mention them in your PR so we can update this section.)*
+### Verifying changes
+- Run the automated checks locally: `pytest`.
+- For UI or routing updates, reproduce the validation preset in Streamlit  
+  *(Validation → “Validation (as cast)” → Dataset = Likely → Grid = BRA)* and confirm values match Table 1 / README.
+- Optional: use `python steel_batch_cli.py run --scenario datasets/steel/likely/scenarios/BF_BOF_coal.yml --route BF-BOF --stage-key Cast --stage-role validation --country-code BRA` to capture deterministic JSON/CSV outputs outside the UI.
 
 ## Style & conventions
 - Keep PRs **small and focused** (one change set per PR).
@@ -38,6 +35,7 @@ Until scripted tests are added, please verify locally by reproducing the validat
 
 ## Pull request checklist
 Before opening a PR, please ensure:
+- [ ] `pytest` passes locally.
 - [ ] The app runs locally without errors (`streamlit_app.py`).
 - [ ] Validation preset still produces expected magnitudes (no regressions).
 - [ ] Docs/README updated if behavior or options changed.

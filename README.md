@@ -36,12 +36,6 @@ https://doi.org/10.5281/zenodo.17145189
 
 ## Install
 Requires **Python ≥ 3.10**.
-streamlit run streamlit_app.py
-# In the UI (sidebar): Dataset = Likely → Grid = BRA → Product = Validation (as cast)
-# In the UI (sidebar): Route: should be selected for each main route
-# In the UI (main): Tab = Main Model → Run model button
-# Values are displayed and match Table 1 in the paper.
-
 
 ```bash
 git clone https://github.com/rafaelmosquim/forge.git
@@ -52,7 +46,7 @@ pip install -r requirements.txt
 
 ## Quick start (Streamlit)
 ```bash
-streamlit run streamlity_app.py
+streamlit run streamlit_app.py
 ```
 In the main UI:
 1. Landing screen → Sector = Steel, click Continue
@@ -61,8 +55,19 @@ In the main UI:
 3. Main → Tab = Main Model → Run model
 4. Reported Crude steel (as-cast) CO₂e matches Table 1 in the paper.
 
-CLI note: A CLI run is intentionally not provided because the recipe graph contains ambiguous producer choices;
-the UI resolves this interactively. 
+## CLI batch runner
+When you already know the scenario and route selections you can execute the model headlessly:
+
+```bash
+python steel_batch_cli.py run \
+  --scenario datasets/steel/likely/scenarios/BF_BOF_coal.yml \
+  --route BF-BOF \
+  --stage-key Cast \
+  --stage-role validation \
+  --country-code BRA
+```
+
+`steel_batch_cli.py --help` lists additional options for supplying batches, override files, and pick lists.
 
 ## Tests
 Run the lightweight consistency checks:

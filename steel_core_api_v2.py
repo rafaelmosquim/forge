@@ -44,6 +44,7 @@ from steel_model_core import (
     expand_energy_tables_for_active,
     calculate_internal_electricity,
     calculate_energy_balance,
+    calculate_lci,
     adjust_energy_balance,
     analyze_energy_costs,
     analyze_material_costs,
@@ -125,6 +126,7 @@ class RunOutputs:
         emissions: DataFrame of CO2e emissions by process (kg)
         total_co2e_kg: Total CO2e emissions for the scenario (kg)
         balance_matrix: DataFrame of material balances
+        lci: DataFrame with material and energy inputs per process
         meta: Dictionary of metadata about the run
     """    
     production_routes: Dict[str, int]
@@ -135,6 +137,7 @@ class RunOutputs:
     total_cost: Optional[float] = None
     material_cost: Optional[float] = None
     balance_matrix: Optional[pd.DataFrame] = None   # ← add this line
+    lci: Optional[pd.DataFrame] = None
     meta: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -779,13 +782,19 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     # Optional fix-ups to BF / Coke carriers (if your CLI does this)
     try:
-        if 'Blast Furnace' in energy_balance.index and hasattr(params, 'bf_base_intensity'):
+        if 'Blast Furnace' in energy_balance.index:
             bf_runs = float(prod_levels.get('Blast Furnace', 0.0))
-            base_bf = float(params.bf_base_intensity)
+            bf_intensity = float(
+                getattr(
+                    params,
+                    'bf_adj_intensity',
+                    getattr(params, 'bf_base_intensity', energy_int.get('Blast Furnace', 0.0)),
+                )
+            )
             bf_sh   = energy_shares.get('Blast Furnace', {})
             for carrier in energy_balance.columns:
                 if carrier != 'Electricity':
-                    energy_balance.loc['Blast Furnace', carrier] = bf_runs * base_bf * float(bf_sh.get(carrier, 0.0))
+                    energy_balance.loc['Blast Furnace', carrier] = bf_runs * bf_intensity * float(bf_sh.get(carrier, 0.0))
         cp_runs = float(prod_levels.get('Coke Production', 0.0))
         base_cp = float(getattr(params, 'coke_production_base_intensity', energy_int.get('Coke Production', 0.0)))
         cp_sh   = energy_shares.get('Coke Production', {})
@@ -795,6 +804,9 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
                     energy_balance.loc['Coke Production', carrier] = cp_runs * base_cp * float(cp_sh.get(carrier, 0.0))
     except Exception:
         pass  # if fields missing, skip the fix-up
+
+    # Defer LCI build until after gas routing adjustments
+    lci_df = None
 
     # Delegate gas routing, EF blending and credit application to core helper
     gas_reference_fn = partial(
@@ -990,6 +1002,17 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "utility_process": gas_meta.get('utility_process', None),
     }
 
+    # Build final LCI with carrier splits
+    lci_df = calculate_lci(
+        prod_level=prod_levels,
+        recipes=recipes_calc,
+        energy_balance=energy_balance,
+        electricity_internal_fraction=f_internal,
+        gas_internal_fraction=f_internal_gas,
+        natural_gas_carrier=gas_meta.get('natural_gas_carrier', natural_gas_carrier),
+        process_gas_carrier=gas_meta.get('process_gas_carrier', process_gas_carrier),
+    )
+
     # Debug prints for emission factors
     print("\n=== EMISSION FACTOR DEBUG ===")
     print(f"ELECTRICITY:")
@@ -1021,5 +1044,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         total_cost=total_cost,
         material_cost=material_cost,
         balance_matrix=balance_matrix,
+        lci=lci_df,
         meta=meta,
     )

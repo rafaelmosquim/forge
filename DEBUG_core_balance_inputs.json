@@ -1,29 +1,47 @@
 {
   "final_demand": {
-    "Cast Steel (IP1)": 1000.0
+    "Finished Products": 1000.0
   },
   "production_routes": {
+    "Organic or Sintetic Coating (painting)": 1,
+    "No Coating": 0,
+    "Hot Dip Metal Coating FP": 0,
+    "Electrolytic Metal Coating FP": 0,
+    "Machining": 1,
+    "Direct use of Basic Steel Products": 0,
+    "Casting/Extrusion/Conformation": 0,
+    "Stamping/calendering/lamination": 0,
+    "Bypass Raw\u2192IP3": 1,
+    "Steel Thermal Treatment": 0,
+    "Hot Dip Metal Coating": 0,
+    "Electrolytic Metal Coating": 0,
+    "Steel Thermal Treatment (CR)": 0,
+    "Hot Dip Metal Coating (CR)": 0,
+    "Electrolytic Metal Coating (CR)": 0,
+    "Bypass CR\u2192IP3": 0,
+    "Hot Rolling": 1,
+    "Rod/bar/section Mill": 0,
     "Continuous Casting (R)": 1,
     "Continuous Casting (L)": 0,
     "Continuous Casting (H)": 0,
     "Regular Steel": 1,
     "Basic Oxygen Furnace": 1,
     "Electric Arc Furnace": 0,
-    "Nitrogen from market": 1,
-    "Nitrogen Production": 0,
-    "Oxygen from market": 1,
-    "Oxygen Production": 0,
-    "Dolomite from market": 1,
-    "Dolomite Production": 0,
-    "Burnt Lime from market": 1,
-    "Burnt Lime Production": 0,
+    "Nitrogen Production": 1,
+    "Nitrogen from market": 0,
+    "Oxygen Production": 1,
+    "Oxygen from market": 0,
+    "Dolomite Production": 1,
+    "Dolomite from market": 0,
+    "Burnt Lime Production": 1,
+    "Burnt Lime from market": 0,
     "Blast Furnace": 1,
     "Direct Reduction Iron": 0,
     "Scrap Purchase": 1,
+    "Limestone from Market": 1,
     "Sintering": 1,
     "Pelletizing": 1,
     "Iron Ore from Market": 1,
-    "Limestone from Market": 1,
     "Coke Production": 1,
     "Coke Petroleum from Market": 0,
     "Coke Mineral from Market": 0,
@@ -84,16 +102,21 @@
       ],
       "Burnt Lime Production": [
         "Burnt Lime from market"
+      ],
+      "Coke Production": [
+        "Coke from market",
+        "Coke Mineral from Market",
+        "Coke Petroleum from Market"
       ]
     },
     "external_purchase_rows": [
-      "Burnt Lime from market",
-      "External Inputs",
+      "Limestone from Market",
       "Dolomite from market",
       "Scrap Purchase",
+      "External Inputs",
+      "Burnt Lime from market",
       "Nitrogen from market",
-      "Oxygen from market",
-      "Limestone from Market"
+      "Oxygen from market"
     ]
   },
   "recipes_sample": [

@@ -1,0 +1,12 @@
+emission_ghg:
+  Electricity: 0
+  FLF: 94.12
+  RLF: 23.58
+  Gas: 56.16
+  Biomethane: 0.06
+  Green hydrogen: 0
+  Blue hydrogen: 0
+  Wood: 9.82
+  Coal: 95.04
+  Charcoal: 7.05
+  Coke: 107.51

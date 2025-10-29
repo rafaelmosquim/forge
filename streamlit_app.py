@@ -1770,6 +1770,8 @@ if run_now:
                         st.caption(f"Reference output: {output_name}")
                         inputs_section = df_out[df_out["Flow"] == "Input"]
                         outputs_section = df_out[df_out["Flow"] == "Output"]
+                        # Also show emissions rows (totals and credits)
+                        emissions_section = df_out[(df_out["Flow"].astype(str) == "Emissions") | (df_out["Category"].astype(str) == "Emissions")]
 
                         rows = []
                         for _, row in inputs_section.iterrows():
@@ -1789,6 +1791,17 @@ if run_now:
                                 "ValueUnit": row.get("ValueUnit", ""),
                                 "Amount": float(row["Amount"]),
                                 "Unit": row["Unit"],
+                            })
+
+                        # Append emissions at the end, if present
+                        for _, row in emissions_section.iterrows():
+                            rows.append({
+                                "Section": "Emissions",
+                                "Name": row.get("Input", "Emissions"),
+                                "Category": row.get("Category", "Emissions"),
+                                "ValueUnit": row.get("ValueUnit", ""),
+                                "Amount": float(row.get("Amount", 0.0) or 0.0),
+                                "Unit": row.get("Unit", ""),
                             })
 
                         if rows:

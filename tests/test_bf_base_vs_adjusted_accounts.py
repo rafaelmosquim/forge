@@ -3,8 +3,8 @@ import math
 import pytest
 import pandas as pd
 
-from steel_core_api_v2 import run_scenario, ScenarioInputs, RouteConfig
-from steel_model_core import load_data_from_yaml
+from forge.steel_core_api_v2 import run_scenario, ScenarioInputs, RouteConfig
+from forge.steel_model_core import load_data_from_yaml
 
 
 @pytest.mark.integration

@@ -24,7 +24,7 @@ from functools import partial
 import pandas as pd
 
 # Core functions & models from your existing engine
-from steel_model_core import (
+from forge.steel_model_core import (
     # IO
     load_data_from_yaml,
     load_parameters,
@@ -59,8 +59,8 @@ from steel_model_core import (
     apply_inhouse_clamp,
 )
 
-from sector_descriptor import load_sector_descriptor
-from scenario_resolver import (
+from forge.sector_descriptor import load_sector_descriptor
+from forge.scenario_resolver import (
     build_stage_material_map,
     build_route_mask_for_descriptor,
     reference_stage_for_gas,
@@ -390,7 +390,7 @@ def compute_inside_gas_reference_for_share(
     This provides a fixed reference regardless of user's stop-at-stage.
     """
     # Build a production route for the entire plant (to final product)
-    from steel_model_core import build_route_mask, calculate_balance_matrix
+    from forge.steel_model_core import build_route_mask, calculate_balance_matrix
     
     pre_mask = build_route_mask(route_key, recipes)
     stage_map = stage_lookup or STAGE_MATS
@@ -625,7 +625,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     _recursive_ns_update(params, _param_patch)
 
     # Intensity adjustments
-    from steel_model_core import adjust_blast_furnace_intensity, adjust_process_gas_intensity
+    from forge.steel_model_core import adjust_blast_furnace_intensity, adjust_process_gas_intensity
     adjust_blast_furnace_intensity(energy_int, energy_shares, params)
     adjust_process_gas_intensity('Coke Production', 'process_gas_coke', energy_int, energy_shares, params)
 
@@ -770,7 +770,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     # Ensure energy tables have rows for all active variants
     active_procs = [p for p, r in prod_levels.items() if r > 1e-9]
-    from steel_model_core import expand_energy_tables_for_active
+    from forge.steel_model_core import expand_energy_tables_for_active
     expand_energy_tables_for_active(active_procs, energy_shares, energy_int)
 
     # Internal electricity from recovered gases (before credit)

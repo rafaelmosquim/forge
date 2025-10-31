@@ -18,9 +18,9 @@ dev = [
 ]
 
 [tool.setuptools]
-py-modules = [
-  "steel_model_core",
-  "steel_core_api_v2",
-  "sector_descriptor",
-  "scenario_resolver",
+package-dir = {"" = "src"}
+packages = [
+  "forge",
+  "forge.apps",
+  "forge.cli",
 ]

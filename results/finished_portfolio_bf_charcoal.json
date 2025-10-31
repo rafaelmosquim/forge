@@ -21,9 +21,9 @@
     "stage_role": "",
     "demand_qty": 1000.0,
     "country_code": "BR",
-    "raw_co2e_kg": 821.0942805364915,
-    "total_co2e_kg": 965.9932712194018,
-    "gross_ef_kg_per_unit": 0.8210942805364915,
+    "raw_co2e_kg": 821.0942805364914,
+    "total_co2e_kg": 965.9932712194017,
+    "gross_ef_kg_per_unit": 0.8210942805364914,
     "total_cost": 362.55026224345306,
     "material_cost": 1973.329986131407
   },
@@ -49,9 +49,9 @@
     "stage_role": "",
     "demand_qty": 1000.0,
     "country_code": "BR",
-    "raw_co2e_kg": 1415.0074232523857,
-    "total_co2e_kg": 1664.714615591042,
-    "gross_ef_kg_per_unit": 1.4150074232523857,
+    "raw_co2e_kg": 1415.0074232523855,
+    "total_co2e_kg": 1664.7146155910418,
+    "gross_ef_kg_per_unit": 1.4150074232523855,
     "total_cost": 408.48557368733776,
     "material_cost": 1967.418086616808
   },
@@ -109,9 +109,9 @@
         "label": "Regular HR + CR",
         "normalized_share": 0.1216,
         "input_share": 0.1216,
-        "raw_co2e_kg": 821.0942805364915,
-        "total_co2e_kg": 965.9932712194018,
-        "gross_ef_kg_per_unit": 0.8210942805364915,
+        "raw_co2e_kg": 821.0942805364914,
+        "total_co2e_kg": 965.9932712194017,
+        "gross_ef_kg_per_unit": 0.8210942805364914,
         "demand_qty": 1000.0
       },
       {
@@ -129,9 +129,9 @@
         "label": "High-alloy HR only",
         "normalized_share": 0.1216,
         "input_share": 0.1216,
-        "raw_co2e_kg": 1415.0074232523857,
-        "total_co2e_kg": 1664.714615591042,
-        "gross_ef_kg_per_unit": 1.4150074232523857,
+        "raw_co2e_kg": 1415.0074232523855,
+        "total_co2e_kg": 1664.7146155910418,
+        "gross_ef_kg_per_unit": 1.4150074232523855,
         "demand_qty": 1000.0
       },
       {

@@ -77,9 +77,9 @@
     "stage_role": "",
     "demand_qty": 1000.0,
     "country_code": "BR",
-    "raw_co2e_kg": 4024.285217232393,
+    "raw_co2e_kg": 4024.2852172323924,
     "total_co2e_kg": 4734.453196743992,
-    "gross_ef_kg_per_unit": 4.024285217232393,
+    "gross_ef_kg_per_unit": 4.024285217232392,
     "total_cost": 459.6293289446569,
     "material_cost": 1967.418086616808
   },
@@ -149,9 +149,9 @@
         "label": "High-alloy rod/bar",
         "normalized_share": 0.048,
         "input_share": 0.048,
-        "raw_co2e_kg": 4024.285217232393,
+        "raw_co2e_kg": 4024.2852172323924,
         "total_co2e_kg": 4734.453196743992,
-        "gross_ef_kg_per_unit": 4.024285217232393,
+        "gross_ef_kg_per_unit": 4.024285217232392,
         "demand_qty": 1000.0
       }
     ],

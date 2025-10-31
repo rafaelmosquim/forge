@@ -2,7 +2,9 @@ import importlib
 import pytest
 
 CANDIDATE_MODULES = [
+    "forge.steel_core_api_v2",
     "steel_core_api_v2",
+    "forge.steel_model_core",
     "steel_model_core",
     "steel_core",
 ]

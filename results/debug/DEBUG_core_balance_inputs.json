@@ -1,0 +1,106 @@
+{
+  "final_demand": {
+    "Cast Steel (IP1)": 1000.0
+  },
+  "production_routes": {
+    "Continuous Casting (R)": 1,
+    "Continuous Casting (L)": 0,
+    "Continuous Casting (H)": 0,
+    "Regular Steel": 1,
+    "Basic Oxygen Furnace": 1,
+    "Electric Arc Furnace": 0,
+    "Nitrogen from market": 1,
+    "Nitrogen Production": 0,
+    "Oxygen from market": 1,
+    "Oxygen Production": 0,
+    "Dolomite from market": 1,
+    "Dolomite Production": 0,
+    "Burnt Lime from market": 1,
+    "Burnt Lime Production": 0,
+    "Blast Furnace": 1,
+    "Direct Reduction Iron": 0,
+    "Scrap Purchase": 1,
+    "Sintering": 1,
+    "Pelletizing": 1,
+    "Iron Ore from Market": 1,
+    "Limestone from Market": 1,
+    "Coke Production": 1,
+    "Coke Petroleum from Market": 0,
+    "Coke Mineral from Market": 0,
+    "Anthracite Coal from Market": 1,
+    "Coal from Market": 0,
+    "PCI Coal from Market": 0
+  },
+  "scenario_dict": {
+    "description": "Base BF\u2013BOF (no overrides)",
+    "route_overrides": {
+      "Blast Furnace": 1.0,
+      "Basic Oxygen Furnace": 1.0,
+      "Electric Arc Furnace": 0.0,
+      "Direct Reduction Iron": 0.0,
+      "Charcoal from Market": 0.0,
+      "Charcoal Production": 1.0,
+      "Coke Production": 1.0
+    },
+    "energy_int": {},
+    "energy_matrix": {
+      "Blast Furnace": {
+        "Electricity": 0.04,
+        "Coke": 0.768,
+        "Coal": 0.19199999999999995,
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "RLF": 0.0,
+        "Wood": 0.0
+      }
+    },
+    "emission_factors": {
+      "Gas": 72.73
+    },
+    "gas_blend": {
+      "shares": {
+        "NG": 1.0,
+        "Biomethane": 0.0,
+        "H2_green": 0.0,
+        "H2_blue": 0.0
+      },
+      "effective_gas_ef_gco2_per_MJ": 72.73
+    },
+    "gas_routing": {
+      "direct_use_fraction": 0.5,
+      "electricity_fraction": 0.5
+    },
+    "fallback_materials": [],
+    "prefer_internal_processes": {
+      "Nitrogen Production": [
+        "Nitrogen from market"
+      ],
+      "Oxygen Production": [
+        "Oxygen from market"
+      ],
+      "Dolomite Production": [
+        "Dolomite from market"
+      ],
+      "Burnt Lime Production": [
+        "Burnt Lime from market"
+      ]
+    },
+    "external_purchase_rows": [
+      "Limestone from Market",
+      "Nitrogen from market",
+      "Dolomite from market",
+      "Scrap Purchase",
+      "External Inputs",
+      "Oxygen from market",
+      "Burnt Lime from market"
+    ]
+  },
+  "recipes_sample": [
+    "Manganese from Market",
+    "Chromium from Market",
+    "Nickel from Market",
+    "Molibdenium from Market",
+    "Copper from Market"
+  ]
+}

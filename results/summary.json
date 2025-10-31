@@ -3,18 +3,18 @@
     "route": "BF-BOF",
     "total_co2e_kg": 3656.395734496165,
     "raw_co2e_kg": 3107.93637432174,
-    "source": "results/finished_portfolio_bf.json"
+    "source": "/home/rafael/code/personal/forge/results/finished_portfolio_bf.json"
   },
   {
     "route": "EAF-Scrap",
     "total_co2e_kg": 865.1194963075425,
     "raw_co2e_kg": 735.3515718614111,
-    "source": "results/finished_portfolio_eaf.json"
+    "source": "/home/rafael/code/personal/forge/results/finished_portfolio_eaf.json"
   },
   {
     "route": "BF-BOF",
     "total_co2e_kg": 1079.5659513111257,
     "raw_co2e_kg": 917.6310586144568,
-    "source": "results/finished_portfolio_bf_charcoal.json"
+    "source": "/home/rafael/code/personal/forge/results/finished_portfolio_bf_charcoal.json"
   }
 ]

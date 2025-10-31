@@ -12,7 +12,7 @@ EXPECTED = {
 TOL = 0.08  # wide-ish to avoid false red; adjust if your core is tighter
 
 def _import_core():
-    for mod in ("steel_core_api_v2", "steel_model_core", "steel_core"):
+    for mod in ("forge.steel_core_api_v2", "steel_core_api_v2", "forge.steel_model_core", "steel_model_core", "steel_core"):
         try:
             return importlib.import_module(mod)
         except Exception:

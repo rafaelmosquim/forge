@@ -4,12 +4,12 @@ import pandas as pd
 import types
 from types import SimpleNamespace
 
-# Ensure repository root is on sys.path so top-level modules import during tests
-ROOT = pathlib.Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+# Ensure src directory is on sys.path so package imports resolve during tests
+SRC_DIR = pathlib.Path(__file__).resolve().parents[1] / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-from steel_model_core import Process, apply_gas_routing_and_credits, calculate_energy_balance
+from forge.steel_model_core import Process, apply_gas_routing_and_credits, calculate_energy_balance
 
 
 def make_minimal_recipes():

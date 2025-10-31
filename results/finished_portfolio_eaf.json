@@ -63,9 +63,9 @@
     "stage_role": "",
     "demand_qty": 1000.0,
     "country_code": "BR",
-    "raw_co2e_kg": 1504.431116113456,
-    "total_co2e_kg": 1769.9189601334776,
-    "gross_ef_kg_per_unit": 1.504431116113456,
+    "raw_co2e_kg": 1504.4311161134563,
+    "total_co2e_kg": 1769.918960133478,
+    "gross_ef_kg_per_unit": 1.5044311161134563,
     "total_cost": 453.47376581056005,
     "material_cost": 1121.00130475
   },
@@ -139,9 +139,9 @@
         "label": "High-alloy HR + CR",
         "normalized_share": 0.0304,
         "input_share": 0.0304,
-        "raw_co2e_kg": 1504.431116113456,
-        "total_co2e_kg": 1769.9189601334776,
-        "gross_ef_kg_per_unit": 1.504431116113456,
+        "raw_co2e_kg": 1504.4311161134563,
+        "total_co2e_kg": 1769.918960133478,
+        "gross_ef_kg_per_unit": 1.5044311161134563,
         "demand_qty": 1000.0
       },
       {

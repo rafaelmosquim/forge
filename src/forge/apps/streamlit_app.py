@@ -12,29 +12,35 @@ No Finished-tailoring UI.
 """
 
 from __future__ import annotations
-import os
-import re
-import pathlib
+
 import base64
-import math
 import copy as _copy
 import json
-from typing import Dict, List, Tuple, Set, Optional
+import math
+import os
+import pathlib
+import re
+import sys
+import textwrap
 from collections import defaultdict, deque
 from datetime import datetime
 from pathlib import Path
-import streamlit as st
-import pandas as pd
-import yaml
-import numpy as np
 from copy import deepcopy
 from types import SimpleNamespace
-import textwrap, json, yaml
-from steel_core_api_v2 import ScenarioInputs, run_scenario
+from typing import Dict, List, Optional, Set, Tuple
+
+import numpy as np
+import pandas as pd
+import streamlit as st
+import yaml
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 
 # --- Core wrappers (no duplicate math here) ---
-from steel_core_api_v2 import (
+from forge.steel_core_api_v2 import (
     RouteConfig,
     ScenarioInputs,
     run_scenario,
@@ -42,7 +48,7 @@ from steel_core_api_v2 import (
 )
 
 # --- Original core imports for UI-building only (recipes graph & helpers) ---
-from steel_model_core import (
+from forge.steel_model_core import (
     Process,
     load_data_from_yaml,
     load_parameters,
@@ -65,8 +71,8 @@ from steel_model_core import (
     enforce_eaf_feed,
 )
 
-from sector_descriptor import load_sector_descriptor, StageMenuItem
-from scenario_resolver import (
+from forge.sector_descriptor import load_sector_descriptor, StageMenuItem
+from forge.scenario_resolver import (
     build_route_mask_for_descriptor,
     build_stage_material_map,
     match_route,
@@ -90,7 +96,6 @@ DATA_ROOT = st.session_state.get("DATA_ROOT", DEFAULT_DATA_ROOT)
 # -----------------------------
 # Helpers
 # -----------------------------
-from pathlib import Path
 
 APP_DIR = Path(__file__).parent
 ASSETS  = APP_DIR / "assets"
@@ -366,9 +371,6 @@ def _route_from_scenario(
             return "External"
 
     return "auto"
-
-from pathlib import Path
-
 def _route_label_for_file(fname: str) -> str:
     stem = Path(fname).stem.lower()
 
@@ -1588,8 +1590,10 @@ if not IS_PAPER:
                 for k in keys:
                     v = d.get(k)
                     if v is not None:
-                        try: return float(v)
-                        except Exception: continue
+                        try:
+                            return float(v)
+                        except Exception:
+                            continue
                 return None
 
             ef_ng  = find_ef(base_efs, ["Natural gas", "Natural Gas", "Gas"])

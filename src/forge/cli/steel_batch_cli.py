@@ -46,7 +46,11 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import pandas as pd
 import yaml
 
-from steel_core_api_v2 import (
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from forge.steel_core_api_v2 import (
     RouteConfig,
     ScenarioInputs,
     RunOutputs,

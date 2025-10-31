@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Repackaged the core modules under `src/forge` with package metadata so app, CLI, and tests share the same import path.
+- Updated Streamlit app, CLI entrypoints, and test harness to reference `forge.*` modules after the reorg.
+- Ensured helper scripts export `PYTHONPATH` when invoking the relocated CLI tools.
 - Generalized core/app via sector descriptors (multi-industry datasets).
 - Added dataset-specific `sector.yml` configs and descriptor loader module.
 - Enabled fallback external supplies to avoid loops when internal utilities absent.

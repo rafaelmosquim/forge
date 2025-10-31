@@ -8,11 +8,11 @@ from __future__ import annotations
 from typing import Dict, Iterable, Optional
 
 try:
-    from steel_model_core import STAGE_MATS  # type: ignore
+    from forge.steel_model_core import STAGE_MATS  # type: ignore
 except Exception:  # pragma: no cover - steel_model_core optional during doc builds
     STAGE_MATS: Dict[str, str] = {}
 
-from sector_descriptor import SectorDescriptor, RoutePreset
+from forge.sector_descriptor import SectorDescriptor, RoutePreset
 
 
 def build_stage_material_map(

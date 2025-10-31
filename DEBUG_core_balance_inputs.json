@@ -1,16 +1,8 @@
 {
   "final_demand": {
-    "Finished Products": 1000.0
+    "Intermediate Process 3": 1000.0
   },
   "production_routes": {
-    "No Coating": 1,
-    "Hot Dip Metal Coating FP": 0,
-    "Electrolytic Metal Coating FP": 0,
-    "Organic or Sintetic Coating (painting)": 0,
-    "Stamping/calendering/lamination": 1,
-    "Direct use of Basic Steel Products": 0,
-    "Casting/Extrusion/Conformation": 0,
-    "Machining": 0,
     "Bypass Raw\u2192IP3": 1,
     "Steel Thermal Treatment": 0,
     "Hot Dip Metal Coating": 0,
@@ -19,15 +11,14 @@
     "Hot Dip Metal Coating (CR)": 0,
     "Electrolytic Metal Coating (CR)": 0,
     "Bypass CR\u2192IP3": 0,
-    "Rod/bar/section Mill": 1,
-    "Hot Rolling": 0,
-    "Continuous Casting (L)": 1,
-    "Continuous Casting (R)": 0,
+    "Hot Rolling": 1,
+    "Rod/bar/section Mill": 0,
+    "Continuous Casting (R)": 1,
+    "Continuous Casting (L)": 0,
     "Continuous Casting (H)": 0,
-    "Steel Refining (Low Alloy)": 1,
+    "Regular Steel": 1,
     "Basic Oxygen Furnace": 1,
     "Electric Arc Furnace": 0,
-    "Alloys Mix for Low Alloy Steel (LAS)": 1,
     "Nitrogen Production": 1,
     "Nitrogen from market": 0,
     "Oxygen Production": 1,
@@ -39,95 +30,23 @@
     "Blast Furnace": 1,
     "Direct Reduction Iron": 0,
     "Scrap Purchase": 1,
-    "Manganese from Market": 1,
-    "Chromium from Market": 1,
-    "Nickel from Market": 1,
-    "Molibdenium from Market": 1,
-    "Copper from Market": 1,
-    "Silicon from Market": 1,
-    "Vanadium from market": 1,
-    "Titanium from market": 1,
-    "Niobium from market": 1,
-    "Aluminium from market": 1,
     "Limestone from Market": 1,
     "Sintering": 1,
     "Pelletizing": 1,
     "Iron Ore from Market": 1,
-    "Coke Mineral from Market": 1,
+    "Coke Production": 1,
     "Coke Petroleum from Market": 0,
-    "Coke Production": 0,
+    "Coke Mineral from Market": 0,
     "Anthracite Coal from Market": 1,
     "Coal from Market": 0,
     "PCI Coal from Market": 0
   },
   "scenario_dict": {
-    "description": "BF-BOF route, solid fuels switched to charcoal \u2013 Avg case",
-    "route_overrides": {
-      "Blast Furnace": 1.0,
-      "Basic Oxygen Furnace": 1.0,
-      "Electric Arc Furnace": 0.0,
-      "Direct Reduction Iron": 0.0,
-      "Charcoal Production": 1.0,
-      "Charcoal from Market": 0.0,
-      "Coke Production": 0.0,
-      "Coke from market": 0.0,
-      "Coal from Market": 0.0,
-      "PCI Coal from Market": 0.0
-    },
-    "fuel_substitutions": {
-      "Coal": "Charcoal",
-      "PCI Coal from Market": "Charcoal"
-    },
-    "energy_int": {
-      "Blast Furnace": 14.95
-    },
-    "energy_matrix": {
-      "Blast Furnace": {
-        "Coke": 0.0,
-        "Coal": 0.0,
-        "Charcoal": 1.0
-      },
-      "Sintering": {
-        "Coke": 0.0,
-        "Charcoal": 0.77,
-        "Electricity": 0.23
-      }
-    },
-    "recipe_overrides": {
-      "Blast Furnace": {
-        "inputs": {
-          "Sinter": "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.sinter",
-          "Pellet": "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.pellet",
-          "Iron Ore": "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.lump",
-          "Nitrogen": "0.0750 * 1.0",
-          "Oxygen": "0.0800 * 1.0",
-          "Limestone": "0.0400 * 1.0",
-          "Coke": 0.0,
-          "Coal": 0.0
-        }
-      },
-      "Charcoal Production": {
-        "inputs": {
-          "Wood": 2.5226
-        },
-        "outputs": {
-          "Charcoal (raw)": 1.0
-        }
-      },
-      "Sintering": {
-        "inputs": {
-          "Iron Ore": "feo3_sinter / feo3_lump",
-          "Limestone": 0.14,
-          "Charcoal": "energy_int['Sintering'] * energy_shares['Sintering']['Charcoal'] / energy_content['Charcoal']"
-        },
-        "outputs": {
-          "Sinter": 1.0
-        }
-      }
+    "param_overrides": {
+      "process_gas": 0.2
     },
     "gas_routing": {
-      "direct_use_fraction": 0.5,
-      "electricity_fraction": 0.5
+      "direct_use_fraction": 0.5
     },
     "fallback_materials": [],
     "prefer_internal_processes": {
@@ -151,13 +70,14 @@
     },
     "external_purchase_rows": [
       "Nitrogen from market",
-      "Dolomite from market",
-      "Scrap Purchase",
-      "Burnt Lime from market",
       "Limestone from Market",
-      "Oxygen from market",
-      "External Inputs"
-    ]
+      "Burnt Lime from market",
+      "Scrap Purchase",
+      "Dolomite from market",
+      "External Inputs",
+      "Oxygen from market"
+    ],
+    "energy_int": {}
   },
   "recipes_sample": [
     "Manganese from Market",

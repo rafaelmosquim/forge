@@ -1,8 +1,8 @@
 [
   {
     "route": "BF-BOF",
-    "total_co2e_kg": 3656.395734496166,
-    "raw_co2e_kg": 3107.936374321741,
+    "total_co2e_kg": 3656.395734496165,
+    "raw_co2e_kg": 3107.93637432174,
     "source": "results/finished_portfolio_bf.json"
   },
   {

@@ -63,9 +63,9 @@
     "stage_role": "",
     "demand_qty": 1000.0,
     "country_code": "BR",
-    "raw_co2e_kg": 1456.3810481376095,
-    "total_co2e_kg": 1713.3894683971876,
-    "gross_ef_kg_per_unit": 1.4563810481376094,
+    "raw_co2e_kg": 1456.3810481376097,
+    "total_co2e_kg": 1713.389468397188,
+    "gross_ef_kg_per_unit": 1.4563810481376096,
     "total_cost": 430.65534917795725,
     "material_cost": 1967.418086616808
   },
@@ -139,9 +139,9 @@
         "label": "High-alloy HR + CR",
         "normalized_share": 0.0304,
         "input_share": 0.0304,
-        "raw_co2e_kg": 1456.3810481376095,
-        "total_co2e_kg": 1713.3894683971876,
-        "gross_ef_kg_per_unit": 1.4563810481376094,
+        "raw_co2e_kg": 1456.3810481376097,
+        "total_co2e_kg": 1713.389468397188,
+        "gross_ef_kg_per_unit": 1.4563810481376096,
         "demand_qty": 1000.0
       },
       {
@@ -155,6 +155,7 @@
         "demand_qty": 1000.0
       }
     ],
+    "route_preset": "BF-BOF",
     "notes": "Charcoal BF-BOF: 80% Regular, 20% High Alloy; each split 76% Hot Rolling / 24% Rod-Bar, and 20% of the Hot Rolling tonnage proceeds to Cold Rolling."
   }
 ]

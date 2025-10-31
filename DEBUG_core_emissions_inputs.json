@@ -2,55 +2,55 @@
   "prod_levels_sample": {
     "No Coating": 1000.0,
     "Stamping/calendering/lamination": 1000.0,
-    "Bypass CR\u2192IP3": 1000.0,
-    "Cold Rolling": 1000.0,
-    "Hot Rolling": 1000.0
+    "Bypass Raw\u2192IP3": 1000.0,
+    "Rod/bar/section Mill": 1000.0,
+    "Continuous Casting (L)": 1000.0
   },
   "energy_balance_sample": {
     "Charcoal": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Basic Oxygen Furnace": 0.0
     },
     "Coal": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 3052.1739130434776
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Basic Oxygen Furnace": 0.0
     },
     "Coke": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 12208.695652173914
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Basic Oxygen Furnace": 0.0
     },
     "Electricity": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 350.0,
-      "Blast Furnace": 635.8695652173914
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Basic Oxygen Furnace": 337.75
     },
     "FLF": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Basic Oxygen Furnace": 0.0
     },
     "Gas": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Basic Oxygen Furnace": 0.0
     },
     "RLF": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Basic Oxygen Furnace": 0.0
     },
     "Wood": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Basic Oxygen Furnace": 0.0
     },
     "Process Gas": {
-      "Anthracite Coal from Market": 0.0,
-      "Basic Oxygen Furnace": 0.0,
-      "Blast Furnace": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Basic Oxygen Furnace": 0.0
     }
   },
   "energy_int_sample": {

@@ -35,9 +35,9 @@
     "stage_role": "",
     "demand_qty": 1000.0,
     "country_code": "BR",
-    "raw_co2e_kg": 570.0375937984,
-    "total_co2e_kg": 670.6324632922353,
-    "gross_ef_kg_per_unit": 0.5700375937984,
+    "raw_co2e_kg": 570.0375937983999,
+    "total_co2e_kg": 670.6324632922352,
+    "gross_ef_kg_per_unit": 0.5700375937983999,
     "total_cost": 300.97174438400003,
     "material_cost": 1096.21415
   },
@@ -63,9 +63,9 @@
     "stage_role": "",
     "demand_qty": 1000.0,
     "country_code": "BR",
-    "raw_co2e_kg": 1504.431116113456,
-    "total_co2e_kg": 1769.9189601334776,
-    "gross_ef_kg_per_unit": 1.504431116113456,
+    "raw_co2e_kg": 1504.4311161134563,
+    "total_co2e_kg": 1769.918960133478,
+    "gross_ef_kg_per_unit": 1.5044311161134563,
     "total_cost": 453.47376581056005,
     "material_cost": 1121.00130475
   },
@@ -119,9 +119,9 @@
         "label": "Regular rod/bar",
         "normalized_share": 0.192,
         "input_share": 0.192,
-        "raw_co2e_kg": 570.0375937984,
-        "total_co2e_kg": 670.6324632922353,
-        "gross_ef_kg_per_unit": 0.5700375937984,
+        "raw_co2e_kg": 570.0375937983999,
+        "total_co2e_kg": 670.6324632922352,
+        "gross_ef_kg_per_unit": 0.5700375937983999,
         "demand_qty": 1000.0
       },
       {
@@ -139,9 +139,9 @@
         "label": "High-alloy HR + CR",
         "normalized_share": 0.0304,
         "input_share": 0.0304,
-        "raw_co2e_kg": 1504.431116113456,
-        "total_co2e_kg": 1769.9189601334776,
-        "gross_ef_kg_per_unit": 1.504431116113456,
+        "raw_co2e_kg": 1504.4311161134563,
+        "total_co2e_kg": 1769.918960133478,
+        "gross_ef_kg_per_unit": 1.5044311161134563,
         "demand_qty": 1000.0
       },
       {
@@ -155,6 +155,7 @@
         "demand_qty": 1000.0
       }
     ],
+    "route_preset": "EAF-Scrap",
     "notes": "80% Regular, 20% High Alloy; each split 76% Hot Rolling / 24% Rod-Bar, and 20% of the Hot Rolling tonnage proceeds to Cold Rolling."
   }
 ]

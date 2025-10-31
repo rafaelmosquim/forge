@@ -1496,6 +1496,15 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     print(f"  Electricity: {gas_meta.get('electricity_gas_MJ',0.0):.1f} MJ")
     print("============================\n")
 
+    # Feature guard: hide/disable LCI in RunOutputs unless explicitly enabled.
+    # Set FORGE_ENABLE_LCI=1 or =true to include LCI in outputs (experimental).
+    try:
+        _enable_lci_flag = os.environ.get('FORGE_ENABLE_LCI', '').strip().lower() in ('1', 'true', 'yes', 'on')
+    except Exception:
+        _enable_lci_flag = False
+    if not _enable_lci_flag:
+        lci_df = None
+
     return RunOutputs(
         production_routes=production_routes,
         prod_levels=prod_levels,

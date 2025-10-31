@@ -1,0 +1,108 @@
+[
+  {
+    "name": "regular_hot",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "EAF-Scrap; BF-BOF",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "total_co2e_kg": 4104.875713541288,
+    "gross_ef_kg_per_unit": 4.104875713541288,
+    "total_cost": 570.2379432403392,
+    "material_cost": 2077.7582457015637,
+    "reported_co2e_kg": 3489.1443565100944
+  },
+  {
+    "name": "regular_cold",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "EAF-Scrap; BF-BOF",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "total_co2e_kg": 4236.706297730998,
+    "gross_ef_kg_per_unit": 4.236706297730998,
+    "total_cost": 590.3914625400687,
+    "material_cost": 2077.7582457015637,
+    "reported_co2e_kg": 3601.200353071348
+  },
+  {
+    "name": "lowalloy_hot",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "EAF-Scrap; BF-BOF",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "total_co2e_kg": 5200.58032498925,
+    "gross_ef_kg_per_unit": 5.200580324989249,
+    "total_cost": 616.6440432583471,
+    "material_cost": 2068.1913571020086,
+    "reported_co2e_kg": 4420.4932762408625
+  },
+  {
+    "name": "lowalloy_cold",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "EAF-Scrap; BF-BOF",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "total_co2e_kg": 5330.5965577050665,
+    "gross_ef_kg_per_unit": 5.330596557705067,
+    "total_cost": 637.0797541729548,
+    "material_cost": 2068.1913571020086,
+    "reported_co2e_kg": 4531.0070740493065
+  },
+  {
+    "name": "finished_portfolio",
+    "is_blend": true,
+    "blend": true,
+    "demand_qty": 1000.0,
+    "total_co2e_kg": 4361.22447938605,
+    "gross_ef_kg_per_unit": 4.36122447938605,
+    "total_cost": 585.2389625711214,
+    "material_cost": 2075.844867981653,
+    "components": [
+      {
+        "run": "regular_hot",
+        "label": "Regular HR only",
+        "normalized_share": 0.5735849056603773,
+        "input_share": 0.4864,
+        "total_co2e_kg": 4104.875713541288,
+        "gross_ef_kg_per_unit": 4.104875713541288,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "regular_cold",
+        "label": "Regular HR + CR",
+        "normalized_share": 0.22641509433962262,
+        "input_share": 0.192,
+        "total_co2e_kg": 4236.706297730998,
+        "gross_ef_kg_per_unit": 4.236706297730998,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "lowalloy_hot",
+        "label": "Low-alloy HR only",
+        "normalized_share": 0.14339622641509434,
+        "input_share": 0.1216,
+        "total_co2e_kg": 5200.58032498925,
+        "gross_ef_kg_per_unit": 5.200580324989249,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "lowalloy_cold",
+        "label": "Low-alloy HR + CR",
+        "normalized_share": 0.056603773584905655,
+        "input_share": 0.048,
+        "total_co2e_kg": 5330.5965577050665,
+        "gross_ef_kg_per_unit": 5.330596557705067,
+        "demand_qty": 1000.0
+      }
+    ],
+    "notes": "80/20 Regular vs Low Alloy; 76% hot rolled, 24% cold rolled; the cold-rolled runs inherently include the hot rolling step.",
+    "reported_co2e_kg": 3707.0408074781426
+  }
+]

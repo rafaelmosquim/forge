@@ -1,0 +1,160 @@
+[
+  {
+    "name": "regular_hot_eaf",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "EAF-Scrap",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 537.0955937984,
+    "total_co2e_kg": 631.8771691745883,
+    "gross_ef_kg_per_unit": 0.5370955937984,
+    "total_cost": 289.451744384,
+    "material_cost": 1096.21415
+  },
+  {
+    "name": "regular_cold_eaf",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "EAF-Scrap",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 602.0373937984,
+    "total_co2e_kg": 708.279286821647,
+    "gross_ef_kg_per_unit": 0.6020373937984,
+    "total_cost": 318.139744384,
+    "material_cost": 1096.21415
+  },
+  {
+    "name": "regular_rod_eaf",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "EAF-Scrap",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 570.0375937984,
+    "total_co2e_kg": 670.6324632922353,
+    "gross_ef_kg_per_unit": 0.5700375937984,
+    "total_cost": 300.97174438400003,
+    "material_cost": 1096.21415
+  },
+  {
+    "name": "highalloy_hot_eaf",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "EAF-Scrap",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 1439.489316113456,
+    "total_co2e_kg": 1693.516842486419,
+    "gross_ef_kg_per_unit": 1.4394893161134559,
+    "total_cost": 424.78576581056006,
+    "material_cost": 1121.00130475
+  },
+  {
+    "name": "highalloy_cold_eaf",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "EAF-Scrap",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 1504.431116113456,
+    "total_co2e_kg": 1769.9189601334776,
+    "gross_ef_kg_per_unit": 1.504431116113456,
+    "total_cost": 453.47376581056005,
+    "material_cost": 1121.00130475
+  },
+  {
+    "name": "highalloy_rod_eaf",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "EAF-Scrap",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 1472.431316113456,
+    "total_co2e_kg": 1732.272136604066,
+    "gross_ef_kg_per_unit": 1.472431316113456,
+    "total_cost": 436.30576581056005,
+    "material_cost": 1121.00130475
+  },
+  {
+    "name": "finished_portfolio",
+    "is_blend": true,
+    "blend": true,
+    "demand_qty": 1000.0,
+    "raw_co2e_kg": 735.3515718614111,
+    "total_co2e_kg": 865.1194963075425,
+    "gross_ef_kg_per_unit": 0.7353515718614111,
+    "total_cost": 323.643924669312,
+    "material_cost": 1101.1715809500001,
+    "components": [
+      {
+        "run": "regular_hot_eaf",
+        "label": "Regular HR only",
+        "normalized_share": 0.4864,
+        "input_share": 0.4864,
+        "raw_co2e_kg": 537.0955937984,
+        "total_co2e_kg": 631.8771691745883,
+        "gross_ef_kg_per_unit": 0.5370955937984,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "regular_cold_eaf",
+        "label": "Regular HR + CR",
+        "normalized_share": 0.1216,
+        "input_share": 0.1216,
+        "raw_co2e_kg": 602.0373937984,
+        "total_co2e_kg": 708.279286821647,
+        "gross_ef_kg_per_unit": 0.6020373937984,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "regular_rod_eaf",
+        "label": "Regular rod/bar",
+        "normalized_share": 0.192,
+        "input_share": 0.192,
+        "raw_co2e_kg": 570.0375937984,
+        "total_co2e_kg": 670.6324632922353,
+        "gross_ef_kg_per_unit": 0.5700375937984,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "highalloy_hot_eaf",
+        "label": "High-alloy HR only",
+        "normalized_share": 0.1216,
+        "input_share": 0.1216,
+        "raw_co2e_kg": 1439.489316113456,
+        "total_co2e_kg": 1693.516842486419,
+        "gross_ef_kg_per_unit": 1.4394893161134559,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "highalloy_cold_eaf",
+        "label": "High-alloy HR + CR",
+        "normalized_share": 0.0304,
+        "input_share": 0.0304,
+        "raw_co2e_kg": 1504.431116113456,
+        "total_co2e_kg": 1769.9189601334776,
+        "gross_ef_kg_per_unit": 1.504431116113456,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "highalloy_rod_eaf",
+        "label": "High-alloy rod/bar",
+        "normalized_share": 0.048,
+        "input_share": 0.048,
+        "raw_co2e_kg": 1472.431316113456,
+        "total_co2e_kg": 1732.272136604066,
+        "gross_ef_kg_per_unit": 1.472431316113456,
+        "demand_qty": 1000.0
+      }
+    ],
+    "notes": "80% Regular, 20% High Alloy; each split 76% Hot Rolling / 24% Rod-Bar, and 20% of the Hot Rolling tonnage proceeds to Cold Rolling."
+  }
+]

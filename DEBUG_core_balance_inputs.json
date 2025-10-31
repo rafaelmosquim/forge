@@ -3,13 +3,13 @@
     "Finished Products": 1000.0
   },
   "production_routes": {
-    "Electrolytic Metal Coating FP": 1,
-    "No Coating": 0,
+    "No Coating": 1,
     "Hot Dip Metal Coating FP": 0,
+    "Electrolytic Metal Coating FP": 0,
     "Organic or Sintetic Coating (painting)": 0,
-    "Direct use of Basic Steel Products": 1,
+    "Stamping/calendering/lamination": 1,
+    "Direct use of Basic Steel Products": 0,
     "Casting/Extrusion/Conformation": 0,
-    "Stamping/calendering/lamination": 0,
     "Machining": 0,
     "Bypass CR\u2192IP3": 1,
     "Steel Thermal Treatment": 0,

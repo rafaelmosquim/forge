@@ -1,0 +1,20 @@
+[
+  {
+    "route": "bf",
+    "total_co2e_kg": 3656.3957344961655,
+    "raw_co2e_kg": 3107.9363743217405,
+    "source": "results/finished_portfolio_bf.json"
+  },
+  {
+    "route": "eaf",
+    "total_co2e_kg": 865.1194963075425,
+    "raw_co2e_kg": 735.3515718614111,
+    "source": "results/finished_portfolio_eaf.json"
+  },
+  {
+    "route": "bf_charcoal",
+    "total_co2e_kg": 1079.5659513111257,
+    "raw_co2e_kg": 917.6310586144568,
+    "source": "results/finished_portfolio_bf_charcoal.json"
+  }
+]

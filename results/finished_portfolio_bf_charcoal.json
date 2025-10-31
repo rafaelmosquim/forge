@@ -1,0 +1,160 @@
+[
+  {
+    "name": "regular_hot_charcoal",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "BF-BOF",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 780.224551019701,
+    "total_co2e_kg": 917.911236493766,
+    "gross_ef_kg_per_unit": 0.780224551019701,
+    "total_cost": 340.60338106511546,
+    "material_cost": 1973.329986131407
+  },
+  {
+    "name": "regular_cold_charcoal",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "BF-BOF",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 821.0942805364915,
+    "total_co2e_kg": 965.9932712194018,
+    "gross_ef_kg_per_unit": 0.8210942805364915,
+    "total_cost": 362.55026224345306,
+    "material_cost": 1973.329986131407
+  },
+  {
+    "name": "regular_rod_charcoal",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "BF-BOF",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 797.7510878298885,
+    "total_co2e_kg": 938.5306915645748,
+    "gross_ef_kg_per_unit": 0.7977510878298886,
+    "total_cost": 348.0378545065322,
+    "material_cost": 1973.329986131407
+  },
+  {
+    "name": "highalloy_hot_charcoal",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "BF-BOF",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 1415.0074232523857,
+    "total_co2e_kg": 1664.714615591042,
+    "gross_ef_kg_per_unit": 1.4150074232523857,
+    "total_cost": 408.48557368733776,
+    "material_cost": 1967.418086616808
+  },
+  {
+    "name": "highalloy_cold_charcoal",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "BF-BOF",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 1456.3810481376095,
+    "total_co2e_kg": 1713.3894683971876,
+    "gross_ef_kg_per_unit": 1.4563810481376094,
+    "total_cost": 430.65534917795725,
+    "material_cost": 1967.418086616808
+  },
+  {
+    "name": "highalloy_rod_charcoal",
+    "data_dir": "/home/rafael/code/personal/forge/datasets/steel/likely",
+    "route_preset": "BF-BOF",
+    "stage_key": "Finished",
+    "stage_role": "",
+    "demand_qty": 1000.0,
+    "country_code": "BR",
+    "raw_co2e_kg": 1432.8682727296841,
+    "total_co2e_kg": 1685.7273796819813,
+    "gross_ef_kg_per_unit": 1.4328682727296842,
+    "total_cost": 416.05513459074353,
+    "material_cost": 1967.418086616808
+  },
+  {
+    "name": "finished_portfolio",
+    "is_blend": true,
+    "blend": true,
+    "demand_qty": 1000.0,
+    "raw_co2e_kg": 917.6310586144568,
+    "total_co2e_kg": 1079.5659513111257,
+    "gross_ef_kg_per_unit": 0.9176310586144568,
+    "total_cost": 359.3132793398761,
+    "material_cost": 1972.1476062284873,
+    "components": [
+      {
+        "run": "regular_hot_charcoal",
+        "label": "Regular HR only",
+        "normalized_share": 0.4864,
+        "input_share": 0.4864,
+        "raw_co2e_kg": 780.224551019701,
+        "total_co2e_kg": 917.911236493766,
+        "gross_ef_kg_per_unit": 0.780224551019701,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "regular_cold_charcoal",
+        "label": "Regular HR + CR",
+        "normalized_share": 0.1216,
+        "input_share": 0.1216,
+        "raw_co2e_kg": 821.0942805364915,
+        "total_co2e_kg": 965.9932712194018,
+        "gross_ef_kg_per_unit": 0.8210942805364915,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "regular_rod_charcoal",
+        "label": "Regular rod/bar",
+        "normalized_share": 0.192,
+        "input_share": 0.192,
+        "raw_co2e_kg": 797.7510878298885,
+        "total_co2e_kg": 938.5306915645748,
+        "gross_ef_kg_per_unit": 0.7977510878298886,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "highalloy_hot_charcoal",
+        "label": "High-alloy HR only",
+        "normalized_share": 0.1216,
+        "input_share": 0.1216,
+        "raw_co2e_kg": 1415.0074232523857,
+        "total_co2e_kg": 1664.714615591042,
+        "gross_ef_kg_per_unit": 1.4150074232523857,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "highalloy_cold_charcoal",
+        "label": "High-alloy HR + CR",
+        "normalized_share": 0.0304,
+        "input_share": 0.0304,
+        "raw_co2e_kg": 1456.3810481376095,
+        "total_co2e_kg": 1713.3894683971876,
+        "gross_ef_kg_per_unit": 1.4563810481376094,
+        "demand_qty": 1000.0
+      },
+      {
+        "run": "highalloy_rod_charcoal",
+        "label": "High-alloy rod/bar",
+        "normalized_share": 0.048,
+        "input_share": 0.048,
+        "raw_co2e_kg": 1432.8682727296841,
+        "total_co2e_kg": 1685.7273796819813,
+        "gross_ef_kg_per_unit": 1.4328682727296842,
+        "demand_qty": 1000.0
+      }
+    ],
+    "notes": "Charcoal BF-BOF: 80% Regular, 20% High Alloy; each split 76% Hot Rolling / 24% Rod-Bar, and 20% of the Hot Rolling tonnage proceeds to Cold Rolling."
+  }
+]

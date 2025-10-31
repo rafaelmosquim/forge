@@ -1,0 +1,91 @@
+defaults:
+  route:
+    scenario_file: ../datasets/steel/likely/scenarios/scrap_EAF.yml
+    route_preset: EAF-Scrap
+    stage_key: Finished
+    demand_qty: 1000
+  country_code: BR
+  scenario:
+    gas_routing:
+      direct_use_fraction: 0.5
+      electricity_fraction: 0.5
+  picks_by_material:
+    Nitrogen: Nitrogen Production
+    Oxygen: Oxygen Production
+    Dolomite: Dolomite Production
+    Burnt Lime: Burnt Lime Production
+    Finished Products: No Coating
+
+runs:
+  - name: regular_hot_eaf
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+
+  - name: regular_cold_eaf
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+
+  - name: regular_rod_eaf
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+
+  - name: highalloy_hot_eaf
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+
+  - name: highalloy_cold_eaf
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+
+  - name: highalloy_rod_eaf
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+
+blends:
+  - name: finished_portfolio
+    notes: >
+      80% Regular, 20% High Alloy; each split 76% Hot Rolling / 24% Rod-Bar,
+      and 20% of the Hot Rolling tonnage proceeds to Cold Rolling.
+    components:
+      - run: regular_hot_eaf
+        share: 0.4864
+        label: Regular HR only
+      - run: regular_cold_eaf
+        share: 0.1216
+        label: Regular HR + CR
+      - run: regular_rod_eaf
+        share: 0.192
+        label: Regular rod/bar
+      - run: highalloy_hot_eaf
+        share: 0.1216
+        label: High-alloy HR only
+      - run: highalloy_cold_eaf
+        share: 0.0304
+        label: High-alloy HR + CR
+      - run: highalloy_rod_eaf
+        share: 0.048
+        label: High-alloy rod/bar

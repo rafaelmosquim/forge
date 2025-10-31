@@ -1,7 +1,7 @@
 {
   "prod_levels_sample": {
-    "Electrolytic Metal Coating FP": 1000.0,
-    "Direct use of Basic Steel Products": 1000.0,
+    "No Coating": 1000.0,
+    "Stamping/calendering/lamination": 1000.0,
     "Bypass CR\u2192IP3": 1000.0,
     "Cold Rolling": 1000.0,
     "Hot Rolling": 1000.0

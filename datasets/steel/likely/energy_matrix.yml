@@ -396,10 +396,10 @@ processes:
     Charcoal: ~
     Coke: ~
   "Burnt Lime Production":
-    Electricity: 0.02
+    Electricity: 0.024
     FLF: 0
     RLF: 0
-    Gas: 0.98
+    Gas: 0.976
     Wood: 0
     Coal: 0
     Charcoal: 0
@@ -414,10 +414,10 @@ processes:
     Charcoal: ~
     Coke: ~
   "Dolomite Production":
-    Electricity: 0.02
+    Electricity: 0.024
     FLF: 0
     RLF: 0
-    Gas: 0.98
+    Gas: 0.976
     Wood: 0
     Coal: 0
     Charcoal: 0

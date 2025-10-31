@@ -1351,7 +1351,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
                     'Unit': f'kg CO2e per kg {out}',
                 })
 
-                # For Blast Furnace: synthesize an Output line for Process Gas (MJ per kg)
+                # For Blast Furnace: synthesize Output lines
                 if str(proc) == 'Blast Furnace':
                     try:
                         bf_delta = max(0.0, float(getattr(params, 'bf_adj_intensity', 0.0)) - float(getattr(params, 'bf_base_intensity', 0.0)))
@@ -1369,6 +1369,24 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
                             'ValueUnit': 'MJ',
                             'Amount': bf_delta,
                             'Unit': f'MJ per kg {out}',
+                        })
+                    # Add Escória output: 0.330 kg per run, normalized per kg Pig Iron
+                    try:
+                        r_bf = next((r for r in recipes_calc if r.name == 'Blast Furnace'), None)
+                        pig_per_run = float((r_bf.outputs.get('Pig Iron', 1.0)) if r_bf else 1.0)
+                        escoria_per_kg = 0.330 / max(pig_per_run, 1e-12)
+                    except Exception:
+                        escoria_per_kg = 0.0
+                    if escoria_per_kg > 0.0:
+                        output_additions.append({
+                            'Process': 'Blast Furnace',
+                            'Output': out,
+                            'Flow': 'Output',
+                            'Input': 'Escória',
+                            'Category': 'Output',
+                            'ValueUnit': 'kg',
+                            'Amount': escoria_per_kg,
+                            'Unit': f'kg per kg {out}',
                         })
 
             # Add process-gas credit lines (negative emissions) for BF and Coke Production

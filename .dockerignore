@@ -1,0 +1,18 @@
+.git
+.gitignore
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Local results and debug artifacts
+results*.json
+DEBUG_*.json
+
+# Jupyter and VS Code
+*.ipynb
+.ipynb_checkpoints/
+.vscode/

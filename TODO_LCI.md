@@ -1,3 +1,6 @@
-# byproducts
+#  coqueria
+fe gas
 
-ver se escória no Blast é normalizado por ton pig iron ou gas
+# blast 
+input iron ore, sinter e pellet kg
+fe gas

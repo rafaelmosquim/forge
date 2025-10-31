@@ -323,12 +323,12 @@
 
 - process: Blast Furnace
   inputs:
-    Sinter: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.sinter"
-    Pellet: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.pellet"
-    Iron Ore: "(1/1) * 1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.lump"
-    Nitrogen: 0.0750 * 1.0
-    Oxygen: 0.0800 * 1.0
-    Limestone: 0.0400 * 1.0
+    Sinter: "1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.sinter"
+    Pellet: "1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.pellet"
+    Iron Ore: "1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.lump"
+    Nitrogen: 0.0750
+    Oxygen: 0.0800
+    Limestone: 0.0400
     Coke: >
       energy_int['Blast Furnace']
       * energy_shares['Blast Furnace']['Coke']

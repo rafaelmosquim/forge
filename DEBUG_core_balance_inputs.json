@@ -3,22 +3,23 @@
     "Finished Products": 1000.0
   },
   "production_routes": {
-    "Organic or Sintetic Coating (painting)": 1,
+    "Electrolytic Metal Coating FP": 1,
     "No Coating": 0,
     "Hot Dip Metal Coating FP": 0,
-    "Electrolytic Metal Coating FP": 0,
-    "Machining": 1,
-    "Direct use of Basic Steel Products": 0,
+    "Organic or Sintetic Coating (painting)": 0,
+    "Direct use of Basic Steel Products": 1,
     "Casting/Extrusion/Conformation": 0,
     "Stamping/calendering/lamination": 0,
-    "Bypass Raw\u2192IP3": 1,
+    "Machining": 0,
+    "Bypass CR\u2192IP3": 1,
     "Steel Thermal Treatment": 0,
     "Hot Dip Metal Coating": 0,
     "Electrolytic Metal Coating": 0,
     "Steel Thermal Treatment (CR)": 0,
     "Hot Dip Metal Coating (CR)": 0,
     "Electrolytic Metal Coating (CR)": 0,
-    "Bypass CR\u2192IP3": 0,
+    "Bypass Raw\u2192IP3": 0,
+    "Cold Rolling": 1,
     "Hot Rolling": 1,
     "Rod/bar/section Mill": 0,
     "Continuous Casting (R)": 1,
@@ -111,12 +112,12 @@
     },
     "external_purchase_rows": [
       "Burnt Lime from market",
-      "Dolomite from market",
-      "Limestone from Market",
       "Nitrogen from market",
       "Oxygen from market",
-      "External Inputs",
-      "Scrap Purchase"
+      "Dolomite from market",
+      "Limestone from Market",
+      "Scrap Purchase",
+      "External Inputs"
     ]
   },
   "recipes_sample": [

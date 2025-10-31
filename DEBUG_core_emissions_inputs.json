@@ -1,10 +1,10 @@
 {
   "prod_levels_sample": {
-    "Organic or Sintetic Coating (painting)": 1000.0,
-    "Machining": 1000.0,
-    "Bypass Raw\u2192IP3": 1000.0,
-    "Hot Rolling": 1000.0,
-    "Continuous Casting (R)": 1000.0
+    "Electrolytic Metal Coating FP": 1000.0,
+    "Direct use of Basic Steel Products": 1000.0,
+    "Bypass CR\u2192IP3": 1000.0,
+    "Cold Rolling": 1000.0,
+    "Hot Rolling": 1000.0
   },
   "energy_balance_sample": {
     "Charcoal": {

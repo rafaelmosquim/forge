@@ -3,7 +3,12 @@ import math
 import pytest
 import pandas as pd
 
-from forge.steel_core_api_v2 import run_scenario, ScenarioInputs, RouteConfig
+from forge.steel_core_api_v2 import (
+    run_scenario,
+    ScenarioInputs,
+    RouteConfig,
+    is_lci_enabled,
+)
 from forge.steel_model_core import load_data_from_yaml
 
 
@@ -14,6 +19,9 @@ def test_blast_furnace_emissions_use_base_while_lci_uses_adjusted():
 
     # Ensure paths exist
     assert os.path.isdir(data_dir), f"Missing dataset directory: {data_dir}"
+
+    if not is_lci_enabled():
+        pytest.skip("LCI feature disabled; set FORGE_ENABLE_LCI=1 to run LCI-focused tests.")
 
     # Scenario that triggers BF adjusted intensity (via process_gas > 0)
     scn = ScenarioInputs(

@@ -44,6 +44,7 @@ from forge.steel_core_api_v2 import (
     RouteConfig,
     ScenarioInputs,
     run_scenario,
+    is_lci_enabled,
     write_run_log,  # for simple JSON logging
 )
 
@@ -1745,7 +1746,7 @@ if run_now:
             if isinstance(emissions, pd.DataFrame):
                 d3.download_button("Emissions (CSV)", data=emissions.to_csv().encode("utf-8"),
                                    file_name="emissions.csv", mime="text/csv")
-            if isinstance(lci_df, pd.DataFrame) and not lci_df.empty:
+            if is_lci_enabled() and isinstance(lci_df, pd.DataFrame) and not lci_df.empty:
                 d4.download_button("LCI (CSV)", data=lci_df.to_csv(index=False).encode("utf-8"),
                                    file_name="lci.csv", mime="text/csv")
 

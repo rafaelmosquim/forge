@@ -3,8 +3,8 @@
     "Continuous Casting (R)": 1000.0,
     "Regular Steel": 1000.0,
     "Basic Oxygen Furnace": 1000.0,
-    "Nitrogen Production": 190.34027419170775,
-    "Oxygen Production": 162.0
+    "Nitrogen from market": 190.34027419170775,
+    "Oxygen from market": 162.0
   },
   "energy_balance_sample": {
     "Charcoal": {

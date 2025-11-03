@@ -52,11 +52,13 @@ from forge.steel_model_core import (
     calculate_emissions,  # signature may vary; we guard below
     # Data classes/types
     OUTSIDE_MILL_PROCS,
-    compute_inside_elec_reference_for_share,
-    compute_inside_gas_reference_for_share,
-    apply_gas_routing_and_credits,
     set_prefer_internal_processes,
     apply_inhouse_clamp,
+)
+from forge.gas_routing import apply_gas_routing_and_credits
+from forge.reference_plant import (
+    compute_inside_elec_reference_for_share,
+    compute_inside_gas_reference_for_share,
 )
 
 from forge.sector_descriptor import load_sector_descriptor
@@ -394,64 +396,6 @@ def write_run_log(log_dir: str, payload: Dict[str, Any]) -> str:
         json.dump(payload, f, indent=2, ensure_ascii=False)
     return fpath
 
-def compute_inside_gas_reference_for_share(
-    recipes: List[Process],
-    energy_int: Dict[str, float],
-    energy_shares: Dict[str, Dict[str, float]],
-    energy_content: Dict[str, float],
-    params: Any,
-    route_key: str,
-    demand_qty: float,
-    stage_ref: str = "IP3",
-    stage_lookup: Optional[Dict[str, str]] = None,
-    gas_carrier: str = "Gas",
-    fallback_materials: Optional[Set[str]] = None,
-) -> float:
-    """
-    Compute total plant-level gas consumption for the entire production route.
-    This provides a fixed reference regardless of user's stop-at-stage.
-    """
-    # Build a production route for the entire plant (to final product)
-    from forge.steel_model_core import build_route_mask, calculate_balance_matrix
-    
-    pre_mask = build_route_mask(route_key, recipes)
-    stage_map = stage_lookup or STAGE_MATS
-    if stage_ref not in stage_map:
-        raise KeyError(f"Stage '{stage_ref}' not found while computing gas reference.")
-    demand_mat = stage_map[stage_ref]
-    
-    # Build production route deterministically (no picks)
-    production_routes_full = _build_routes_from_picks(
-        recipes,
-        demand_mat,
-        picks_by_material={},  # Use defaults
-        pre_mask=pre_mask,
-        fallback_materials=fallback_materials,
-    )
-    
-    final_demand_full = {demand_mat: demand_qty}
-    import copy as _copy
-    recipes_full = _copy.deepcopy(recipes)
-    _ensure_fallback_processes(recipes_full, production_routes_full, fallback_materials)
-    balance_matrix_full, prod_levels_full = calculate_balance_matrix(
-        recipes_full, final_demand_full, production_routes_full
-    )
-    
-    if balance_matrix_full is None:
-        return 0.0
-    
-    # Calculate energy balance for full route
-    energy_balance_full = calculate_energy_balance(prod_levels_full, energy_int, energy_shares)
-    
-    # Sum all gas consumption across the plant
-    total_gas_consumption = 0.0
-    if gas_carrier in energy_balance_full.columns:
-        total_gas_consumption = float(energy_balance_full[gas_carrier].sum())
-    
-    return total_gas_consumption
-# ==============================
-# Main API
-# ==============================
 def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     """
     Execute the model for the given ScenarioInputs.

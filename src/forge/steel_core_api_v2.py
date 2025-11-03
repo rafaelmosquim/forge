@@ -859,6 +859,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         },
         credit_on=credit_on,
         compute_inside_gas_reference_fn=gas_reference_fn,
+        compute_inside_elec_reference_fn=compute_inside_elec_reference_for_share,
     )
 
     # Build a separate energy balance for emissions where BF uses BASE intensity

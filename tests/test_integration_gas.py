@@ -10,7 +10,8 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from forge.models import Process
-from forge.steel_model_core import apply_gas_routing_and_credits, calculate_energy_balance
+from forge.gas_routing import apply_gas_routing_and_credits
+from forge.steel_model_core import calculate_energy_balance
 
 
 def make_minimal_recipes():
@@ -57,6 +58,7 @@ def test_apply_gas_routing_and_credits_basic():
         scenario=scenario,
         credit_on=True,
         compute_inside_gas_reference_fn=lambda *a, **k: 5.0,
+        compute_inside_elec_reference_fn=lambda *a, **k: 2.0,
     )
 
     # With all process gas routed to electricity and util eff 0.2, internal elec should be > 0

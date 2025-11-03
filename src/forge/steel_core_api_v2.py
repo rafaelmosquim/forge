@@ -24,6 +24,7 @@ from functools import partial
 import pandas as pd
 
 # Core functions & models from your existing engine
+from forge.models import Process
 from forge.steel_model_core import (
     # IO
     load_data_from_yaml,
@@ -50,7 +51,6 @@ from forge.steel_model_core import (
     analyze_material_costs,
     calculate_emissions,  # signature may vary; we guard below
     # Data classes/types
-    Process,
     OUTSIDE_MILL_PROCS,
     compute_inside_elec_reference_for_share,
     compute_inside_gas_reference_for_share,

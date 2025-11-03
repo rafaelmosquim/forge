@@ -49,8 +49,8 @@ from forge.steel_core_api_v2 import (
 )
 
 # --- Original core imports for UI-building only (recipes graph & helpers) ---
+from forge.models import Process
 from forge.steel_model_core import (
-    Process,
     load_data_from_yaml,
     load_parameters,
     load_recipes_from_yaml,
@@ -61,15 +61,16 @@ from forge.steel_model_core import (
     apply_recipe_overrides,
     adjust_blast_furnace_intensity,
     adjust_process_gas_intensity,
-    # Sankey plot builders (work from prod levels / energy balance)
-    make_mass_sankey,
-    make_energy_sankey,
-    make_energy_to_process_sankey,
-    make_hybrid_sankey,
     # Route helpers & constants
     STAGE_MATS,
     build_route_mask,
     enforce_eaf_feed,
+)
+from forge.visual import (
+    make_mass_sankey,
+    make_energy_sankey,
+    make_energy_to_process_sankey,
+    make_hybrid_sankey,
 )
 
 from forge.sector_descriptor import load_sector_descriptor, StageMenuItem

@@ -34,6 +34,9 @@ import pandas as pd
 import streamlit as st
 import yaml
 
+# Ensure LCI flag defaults on when running via the app (can still be overridden externally)
+os.environ.setdefault("FORGE_ENABLE_LCI", "1")
+
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))

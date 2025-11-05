@@ -1,11 +1,17 @@
 defaults:
-  scenario_file: ../datasets/steel/likely/scenarios/BF_BOF_charcoal.yml
   route:
     route_preset: BF-BOF
     stage_key: Finished
     demand_qty: 1000
   country_code: BR
   scenario:
+    # Hard cap BF base intensity (before process-gas adjustment)
+    energy_int:
+      Blast Furnace: 11.0
+    # Enable charcoal use in BF chain by remapping fossil solids
+    fuel_substitutions:
+      Coal: Charcoal
+      Coke: Charcoal
     gas_routing:
       direct_use_fraction: 0.5
       electricity_fraction: 0.5
@@ -14,78 +20,69 @@ defaults:
     Oxygen: Oxygen Production
     Dolomite: Dolomite Production
     Burnt Lime: Burnt Lime Production
+    # Finished processing defaults
+    Manufactured Feed (IP4): Stamping/calendering/lamination
     Finished Products: No Coating
 
 runs:
-  - name: regular_hot_charcoal
+  - name: regular_hot_bf_char
     picks_by_material:
       Liquid Steel: Regular Steel
       Cast Steel (IP1): Continuous Casting (R)
       Raw Products (types): Hot Rolling
       Intermediate Process 3: Bypass Raw→IP3
-      Manufactured Feed (IP4): Stamping/calendering/lamination
 
-  - name: regular_cold_charcoal
+  - name: regular_cold_bf_char
     picks_by_material:
       Liquid Steel: Regular Steel
       Cast Steel (IP1): Continuous Casting (R)
       Raw Products (types): Hot Rolling
       Intermediate Process 3: Bypass CR→IP3
-      Manufactured Feed (IP4): Stamping/calendering/lamination
 
-  - name: regular_rod_charcoal
+  - name: regular_rod_bf_char
     picks_by_material:
       Liquid Steel: Regular Steel
       Cast Steel (IP1): Continuous Casting (R)
       Raw Products (types): Rod/bar/section Mill
       Intermediate Process 3: Bypass Raw→IP3
-      Manufactured Feed (IP4): Stamping/calendering/lamination
 
-  - name: highalloy_hot_charcoal
+  - name: highalloy_hot_bf_char
     picks_by_material:
       Liquid Steel: Steel Refining (High Alloy)
       Cast Steel (IP1): Continuous Casting (L)
       Raw Products (types): Hot Rolling
       Intermediate Process 3: Bypass Raw→IP3
-      Manufactured Feed (IP4): Stamping/calendering/lamination
 
-  - name: highalloy_cold_charcoal
+  - name: highalloy_cold_bf_char
     picks_by_material:
       Liquid Steel: Steel Refining (High Alloy)
       Cast Steel (IP1): Continuous Casting (L)
       Raw Products (types): Hot Rolling
       Intermediate Process 3: Bypass CR→IP3
-      Manufactured Feed (IP4): Stamping/calendering/lamination
 
-  - name: highalloy_rod_charcoal
+  - name: highalloy_rod_bf_char
     picks_by_material:
       Liquid Steel: Steel Refining (High Alloy)
       Cast Steel (IP1): Continuous Casting (L)
       Raw Products (types): Rod/bar/section Mill
       Intermediate Process 3: Bypass Raw→IP3
-      Manufactured Feed (IP4): Stamping/calendering/lamination
 
 blends:
-  - name: finished_portfolio
+  - name: finished_portfolio_bf_char
     notes: >
-      Charcoal BF-BOF: 80% Regular, 20% High Alloy; each split 76% Hot Rolling / 24% Rod-Bar,
+      Charcoal BF-BOF portfolio – 80% Regular, 20% High Alloy; each split 76% Hot Rolling / 24% Rod-Bar,
       and 20% of the Hot Rolling tonnage proceeds to Cold Rolling.
     components:
-      - run: regular_hot_charcoal
+      - run: regular_hot_bf_char
         share: 0.4864
-        label: Regular HR only
-      - run: regular_cold_charcoal
+      - run: regular_cold_bf_char
         share: 0.1216
-        label: Regular HR + CR
-      - run: regular_rod_charcoal
+      - run: regular_rod_bf_char
         share: 0.192
-        label: Regular rod/bar
-      - run: highalloy_hot_charcoal
+      - run: highalloy_hot_bf_char
         share: 0.1216
-        label: High-alloy HR only
-      - run: highalloy_cold_charcoal
+      - run: highalloy_cold_bf_char
         share: 0.0304
-        label: High-alloy HR + CR
-      - run: highalloy_rod_charcoal
+      - run: highalloy_rod_bf_char
         share: 0.048
-        label: High-alloy rod/bar
+

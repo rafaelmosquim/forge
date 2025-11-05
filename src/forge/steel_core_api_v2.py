@@ -91,6 +91,89 @@ def is_lci_enabled() -> bool:
 
 
 # ==============================
+# Scenario transforms
+# ==============================
+def _apply_energy_int_efficiency_scaling(energy_int: Dict[str, float], scenario: Dict[str, Any]) -> None:
+    """Apply uniform scaling to energy intensities based on scenario.
+
+    Recognized keys (all optional):
+      - energy_int_factor: float multiplier applied to all numeric intensities
+      - energy_int_schedule: mapping with one or more of:
+            rate_pct_per_year: float (e.g., 1.0 for 1%/yr reduction)
+            baseline_year: int (default 2023)
+            target_year: int (year to apply against; default 2050)
+            max_year: int (upper clamp for target_year; default 2050)
+            years: int (directly specify years to apply)
+
+    Notes:
+      - Executed BEFORE intensity adjustment functions so downstream logic uses improved base values.
+      - Non-numeric entries and zeros are left untouched.
+    """
+    if not isinstance(energy_int, dict) or not isinstance(scenario, dict):
+        return
+
+    # 1) Uniform factor
+    try:
+        factor = float(scenario.get("energy_int_factor", 1.0))
+    except Exception:
+        factor = 1.0
+
+    # 2) Yearly schedule → multiplicative factor
+    sched = scenario.get("energy_int_schedule") or scenario.get("efficiency_schedule")
+    if isinstance(sched, dict):
+        try:
+            # Accept a variety of rate keys
+            rate = (
+                sched.get("rate_pct_per_year", sched.get("annual_pct", sched.get("rate_pct", sched.get("rate"))))
+            )
+            rate = float(rate) if rate is not None else None
+        except Exception:
+            rate = None
+
+        if rate is not None:
+            # Prefer explicit years, else baseline/target
+            years_raw = sched.get("years")
+            years = None
+            try:
+                years = int(years_raw) if years_raw is not None else None
+            except Exception:
+                years = None
+
+            if years is None:
+                try:
+                    baseline = int(sched.get("baseline_year", 2023))
+                except Exception:
+                    baseline = 2023
+                try:
+                    tgt = int(sched.get("target_year", 2050))
+                except Exception:
+                    tgt = 2050
+                try:
+                    cap = int(sched.get("max_year", 2050))
+                except Exception:
+                    cap = 2050
+                tgt = min(tgt, cap)
+                years = max(0, tgt - baseline)
+
+            # Convert percentage reduction per year into multiplicative factor
+            annual = max(0.0, 1.0 - float(rate) / 100.0)
+            factor *= (annual ** int(years))
+
+    if abs(factor - 1.0) < 1e-12:
+        return
+
+    for k, v in list(energy_int.items()):
+        try:
+            val = float(v)
+        except Exception:
+            continue
+        if val == 0.0:
+            # Keep explicit zeros
+            continue
+        energy_int[k] = val * factor
+
+
+# ==============================
 # Dataclasses
 # ==============================
 @dataclass
@@ -627,6 +710,141 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     apply_dict_overrides(energy_shares,  scenario.get('energy_matrix', {}))
     apply_dict_overrides(energy_content, scenario.get('energy_content', {}))
     apply_dict_overrides(e_efs,          scenario.get('emission_factors', {}))
+
+    # Apply uniform/scheduled efficiency improvements to intensities BEFORE adjustments
+    _apply_energy_int_efficiency_scaling(energy_int, scenario)
+
+    # Optional: DRI fuel mix transformations relative to baseline gas share
+    def _apply_dri_mix(energy_shares: Dict[str, Dict[str, float]], scenario: Dict[str, Any]) -> None:
+        mix_name = (scenario.get('dri_mix') or '').strip()
+        if not mix_name:
+            return
+        try:
+            year = int(scenario.get('snapshot_year', 2030))
+        except Exception:
+            year = 2030
+        # Default definitions based on the paper table
+        default_defs = {
+            'Blue': {
+                2030: {'Gas': 1.0},
+                2040: {'Gas': 0.70, 'Biomethane': 0.10, 'Green hydrogen': 0.20},
+            },
+            'Green': {
+                2030: {'Gas': 0.70, 'Biomethane': 0.10, 'Green hydrogen': 0.20},
+                2040: {'Gas': 0.40, 'Biomethane': 0.20, 'Green hydrogen': 0.40},
+            },
+        }
+        defs = scenario.get('dri_mix_definitions') or default_defs
+        plan = None
+        try:
+            options = defs.get(mix_name) or {}
+            if isinstance(options, dict):
+                # accept string keys (e.g., '2040') or int
+                keys = []
+                for k in options.keys():
+                    try:
+                        keys.append(int(k))
+                    except Exception:
+                        continue
+                keys = sorted(set(keys))
+                chosen = None
+                for k in keys:
+                    if k <= year:
+                        chosen = k
+                if chosen is None and keys:
+                    chosen = min(keys)
+                if chosen is not None:
+                    plan = options.get(str(chosen), options.get(chosen))
+        except Exception:
+            plan = None
+        if not isinstance(plan, dict):
+            return
+        es = energy_shares.get('Direct Reduction Iron')
+        if not isinstance(es, dict):
+            return
+        try:
+            base_gas = float(es.get('Gas', 0.0) or 0.0)
+        except Exception:
+            base_gas = 0.0
+        if base_gas <= 0:
+            return
+        # Normalize plan values: accept 0-100 or 0-1
+        def _as_frac(x):
+            try:
+                v = float(x)
+                if v > 1.0:
+                    return v / 100.0
+                return v
+            except Exception:
+                return 0.0
+        fractions = {str(k): _as_frac(v) for k, v in plan.items()}
+        # Rebuild shares derived from baseline Gas
+        gas_left = base_gas
+        ordered = []
+        for carrier in ('Gas', 'Biomethane', 'Green hydrogen'):
+            f = float(fractions.get(carrier, 0.0) or 0.0)
+            if carrier == 'Gas':
+                new_val = base_gas * f
+                es['Gas'] = new_val
+                gas_left = max(0.0, base_gas - new_val)
+            else:
+                add_val = base_gas * f
+                if add_val > 0:
+                    es[carrier] = es.get(carrier, 0.0) + add_val
+            ordered.append((carrier, f))
+        # If plan doesn't sum to 1, leave remaining gas as-is
+        # (i.e., keep existing es['Gas'] value which already captures the 'Gas' fraction)
+
+    def _apply_charcoal_expansion(energy_shares: Dict[str, Dict[str, float]], scenario: Dict[str, Any]) -> None:
+        mode = (scenario.get('charcoal_expansion') or '').strip().lower()
+        if mode not in {'expansion'}:
+            return
+        try:
+            year = int(scenario.get('snapshot_year', 2030))
+        except Exception:
+            year = 2030
+        schedule = scenario.get('charcoal_share_schedule') or {}
+        frac = None
+        if isinstance(schedule, dict):
+            # pick nearest <= year
+            try:
+                years = sorted({int(k) for k in schedule.keys()})
+                chosen = None
+                for y in years:
+                    if y <= year:
+                        chosen = y
+                if chosen is None and years:
+                    chosen = min(years)
+                if chosen is not None:
+                    raw = schedule.get(str(chosen), schedule.get(chosen))
+                    try:
+                        val = float(raw)
+                        frac = val / 100.0 if val > 1.0 else val
+                    except Exception:
+                        frac = None
+            except Exception:
+                pass
+        if frac is None:
+            # If no schedule, do nothing (explicit only)
+            return
+        frac = max(0.0, min(1.0, float(frac)))
+        es_bf = energy_shares.get('Blast Furnace')
+        if not isinstance(es_bf, dict):
+            return
+        coal = float(es_bf.get('Coal', 0.0) or 0.0)
+        coke = float(es_bf.get('Coke', 0.0) or 0.0)
+        if (coal + coke) <= 0:
+            return
+        # Shift a fraction of fossil solid fuels to Charcoal
+        new_coal = coal * (1.0 - frac)
+        new_coke = coke * (1.0 - frac)
+        moved = (coal - new_coal) + (coke - new_coke)
+        es_bf['Coal'] = new_coal
+        es_bf['Coke'] = new_coke
+        es_bf['Charcoal'] = es_bf.get('Charcoal', 0.0) + moved
+
+    _apply_dri_mix(energy_shares, scenario)
+    _apply_charcoal_expansion(energy_shares, scenario)
 
     # Parameters (light/deep merge)
     from types import SimpleNamespace

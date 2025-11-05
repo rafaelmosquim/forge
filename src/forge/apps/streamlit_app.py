@@ -442,6 +442,13 @@ def _load_for_picks(
     apply_dict_overrides(energy_content, scenario.get('energy_content', {}))
     apply_dict_overrides(e_efs,          scenario.get('emission_factors', {}))
 
+    # Apply optional uniform/scheduled efficiency improvements to intensities BEFORE adjustments
+    try:
+        from forge.steel_core_api_v2 import _apply_energy_int_efficiency_scaling
+        _apply_energy_int_efficiency_scaling(energy_int, scenario)
+    except Exception:
+        pass
+
     # Parameters overrides (light merge)
     from types import SimpleNamespace
     def _recursive_ns_update(ns, patch):

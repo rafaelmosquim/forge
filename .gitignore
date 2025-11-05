@@ -45,3 +45,6 @@ repo_tree.txt
 # Preview lists from cleanup
 _preview_*.txt
 .venv/
+
+**/*.json
+**/*.csv

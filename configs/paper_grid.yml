@@ -1,0 +1,43 @@
+# Batch spec replicating the paper's scenario grid via CLI
+
+defaults:
+  data_dir: datasets/steel/likely
+  route:
+    stage_key: Finished
+
+# Cartesian product over these axes
+grid:
+  name_prefix: paper
+  years: [2030, 2040]
+  scenario: [BAU, Conservative, Aggressive]
+  utilization_rate: [65, 80, 100]
+  intensity_improvement: [0, 1, 2]     # % per year efficiency improvement
+  charcoal_expansion: [None, Expansion]
+  dri_mix: [Blue, Green]
+  base_demand: 1000                    # demand at 100% utilization
+
+# Policies driving how the grid maps to model inputs
+grid_policies:
+  # Route selection policy per scenario and year
+  scenario_route_logic:
+    BAU: {2030: BF-BOF, 2040: BF-BOF}
+    Conservative: {2030: BF-BOF, 2040: DRI-EAF}
+    Aggressive: {2030: DRI-EAF, 2040: DRI-EAF}
+
+  # DRI mix definitions: split baseline Gas share in DRI across carriers
+  dri_mix_definitions:
+    Blue:
+      2030: { Gas: 1.0 }
+      2040: { Gas: 0.70, Biomethane: 0.10, "Green hydrogen": 0.20 }
+    Green:
+      2030: { Gas: 0.70, Biomethane: 0.10, "Green hydrogen": 0.20 }
+      2040: { Gas: 0.40, Biomethane: 0.20, "Green hydrogen": 0.40 }
+
+  # Optional: fraction of BF solid fossil fuels replaced by Charcoal
+  # Provide values in 0..1 (or 0..100) for known years; nearest <= year is used
+  # charcoal_share_schedule:
+  #   2030: 0.00
+  #   2035: 0.15
+  #   2040: 0.30
+  #   2045: 0.45
+

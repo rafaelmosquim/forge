@@ -1,0 +1,23 @@
+# Green steel scenario: uniform efficiency improvements + fuel substitutions
+
+energy_int_schedule:
+  # Reduce energy intensity by 1% per year from 2023 to 2050
+  rate_pct_per_year: 1.0
+  baseline_year: 2023
+  target_year: 2050
+  max_year: 2050
+
+# Switch gaseous fuels to low-carbon alternatives where applicable
+fuel_substitutions:
+  Gas: "Green hydrogen"
+  Coal: Charcoal
+  Coke: Charcoal
+
+# Optional: emission factor overrides can be placed here if needed
+# emission_factors:
+#   Electricity: 30.0
+
+# Route overrides or parameters can be added as needed
+# route_overrides: {}
+# param_overrides: {}
+

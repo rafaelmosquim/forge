@@ -1,75 +1,56 @@
 {
   "final_demand": {
-    "Cast Steel (IP1)": 1000.0
+    "Finished Products": 1000.0
   },
   "production_routes": {
+    "No Coating": 1,
+    "Hot Dip Metal Coating FP": 0,
+    "Electrolytic Metal Coating FP": 0,
+    "Organic or Sintetic Coating (painting)": 0,
+    "Stamping/calendering/lamination": 1,
+    "Direct use of Basic Steel Products": 0,
+    "Casting/Extrusion/Conformation": 0,
+    "Machining": 0,
+    "Bypass Raw\u2192IP3": 1,
+    "Steel Thermal Treatment": 0,
+    "Hot Dip Metal Coating": 0,
+    "Electrolytic Metal Coating": 0,
+    "Steel Thermal Treatment (CR)": 0,
+    "Hot Dip Metal Coating (CR)": 0,
+    "Electrolytic Metal Coating (CR)": 0,
+    "Bypass CR\u2192IP3": 0,
+    "Hot Rolling": 1,
+    "Rod/bar/section Mill": 0,
     "Continuous Casting (R)": 1,
     "Continuous Casting (L)": 0,
     "Continuous Casting (H)": 0,
     "Regular Steel": 1,
-    "Basic Oxygen Furnace": 1,
-    "Electric Arc Furnace": 0,
-    "Nitrogen from market": 1,
-    "Nitrogen Production": 0,
-    "Oxygen from market": 1,
-    "Oxygen Production": 0,
-    "Dolomite from market": 1,
-    "Dolomite Production": 0,
-    "Burnt Lime from market": 1,
-    "Burnt Lime Production": 0,
-    "Blast Furnace": 1,
-    "Direct Reduction Iron": 0,
+    "Electric Arc Furnace": 1,
+    "Basic Oxygen Furnace": 0,
+    "Nitrogen Production": 1,
+    "Nitrogen from market": 0,
+    "Oxygen Production": 1,
+    "Oxygen from market": 0,
+    "Dolomite Production": 1,
+    "Dolomite from market": 0,
+    "Burnt Lime Production": 1,
+    "Burnt Lime from market": 0,
+    "Natural gas from Market": 1,
+    "LPG from Market": 0,
+    "Biomethane from Market": 0,
+    "Hydrogen (Electrolysis) from Market": 0,
+    "Hydrogen (Methane reforming) from Market": 0,
     "Scrap Purchase": 1,
-    "Sintering": 1,
-    "Pelletizing": 1,
-    "Iron Ore from Market": 1,
-    "Limestone from Market": 1,
-    "Coke Production": 1,
-    "Coke Petroleum from Market": 0,
-    "Coke Mineral from Market": 0,
-    "Anthracite Coal from Market": 1,
-    "Coal from Market": 0,
-    "PCI Coal from Market": 0
+    "Limestone from Market": 1
   },
   "scenario_dict": {
-    "description": "Base BF\u2013BOF (no overrides)",
-    "route_overrides": {
-      "Blast Furnace": 1.0,
-      "Basic Oxygen Furnace": 1.0,
-      "Electric Arc Furnace": 0.0,
-      "Direct Reduction Iron": 0.0,
-      "Charcoal from Market": 0.0,
-      "Charcoal Production": 1.0,
-      "Coke Production": 1.0
+    "snapshot_year": 2050,
+    "energy_int_schedule": {
+      "rate_pct_per_year": 1.0
     },
-    "energy_int": {},
-    "energy_matrix": {
-      "Blast Furnace": {
-        "Electricity": 0.04,
-        "Coke": 0.768,
-        "Coal": 0.19199999999999995,
-        "Charcoal": 0.0,
-        "FLF": 0.0,
-        "Gas": 0.0,
-        "RLF": 0.0,
-        "Wood": 0.0
-      }
-    },
-    "emission_factors": {
-      "Gas": 72.73
-    },
-    "gas_blend": {
-      "shares": {
-        "NG": 1.0,
-        "Biomethane": 0.0,
-        "H2_green": 0.0,
-        "H2_blue": 0.0
-      },
-      "effective_gas_ef_gco2_per_MJ": 72.73
-    },
+    "dri_mix": "Blue",
     "gas_routing": {
-      "direct_use_fraction": 0.5,
-      "electricity_fraction": 0.5
+      "direct_use_fraction": 0.5
     },
     "fallback_materials": [],
     "prefer_internal_processes": {
@@ -84,17 +65,23 @@
       ],
       "Burnt Lime Production": [
         "Burnt Lime from market"
+      ],
+      "Coke Production": [
+        "Coke from market",
+        "Coke Mineral from Market",
+        "Coke Petroleum from Market"
       ]
     },
     "external_purchase_rows": [
-      "Dolomite from market",
-      "Burnt Lime from market",
-      "Oxygen from market",
-      "Limestone from Market",
       "Nitrogen from market",
+      "Limestone from Market",
       "External Inputs",
-      "Scrap Purchase"
-    ]
+      "Oxygen from market",
+      "Burnt Lime from market",
+      "Scrap Purchase",
+      "Dolomite from market"
+    ],
+    "energy_int": {}
   },
   "recipes_sample": [
     "Manganese from Market",

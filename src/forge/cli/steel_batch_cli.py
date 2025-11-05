@@ -42,6 +42,7 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+import re
 
 import pandas as pd
 import yaml
@@ -149,12 +150,31 @@ def _load_any(path: Path) -> Any:
 
 
 def _resolve_path(raw: Optional[str | Path], base: Path) -> Optional[Path]:
+    """Resolve a path relative to spec base, with project-root fallback.
+
+    Behavior:
+    - Absolute paths are returned as-is.
+    - Relative paths are resolved against the spec base directory first.
+    - If that does not exist, fall back to project root (ROOT_DIR) for common
+      repo-relative references like 'datasets/...', 'configs/...', etc.
+    """
     if raw is None:
         return None
-    p = Path(raw).expanduser()
-    if not p.is_absolute():
-        p = (base / p).resolve()
-    return p
+    candidate = Path(raw).expanduser()
+    if candidate.is_absolute():
+        return candidate
+    # First try relative to the spec file
+    p1 = (base / candidate).resolve()
+    if p1.exists():
+        return p1
+    # Fallback: resolve relative to the repository root
+    # Compute repository root as three levels above this file (…/src/forge/cli → repo)
+    try:
+        repo_root = Path(__file__).resolve().parents[3]
+    except Exception:
+        repo_root = Path.cwd()
+    p2 = (repo_root / candidate).resolve()
+    return p2
 
 
 def _ensure_dict(value: Any, base_dir: Path) -> Dict[str, Any]:
@@ -230,6 +250,134 @@ def _choose_run_name(spec: Dict[str, Any], scenario_path: Optional[Path], idx: i
     if scenario_path:
         return scenario_path.stem
     return f"run_{idx+1}"
+
+
+def _expand_grid_runs(spec_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Generate run entries from a compact 'grid' definition inside the spec.
+
+    Expected shape (all keys optional, sensible defaults inferred):
+
+      grid:
+        name_prefix: paper
+        years: [2030, 2040]
+        scenario: [BAU, Conservative, Aggressive]
+        utilization_rate: [65, 80, 100]
+        intensity_improvement: [0, 1, 2]
+        charcoal_expansion: [None, Expansion]
+        dri_mix: [Blue, Green]
+        base_demand: 1000
+
+      grid_policies:
+        scenario_route_logic:
+          BAU: {2030: BF-BOF, 2040: BF-BOF}
+          Conservative: {2030: BF-BOF, 2040: DRI-EAF}
+          Aggressive: {2030: DRI-EAF, 2040: DRI-EAF}
+        dri_mix_definitions:
+          Blue:
+            2030: { Gas: 1.0 }
+            2040: { Gas: 0.70, Biomethane: 0.10, "Green hydrogen": 0.20 }
+          Green:
+            2030: { Gas: 0.70, Biomethane: 0.10, "Green hydrogen": 0.20 }
+            2040: { Gas: 0.40, Biomethane: 0.20, "Green hydrogen": 0.40 }
+        charcoal_share_schedule: {2030: 0.0, 2035: 0.2, 2040: 0.4, 2045: 0.6}
+
+    Returns a list of per-run dicts compatible with the 'runs' entries.
+    """
+    if not isinstance(spec_data, dict):
+        return []
+    grid = spec_data.get("grid")
+    if not isinstance(grid, dict):
+        return []
+    pol = spec_data.get("grid_policies") or {}
+    # Axes
+    years = list(grid.get("years", [2030, 2040]))
+    scenarios = list(grid.get("scenario", ["BAU", "Conservative", "Aggressive"]))
+    utils = list(grid.get("utilization_rate", [65, 80, 100]))
+    improves = list(grid.get("intensity_improvement", [0, 1, 2]))
+    char_opts = list(grid.get("charcoal_expansion", ["None", "Expansion"]))
+    mixes = list(grid.get("dri_mix", ["Blue", "Green"]))
+    prefix = str(grid.get("name_prefix", "paper")).strip() or "paper"
+    # Always run with demand 1000 by default (clean output); utilization does not scale demand
+    base_demand = 1000.0
+
+    # Policies
+    route_logic = pol.get("scenario_route_logic") or {
+        "BAU": {2030: "BF-BOF", 2040: "BF-BOF"},
+        "Conservative": {2030: "BF-BOF", 2040: "DRI-EAF"},
+        "Aggressive": {2030: "DRI-EAF", 2040: "DRI-EAF"},
+    }
+    dri_defs = pol.get("dri_mix_definitions")  # optional; default handled in core
+    charcoal_sched = pol.get("charcoal_share_schedule")  # optional
+
+    def _route_for(scn: str, year: int) -> str:
+        m = route_logic.get(scn) or {}
+        # lenient: accept string keys
+        if str(year) in m:
+            return m[str(year)]
+        if year in m:
+            return m[year]
+        # nearest <=
+        try:
+            keys = sorted({int(k) for k in m.keys()})
+            chosen = None
+            for k in keys:
+                if k <= year:
+                    chosen = k
+            if chosen is None and keys:
+                chosen = min(keys)
+            if chosen is not None:
+                return m.get(chosen) or m.get(str(chosen))
+        except Exception:
+            pass
+        # fallback
+        return "BF-BOF"
+
+    runs: List[Dict[str, Any]] = []
+    for year in years:
+        try:
+            y = int(year)
+        except Exception:
+            continue
+        for scn in scenarios:
+            scn_str = str(scn)
+            rp = _route_for(scn_str, y)
+            for util in utils:
+                # Utilization is retained for naming, but demand is fixed at 1000
+                try:
+                    u = float(util)
+                except Exception:
+                    u = 100.0
+                demand_qty = base_demand
+                for imp in improves:
+                    try:
+                        imp_rate = float(imp)
+                    except Exception:
+                        imp_rate = 0.0
+                    for char_mode in char_opts:
+                        char_str = str(char_mode)
+                        for mix in mixes:
+                            mix_str = str(mix)
+                            name = f"{prefix}_{scn_str}_{int(u)}u_{int(imp_rate)}imp_{char_str}_{mix_str}_{y}"
+                            entry: Dict[str, Any] = {
+                                "name": name.replace(" ", ""),
+                                "route": {
+                                    "route_preset": rp,
+                                    "stage_key": grid.get("stage_key", "Finished"),
+                                    "demand_qty": demand_qty,
+                                },
+                                "scenario": {
+                                    "snapshot_year": y,
+                                    "energy_int_schedule": {"rate_pct_per_year": imp_rate},
+                                    "charcoal_expansion": "Expansion" if char_str.lower() == "expansion" else "None",
+                                    "dri_mix": mix_str,
+                                },
+                            }
+                            if dri_defs:
+                                entry["scenario"]["dri_mix_definitions"] = dri_defs
+                            if charcoal_sched:
+                                entry["scenario"]["charcoal_share_schedule"] = charcoal_sched
+                            runs.append(entry)
+    return runs
 
 
 @dataclass
@@ -409,6 +557,12 @@ def _plans_from_spec(
     if spec_path is None:
         return [], []
     spec_data = _load_any(spec_path)
+    # Optionally expand grid into concrete run entries and merge with existing 'runs'
+    if isinstance(spec_data, dict) and "grid" in spec_data:
+        grid_runs = _expand_grid_runs(spec_data)
+        orig_runs = spec_data.get("runs") or []
+        combined = list(orig_runs) + grid_runs
+        spec_data = {**spec_data, "runs": combined}
     run_specs = _enumerate_run_specs(spec_data, spec_path, cli_defaults)
     plans = [_build_run_plan(raw) for raw in run_specs]
     blend_plans: List[BlendPlan] = []
@@ -497,18 +651,6 @@ def _build_route_cfg(plan: RunPlan) -> RouteConfig:
 
 def _summarize_result(plan: RunPlan, route_cfg: RouteConfig, result) -> Dict[str, Any]:
     total = getattr(result, "total_co2e_kg", None)
-    demand_qty = float(route_cfg.demand_qty) if route_cfg.demand_qty is not None else float("nan")
-    gross_ef = None
-    if (
-        total is not None
-        and demand_qty
-        and math.isfinite(demand_qty)
-        and demand_qty != 0.0
-    ):
-        try:
-            gross_ef = float(total) / float(demand_qty)
-        except (ZeroDivisionError, TypeError):
-            gross_ef = None
     raw_total = None
     total_with_yield = None
     if total is not None:
@@ -524,18 +666,10 @@ def _summarize_result(plan: RunPlan, route_cfg: RouteConfig, result) -> Dict[str
         "route_preset": route_cfg.route_preset,
         "stage_key": route_cfg.stage_key,
         "stage_role": route_cfg.stage_role or "",
-        "demand_qty": route_cfg.demand_qty,
         "country_code": plan.country_code or "",
-        "raw_co2e_kg": raw_total,
-        "total_co2e_kg": total_with_yield,
-        "gross_ef_kg_per_unit": float(gross_ef) if gross_ef is not None else None,
+        "raw_co2e_kg": raw_total if raw_total is not None else None,
+        "total_co2e_kg": total_with_yield if total_with_yield is not None else None,
     }
-    cost = getattr(result, "total_cost", None)
-    if cost is not None:
-        summary["total_cost"] = cost
-    material_cost = getattr(result, "material_cost", None)
-    if material_cost is not None:
-        summary["material_cost"] = material_cost
     if total is not None:
         try:
             total_val = float(total)
@@ -582,6 +716,19 @@ def _log_payload(plan: RunPlan, route_cfg: RouteConfig, result_summary: Dict[str
     return payload
 
 
+def _write_lci_csv(df: Optional[pd.DataFrame], out_dir: Path, name: str) -> Optional[Path]:
+    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+        return None
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+    path = out_dir / f"{safe_name}.csv"
+    try:
+        df.to_csv(path, index=False)
+        return path
+    except Exception:
+        return None
+
+
 def _compute_blend_result(
     blend: BlendPlan,
     record_map: Dict[str, RunRecord],
@@ -603,6 +750,40 @@ def _compute_blend_result(
         if accumulator is None:
             return addition
         return accumulator.add(addition, fill_value=0.0)
+
+    def _weight_lci(df: Optional[pd.DataFrame], weight: float) -> Optional[pd.DataFrame]:
+        if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+            return None
+        lci = df.copy()
+        if 'Amount' not in lci.columns:
+            return None
+        try:
+            lci['Amount'] = pd.to_numeric(lci['Amount'], errors='coerce').fillna(0.0) * float(weight)
+        except Exception:
+            return None
+        return lci
+
+    def _accumulate_lci(acc: Optional[pd.DataFrame], add: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+        if add is None:
+            return acc
+        if acc is None:
+            acc = add
+        else:
+            acc = pd.concat([acc, add], ignore_index=True)
+        # Group by non-numeric identity columns and sum Amount
+        keys = [
+            c for c in ['Process', 'Output', 'Flow', 'Input', 'Category', 'ValueUnit', 'Unit']
+            if c in acc.columns
+        ]
+        if not keys or 'Amount' not in acc.columns:
+            return acc
+        grouped = (
+            acc.groupby(keys, dropna=False, as_index=False)['Amount']
+               .sum()
+        )
+        # Reorder columns for consistency
+        cols = keys + ['Amount']
+        return grouped.loc[:, cols]
 
     components_payload = []
     weighted_routes: defaultdict[str, float] = defaultdict(float)
@@ -660,8 +841,8 @@ def _compute_blend_result(
         contribution = _weight_numeric_frame(record.result.balance_matrix, weight)
         balance_df = _accumulate_numeric(balance_df, contribution)
 
-        contribution = _weight_numeric_frame(record.result.lci, weight)
-        lci_df = _accumulate_numeric(lci_df, contribution)
+        contribution_lci = _weight_lci(record.result.lci, weight)
+        lci_df = _accumulate_lci(lci_df, contribution_lci)
 
         for proc, flag in record.result.production_routes.items():
             try:
@@ -685,9 +866,6 @@ def _compute_blend_result(
             "demand_qty": record.route_cfg.demand_qty,
         })
 
-    gross_ef = None
-    if demand_qty and math.isfinite(demand_qty):
-        gross_ef = total_co2e / demand_qty
     result = RunOutputs(
         production_routes=dict(weighted_routes),
         prod_levels=dict(weighted_levels),
@@ -711,13 +889,8 @@ def _compute_blend_result(
         "name": blend.name,
         "is_blend": True,
         "blend": True,
-        "demand_qty": demand_qty,
         "raw_co2e_kg": total_co2e,
         "total_co2e_kg": total_co2e * REPORTED_YIELD_DIVISOR,
-        "gross_ef_kg_per_unit": gross_ef,
-        "total_cost": result.total_cost,
-        "material_cost": result.material_cost,
-        "components": components_payload,
     }
     if route_set:
         summary["route_preset"] = route_set.pop() if len(route_set) == 1 else ",".join(sorted(route_set))
@@ -732,6 +905,8 @@ def _run_blends(
     blends: List[BlendPlan],
     records: List[RunRecord],
     log_dir_default: Optional[Path] = None,
+    write_lci: bool = False,
+    lci_dir: Optional[Path] = None,
 ) -> List[Dict[str, Any]]:
     if not blends:
         return []
@@ -740,10 +915,7 @@ def _run_blends(
     for blend in blends:
         summary, result = _compute_blend_result(blend, record_map)
         summaries.append(summary)
-        print(
-            f"[blend] {blend.name}: total_co2e={_fmt_float(summary.get('total_co2e_kg'))} kg; "
-            f"gross_EF={_fmt_float(summary.get('gross_ef_kg_per_unit'))} kg/unit"
-        )
+        print(f"[blend] {blend.name}: raw={_fmt_float(summary.get('raw_co2e_kg'))} kg; adjusted={_fmt_float(summary.get('total_co2e_kg'))} kg")
         log_dir = blend.log_dir or log_dir_default
         if log_dir:
             payload = {
@@ -759,6 +931,11 @@ def _run_blends(
                 print(f"  ↳ blend log written to {path_written}")
             except Exception as exc:
                 print(f"  ! failed to write blend log in {log_dir}: {exc}", file=sys.stderr)
+        if write_lci:
+            out_dir = lci_dir if lci_dir is not None else Path("results/lci").resolve()
+            path_written = _write_lci_csv(getattr(result, 'lci', None), out_dir, blend.name)
+            if path_written:
+                print(f"  ↳ blend LCI written to {path_written}")
     return summaries
 
 
@@ -767,6 +944,8 @@ def run_batch(
     show_meta: bool = False,
     log_dir_default: Optional[Path] = None,
     fail_fast: bool = False,
+    write_lci: bool = False,
+    lci_dir: Optional[Path] = None,
 ) -> Tuple[List[Dict[str, Any]], int, List[RunRecord]]:
     summaries: List[Dict[str, Any]] = []
     failures = 0
@@ -783,12 +962,9 @@ def run_batch(
             result = run_scenario(str(plan.data_dir), scn_inputs)
             summary = _summarize_result(plan, route_cfg, result)
             summaries.append(summary)
-            total = summary.get("total_co2e_kg")
-            gross = summary.get("gross_ef_kg_per_unit")
-            print(
-                f"{plan.name}: total_co2e={_fmt_float(total)} kg; "
-                f"gross_EF={_fmt_float(gross)} kg/unit"
-            )
+            raw = summary.get("raw_co2e_kg")
+            adj = summary.get("total_co2e_kg")
+            print(f"{plan.name}: raw={_fmt_float(raw)} kg; adjusted={_fmt_float(adj)} kg")
             if show_meta and getattr(result, "meta", None):
                 print(json.dumps(result.meta, indent=2))
             log_dir = plan.log_dir or log_dir_default
@@ -799,6 +975,12 @@ def run_batch(
                     print(f"  ↳ log written to {path_written}")
                 except Exception as exc:
                     print(f"  ! failed to write log in {log_dir}: {exc}", file=sys.stderr)
+            # Optionally write LCI CSV per run
+            if write_lci:
+                out_dir = lci_dir if lci_dir is not None else Path("results/lci").resolve()
+                path_written = _write_lci_csv(getattr(result, 'lci', None), out_dir, plan.name)
+                if path_written:
+                    print(f"  ↳ LCI written to {path_written}")
             records.append(RunRecord(plan=plan, route_cfg=route_cfg, result=result, summary=summary))
         except Exception as exc:
             failures += 1
@@ -836,6 +1018,9 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--name", type=str, help="Friendly name for a single run.")
     run_parser.add_argument("--countries", nargs="+", help="List of country codes to cycle through (overrides --country-code).")
     run_parser.add_argument("--fail-fast", action="store_true", help="Abort on first failure.")
+    run_parser.add_argument("--enable-lci", action="store_true", help="Enable LCI outputs (sets FORGE_ENABLE_LCI=1).")
+    run_parser.add_argument("--write-lci", action="store_true", help="Write LCI CSV for each run and blend.")
+    run_parser.add_argument("--lci-dir", type=str, default="results/lci", help="Directory for LCI CSV outputs (with --write-lci).")
     return parser
 
 
@@ -845,6 +1030,10 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     if args.command != "run":
         parser.print_help()
         return 1
+    # Optionally enable LCI calculations explicitly for CLI runs
+    if getattr(args, "enable_lci", False):
+        import os as _os
+        _os.environ["FORGE_ENABLE_LCI"] = "1"
     cli_defaults = {}
     if args.data_dir:
         cli_defaults["data_dir"] = args.data_dir
@@ -907,6 +1096,8 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             show_meta=args.show_meta,
             log_dir_default=log_dir_default,
             fail_fast=args.fail_fast,
+            write_lci=bool(getattr(args, 'write_lci', False)),
+            lci_dir=_resolve_path(args.lci_dir, Path.cwd()) if getattr(args, 'lci_dir', None) else None,
         )
     except Exception as exc:
         print(f"Execution aborted: {exc}", file=sys.stderr)
@@ -914,7 +1105,13 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     blend_summaries: List[Dict[str, Any]] = []
     if blend_plans:
         try:
-            blend_summaries = _run_blends(blend_plans, records, log_dir_default=log_dir_default)
+            blend_summaries = _run_blends(
+                blend_plans,
+                records,
+                log_dir_default=log_dir_default,
+                write_lci=bool(getattr(args, 'write_lci', False)),
+                lci_dir=_resolve_path(args.lci_dir, Path.cwd()) if getattr(args, 'lci_dir', None) else None,
+            )
         except Exception as exc:
             print(f"Blend calculation failed: {exc}", file=sys.stderr)
             return 6

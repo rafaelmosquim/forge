@@ -3,59 +3,59 @@
     "No Coating": 1000.0,
     "Stamping/calendering/lamination": 1000.0,
     "Bypass Raw\u2192IP3": 1000.0,
-    "Hot Rolling": 1000.0,
-    "Continuous Casting (R)": 1000.0
+    "Rod/bar/section Mill": 1000.0,
+    "Continuous Casting (L)": 1000.0
   },
   "energy_balance_sample": {
-    "Biomethane": {
-      "Burnt Lime Production": 0.0,
-      "Continuous Casting (R)": 0.0,
-      "Dolomite Production": 0.0
-    },
     "Charcoal": {
-      "Burnt Lime Production": 0.0,
-      "Continuous Casting (R)": 0.0,
-      "Dolomite Production": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
     },
     "Coal": {
-      "Burnt Lime Production": 0.0,
-      "Continuous Casting (R)": 0.0,
-      "Dolomite Production": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
     },
     "Coke": {
-      "Burnt Lime Production": 0.0,
-      "Continuous Casting (R)": 0.0,
-      "Dolomite Production": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
     },
     "Electricity": {
-      "Burnt Lime Production": 4.958459976365005,
-      "Continuous Casting (R)": 186.77396501504037,
-      "Dolomite Production": 1.451256578448294
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
     },
     "FLF": {
-      "Burnt Lime Production": 0.0,
-      "Continuous Casting (R)": 0.0,
-      "Dolomite Production": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
     },
     "Gas": {
-      "Burnt Lime Production": 201.64403903884354,
-      "Continuous Casting (R)": 3.8117135717355177,
-      "Dolomite Production": 59.01776752356396
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
     },
     "Green hydrogen": {
-      "Burnt Lime Production": 0.0,
-      "Continuous Casting (R)": 0.0,
-      "Dolomite Production": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
     },
     "RLF": {
-      "Burnt Lime Production": 0.0,
-      "Continuous Casting (R)": 0.0,
-      "Dolomite Production": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
     },
     "Wood": {
-      "Burnt Lime Production": 0.0,
-      "Continuous Casting (R)": 0.0,
-      "Dolomite Production": 0.0
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
+    },
+    "Process Gas": {
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
     }
   },
   "energy_int_sample": {

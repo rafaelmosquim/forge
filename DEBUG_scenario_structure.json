@@ -1,7 +1,27 @@
 {
-  "snapshot_year": 2050,
-  "energy_int_schedule": {
-    "rate_pct_per_year": 1.0
+  "dri_mix": "Custom",
+  "dri_mix_definitions": {
+    "Custom": {
+      "2030": {
+        "Gas": 0.0,
+        "Biomethane": 0.0,
+        "Green hydrogen": 1.0
+      },
+      "2040": {
+        "Gas": 0.0,
+        "Biomethane": 0.0,
+        "Green hydrogen": 1.0
+      }
+    }
   },
-  "dri_mix": "Blue"
+  "energy_int_schedule": {
+    "rate_pct_per_year": 2.0,
+    "baseline_year": 2025,
+    "target_year": 2032
+  },
+  "snapshot_year": 2032,
+  "gas_routing": {
+    "direct_use_fraction": 0.5,
+    "electricity_fraction": 0.5
+  }
 }

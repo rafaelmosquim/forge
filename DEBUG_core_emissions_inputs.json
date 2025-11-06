@@ -1,7 +1,7 @@
 {
   "prod_levels_sample": {
-    "Organic or Sintetic Coating (painting)": 1000.0,
-    "Machining": 1000.0,
+    "No Coating": 1000.0,
+    "Stamping/calendering/lamination": 1000.0,
     "Bypass Raw\u2192IP3": 1000.0,
     "Rod/bar/section Mill": 1000.0,
     "Continuous Casting (L)": 1000.0
@@ -10,47 +10,47 @@
     "Charcoal": {
       "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
       "Aluminium from market": 0.0,
-      "Burnt Lime Production": 0.0
+      "Anthracite Coal from Market": 0.0
     },
     "Coal": {
       "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
       "Aluminium from market": 0.0,
-      "Burnt Lime Production": 0.0
+      "Anthracite Coal from Market": 0.0
     },
     "Coke": {
       "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
       "Aluminium from market": 0.0,
-      "Burnt Lime Production": 0.0
+      "Anthracite Coal from Market": 0.0
     },
     "Electricity": {
       "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
       "Aluminium from market": 0.0,
-      "Burnt Lime Production": 11.154448276635017
+      "Anthracite Coal from Market": 0.0
     },
     "FLF": {
       "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
       "Aluminium from market": 0.0,
-      "Burnt Lime Production": 0.0
+      "Anthracite Coal from Market": 0.0
     },
     "Gas": {
       "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
       "Aluminium from market": 0.0,
-      "Burnt Lime Production": 453.6142299164907
-    },
-    "Green hydrogen": {
-      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
-      "Aluminium from market": 0.0,
-      "Burnt Lime Production": 0.0
+      "Anthracite Coal from Market": 0.0
     },
     "RLF": {
       "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
       "Aluminium from market": 0.0,
-      "Burnt Lime Production": 0.0
+      "Anthracite Coal from Market": 0.0
     },
     "Wood": {
       "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
       "Aluminium from market": 0.0,
-      "Burnt Lime Production": 0.0
+      "Anthracite Coal from Market": 0.0
+    },
+    "Process Gas": {
+      "Alloys Mix for Low Alloy Steel (LAS)": 0.0,
+      "Aluminium from market": 0.0,
+      "Anthracite Coal from Market": 0.0
     }
   },
   "energy_int_sample": {

@@ -36,6 +36,7 @@ from forge.steel_core_api_v2 import RouteConfig, ScenarioInputs, run_scenario
 # ---- Make plt.show() safe in headless runs ----
 import matplotlib as _mpl
 import matplotlib.pyplot as _plt
+from datetime import datetime as _dt
 _FIG_INDEX = 0
 
 def _install_safe_show():
@@ -45,8 +46,10 @@ def _install_safe_show():
     save_mode = ('agg' in backend) or (_os.getenv('FORGE_SAVE_FIGS', '') == '1')
     if not save_mode:
         return
-    out_dir = _os.getenv('FORGE_FIG_DIR', 'results/figs')
-    out_path = _Path(out_dir)
+    base_dir = _os.getenv('FORGE_FIG_DIR', 'results/figs')
+    # Always save into a unique run subfolder to avoid overwriting prior runs
+    run_tag = _os.getenv('FORGE_RUN_TAG') or _dt.now().strftime('run_%Y%m%d_%H%M%S')
+    out_path = _Path(base_dir) / run_tag
     out_path.mkdir(parents=True, exist_ok=True)
 
     _orig_show = _plt.show
@@ -55,7 +58,8 @@ def _install_safe_show():
         nonlocal out_path
         global _FIG_INDEX
         _FIG_INDEX += 1
-        fname = f'paper_fig_{_FIG_INDEX:02d}.png'
+        prefix = _os.getenv('FORGE_FIG_PREFIX', 'paper')
+        fname = f'{prefix}_fig_{_FIG_INDEX:02d}.png'
         path = out_path / fname
         _plt.gcf().savefig(path, dpi=200, bbox_inches='tight')
         _plt.close(_plt.gcf())
@@ -84,12 +88,55 @@ FINAL_PICKS = {
 # - portfolio: blends EF across a portfolio spec (see configs/*finished_steel_portfolio*.yml)
 PRODUCT_CONFIG = _os.getenv('FORGE_PAPER_PRODUCT_CONFIG', 'simple').strip().lower()
 PORTFOLIO_SPEC_OVERRIDE = _os.getenv('FORGE_PAPER_PORTFOLIO_SPEC', '').strip() or None
+PORTFOLIO_BLEND_OVERRIDE = _os.getenv('FORGE_PAPER_PORTFOLIO_BLEND', '').strip() or None
 
 def _scenario_for_bf_config(config: str) -> Dict[str, Any]:
-    scn: Dict[str, Any] = {}
-    if str(config).strip().lower() == "charcoal":
-        scn["fuel_substitutions"] = {"Coal": "Charcoal", "Coke": "Charcoal"}
-    return scn
+    """Scenario for BF configs; 'Charcoal' uses dataset scenario file for consistency."""
+    name = str(config).strip().lower()
+    if name == "charcoal":
+        try:
+            path = _Path(DATA_DIR) / 'scenarios' / 'BF_BOF_charcoal.yml'
+            import yaml as _yaml_local
+            with path.open('r', encoding='utf-8') as fh:
+                payload = _yaml_local.safe_load(fh) or {}
+            if isinstance(payload, dict):
+                return payload
+        except Exception:
+            pass
+        # Fallback to coarse substitution if file missing
+        return {"fuel_substitutions": {"Coal": "Charcoal", "Coke": "Charcoal"}}
+    return {}
+
+def _route_defaults_scenario(route: str, config: str) -> Dict[str, Any]:
+    """Load dataset scenario defaults per route/config to avoid duplication.
+
+    These are the route-level defaults used in the app (e.g., BF coal/charcoal,
+    DRI-EAF, EAF-Scrap). They act as a baseline that we later augment with
+    energy_int_schedule and any extra toggles.
+    """
+    route_u = (route or '').strip().upper()
+    cfg_u = (config or '').strip().upper()
+    fname = None
+    if route_u.startswith('BF'):
+        # Choose charcoal or coal variant
+        if cfg_u == 'CHARCOAL':
+            fname = 'BF_BOF_charcoal.yml'
+        else:
+            fname = 'BF_BOF_coal.yml'
+    elif route_u.startswith('DRI'):
+        fname = 'DRI_EAF.yml'
+    elif route_u.startswith('EAF'):
+        fname = 'scrap_EAF.yml'
+    if not fname:
+        return {}
+    try:
+        path = _Path(DATA_DIR) / 'scenarios' / fname
+        import yaml as _yaml_local2
+        with path.open('r', encoding='utf-8') as fh:
+            payload = _yaml_local2.safe_load(fh) or {}
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
 
 def _scenario_for_dri_config(config: str) -> Dict[str, Any]:
     name = str(config).strip().lower()
@@ -115,7 +162,8 @@ def _scenario_for_dri_config(config: str) -> Dict[str, Any]:
 def _ef_core_cached(route: str, config: str, year: int, base_year: int, annual_improvement: float) -> float:
     route = str(route).strip()
     config = str(config).strip()
-    # Build scenario payload with in-core efficiency schedule
+    # Build scenario payload starting from route defaults
+    base_defaults = _route_defaults_scenario(route, config)
     if route.upper().startswith("BF"):
         scn = _scenario_for_bf_config(config)
     elif route.upper().startswith("DRI"):
@@ -130,6 +178,12 @@ def _ef_core_cached(route: str, config: str, year: int, base_year: int, annual_i
     }
     # For DRI mixes, set snapshot_year so _apply_dri_mix picks nearest <= year
     scn.setdefault("snapshot_year", int(year))
+    # Enforce BF minimum base intensity (post-schedule) as an explicit floor
+    if route.upper().startswith("BF"):
+        scn.setdefault("energy_int_floor", {})["Blast Furnace"] = 11.0
+    # Merge baseline route defaults first
+    if base_defaults:
+        scn = _merge_scenarios(base_defaults, scn)
     rc = RouteConfig(
         route_preset=route,
         stage_key="Finished",
@@ -222,7 +276,8 @@ def _merge_scenarios(base: Dict[str, Any], extra: Optional[Dict[str, Any]]) -> D
     return out
 
 def _ef_core_run_with_picks(route: str, config: str, year: int, base_year: int, annual_improvement: float, picks: Dict[str, str], scenario_defaults: Optional[Dict[str, Any]] = None) -> float:
-    # Build scenario payload with in-core efficiency schedule + config mapping
+    # Build scenario payload with route defaults + config mapping + schedule
+    base_defaults = _route_defaults_scenario(route, config)
     if route.upper().startswith("BF"):
         scn = _scenario_for_bf_config(config)
     elif route.upper().startswith("DRI"):
@@ -236,6 +291,11 @@ def _ef_core_run_with_picks(route: str, config: str, year: int, base_year: int, 
         "target_year": int(year),
     }
     scn.setdefault("snapshot_year", int(year))
+    if route.upper().startswith("BF"):
+        scn.setdefault("energy_int_floor", {})["Blast Furnace"] = 11.0
+    # Merge route defaults, then portfolio/default scenario overrides
+    if base_defaults:
+        scn = _merge_scenarios(base_defaults, scn)
     if scenario_defaults:
         scn = _merge_scenarios(scn, scenario_defaults)
     rc = RouteConfig(
@@ -268,15 +328,21 @@ def _ef_core_cached_disk_with_picks(route: str, config: str, year: int, base_yea
     return val
 
 def _portfolio_spec_for_route(route: str) -> Optional[str]:
+    """Return the processing basket spec applied across all routes.
+
+    Priority:
+      1) FORGE_PAPER_PORTFOLIO_SPEC if set
+      2) configs/finished_steel_portfolio.yml if present
+      3) fallback to configs/finished_steel_portfolio_eaf.yml
+    """
     if PORTFOLIO_SPEC_OVERRIDE:
         return PORTFOLIO_SPEC_OVERRIDE
-    r = (route or '').strip().upper()
-    if r.startswith('BF'):
-        return 'configs/finished_steel_portfolio_bf_charcoal.yml'
-    # Use EAF portfolio for both DRI-EAF and EAF-Scrap downstream processing
-    if r.startswith('DRI') or r.startswith('EAF'):
-        return 'configs/finished_steel_portfolio_eaf.yml'
-    return None
+    # Prefer a unified portfolio file if it exists
+    unified = _Path('configs/finished_steel_portfolio.yml')
+    if unified.exists():
+        return str(unified)
+    # Fallback to previous EAF-based basket
+    return 'configs/finished_steel_portfolio_eaf.yml'
 
 def _compute_portfolio_ef(route: str, config: str, year: int, base_year: int, annual_improvement: float) -> float:
     import yaml as _yaml
@@ -295,12 +361,18 @@ def _compute_portfolio_ef(route: str, config: str, year: int, base_year: int, an
     runs = spec.get('runs') or []
     run_map = {r.get('name'): (r.get('picks_by_material') or {}) for r in runs if isinstance(r, dict)}
     blends = spec.get('blends') or []
-    # pick first blend if name not known
+    # Choose blend by override name or default to first
     blend = None
-    for b in blends:
-        if isinstance(b, dict):
-            blend = b
-            break
+    if PORTFOLIO_BLEND_OVERRIDE:
+        for b in blends:
+            if isinstance(b, dict) and str(b.get('name','')).strip() == PORTFOLIO_BLEND_OVERRIDE:
+                blend = b
+                break
+    if blend is None:
+        for b in blends:
+            if isinstance(b, dict):
+                blend = b
+                break
     if not blend:
         return _ef_core_cached_disk(route, config, year, base_year, annual_improvement)
     comps = blend.get('components') or []
@@ -384,7 +456,8 @@ def simulate_steel_transition(bf_fleet, **params):
     coal_bfs = bf_fleet[bf_fleet["Fuel"] == "coal"].copy()
     charcoal_bfs = bf_fleet[bf_fleet["Fuel"] == "charcoal"].copy()
     
-    COAL_BF_LIMIT = 2.5  # tCO₂/t steel
+    # Note: enforce BF minimum intensity via energy_int_floor (11 MJ) in core,
+    # not an EF floor here.
     
     # Baseline capacities
     original_coal_cap = coal_bfs["Capacity"].sum()
@@ -444,8 +517,7 @@ def simulate_steel_transition(bf_fleet, **params):
         annual_improvement = params['annual_improvement']
         
         coal_ef = get_emission_factor("BF-BOF", "Coke", year, base_year=2025, annual_improvement=annual_improvement)
-        final_coal_ef = max(coal_ef, COAL_BF_LIMIT)
-        coal_emis = coal_cap * utilization * final_coal_ef
+        coal_emis = coal_cap * utilization * coal_ef
         
         charcoal_ef = get_emission_factor("BF-BOF", "Charcoal", year, base_year=2025, annual_improvement=annual_improvement)
         charcoal_emis = current_charcoal_cap * utilization * charcoal_ef
@@ -618,6 +690,31 @@ for _, scenario_params in results_df.iterrows():
 
 # Combine all results into one DataFrame
 combined_df = pd.concat(all_simulations)
+
+# ---- Aggregate EF table (median and quartiles) for selected years ----
+def _write_aggregate_ef_table(df: pd.DataFrame) -> None:
+    target_years = {2030, 2035, 2040, 2045, 2050}
+    try:
+        sub = df[df['Year'].isin(target_years)].copy()
+        if sub.empty:
+            return
+        stats = (
+            sub.groupby(['scenario', 'Year'])['Emissions_Intensity']
+               .agg(median='median', q25=lambda x: x.quantile(0.25), q75=lambda x: x.quantile(0.75))
+               .reset_index()
+               .sort_values(['scenario', 'Year'])
+        )
+        base_dir = _os.getenv('FORGE_TABLE_DIR', 'results/tables')
+        run_tag = _os.getenv('FORGE_RUN_TAG') or _dt.now().strftime('run_%Y%m%d_%H%M%S')
+        out_dir = _Path(base_dir) / run_tag
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / 'aggregate_ef.csv'
+        stats.to_csv(out_path, index=False)
+        print(f"[table] aggregate EF written to {out_path}")
+    except Exception as e:
+        print(f"[table] failed to write aggregate EF: {e}")
+
+_write_aggregate_ef_table(combined_df)
 
 plt.figure(figsize=(12, 7))
 

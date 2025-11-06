@@ -172,6 +172,29 @@ def _apply_energy_int_efficiency_scaling(energy_int: Dict[str, float], scenario:
             continue
         energy_int[k] = val * factor
 
+def _apply_energy_int_floor(energy_int: Dict[str, float], scenario: Dict[str, Any]) -> None:
+    """Apply per-process minimum intensity floors after schedule scaling.
+
+    Scenario may include:
+      energy_int_floor: { "Blast Furnace": 11.0, ... }
+    which enforces energy_int[proc] = max(floor, current) for numeric entries.
+    """
+    if not isinstance(energy_int, dict) or not isinstance(scenario, dict):
+        return
+    floors = scenario.get("energy_int_floor")
+    if not isinstance(floors, dict):
+        return
+    for k, v in floors.items():
+        try:
+            floor_val = float(v)
+        except Exception:
+            continue
+        try:
+            cur = float(energy_int.get(k, 0.0) or 0.0)
+        except Exception:
+            cur = 0.0
+        energy_int[k] = max(cur, floor_val)
+
 
 # ==============================
 # Dataclasses
@@ -713,6 +736,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     # Apply uniform/scheduled efficiency improvements to intensities BEFORE adjustments
     _apply_energy_int_efficiency_scaling(energy_int, scenario)
+    # Optional per-process minimum floors (applied after schedule)
+    _apply_energy_int_floor(energy_int, scenario)
 
     # Optional: DRI fuel mix transformations relative to baseline gas share
     def _apply_dri_mix(energy_shares: Dict[str, Dict[str, float]], scenario: Dict[str, Any]) -> None:

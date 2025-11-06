@@ -1,0 +1,482 @@
+defaults:
+  route:
+    stage_key: Finished
+    demand_qty: 1000
+  country_code: BR
+  scenario:
+    gas_routing:
+      direct_use_fraction: 0.0
+      electricity_fraction: 1.0
+  # Optionally set country_code or scenario.gas_routing here
+  picks_by_material:
+    Nitrogen: Nitrogen Production
+    Oxygen: Oxygen Production
+    Dolomite: Dolomite Production
+    Burnt Lime: Burnt Lime Production
+
+runs:
+  # Upstream variants (from finished_steel_portfolio) × IP4 × Finishing
+  # Regular – Hot Rolling (no CR)
+  - name: regular_hot_direct_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: No Coating
+  - name: regular_hot_direct_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: regular_hot_casting_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: No Coating
+  - name: regular_hot_casting_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: regular_hot_stamping_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: No Coating
+  - name: regular_hot_stamping_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: regular_hot_machining_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: No Coating
+  - name: regular_hot_machining_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: Organic or Sintetic Coating (painting)
+
+  # Regular – Hot Rolling + CR
+  - name: regular_cold_direct_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: No Coating
+  - name: regular_cold_direct_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: regular_cold_casting_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: No Coating
+  - name: regular_cold_casting_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: regular_cold_stamping_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: No Coating
+  - name: regular_cold_stamping_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: regular_cold_machining_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: No Coating
+  - name: regular_cold_machining_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: Organic or Sintetic Coating (painting)
+
+  # Regular – Rod/bar/section Mill
+  - name: regular_rod_direct_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: No Coating
+  - name: regular_rod_direct_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: regular_rod_casting_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: No Coating
+  - name: regular_rod_casting_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: regular_rod_stamping_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: No Coating
+  - name: regular_rod_stamping_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: regular_rod_machining_no_coat
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: No Coating
+  - name: regular_rod_machining_paint
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: Organic or Sintetic Coating (painting)
+
+  # High Alloy – Hot Rolling (no CR)
+  - name: high_hot_direct_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: No Coating
+  - name: high_hot_direct_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: high_hot_casting_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: No Coating
+  - name: high_hot_casting_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: high_hot_stamping_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: No Coating
+  - name: high_hot_stamping_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: high_hot_machining_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: No Coating
+  - name: high_hot_machining_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: Organic or Sintetic Coating (painting)
+
+  # High Alloy – Hot Rolling + CR
+  - name: high_cold_direct_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: No Coating
+  - name: high_cold_direct_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: high_cold_casting_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: No Coating
+  - name: high_cold_casting_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: high_cold_stamping_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: No Coating
+  - name: high_cold_stamping_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: high_cold_machining_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: No Coating
+  - name: high_cold_machining_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: Organic or Sintetic Coating (painting)
+
+  # High Alloy – Rod/bar/section Mill
+  - name: high_rod_direct_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: No Coating
+  - name: high_rod_direct_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: high_rod_casting_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: No Coating
+  - name: high_rod_casting_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: high_rod_stamping_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: No Coating
+  - name: high_rod_stamping_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Stamping/calendering/lamination
+      Finished Products: Organic or Sintetic Coating (painting)
+  - name: high_rod_machining_no_coat
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: No Coating
+  - name: high_rod_machining_paint
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Machining
+      Finished Products: Organic or Sintetic Coating (painting)
+
+blends:
+  - name: paper_portfolio
+    notes: >
+      Upstream (from finished_steel_portfolio):
+        Regular 80% (Hot 76% (CR 20% of Hot), Rod 24%)
+        High Alloy 20% (Hot 76% (CR 20% of Hot), Rod 24%)
+      × IP4 basket (Direct 10%, Casting 10%, Stamping 35%, Machining 45%)
+      × Finishing (No Coat 70%, Paint 30%).
+    components:
+      # regular_hot (0.4864)
+      - { run: regular_hot_direct_no_coat,     share: 0.034048 }
+      - { run: regular_hot_direct_paint,       share: 0.014592 }
+      - { run: regular_hot_casting_no_coat,    share: 0.034048 }
+      - { run: regular_hot_casting_paint,      share: 0.014592 }
+      - { run: regular_hot_stamping_no_coat,   share: 0.119168 }
+      - { run: regular_hot_stamping_paint,     share: 0.051072 }
+      - { run: regular_hot_machining_no_coat,  share: 0.153216 }
+      - { run: regular_hot_machining_paint,    share: 0.065664 }
+
+      # regular_cold (0.1216)
+      - { run: regular_cold_direct_no_coat,    share: 0.008512 }
+      - { run: regular_cold_direct_paint,      share: 0.003648 }
+      - { run: regular_cold_casting_no_coat,   share: 0.008512 }
+      - { run: regular_cold_casting_paint,     share: 0.003648 }
+      - { run: regular_cold_stamping_no_coat,  share: 0.029792 }
+      - { run: regular_cold_stamping_paint,    share: 0.012768 }
+      - { run: regular_cold_machining_no_coat, share: 0.038304 }
+      - { run: regular_cold_machining_paint,   share: 0.016416 }
+
+      # regular_rod (0.192)
+      - { run: regular_rod_direct_no_coat,     share: 0.01344 }
+      - { run: regular_rod_direct_paint,       share: 0.00576 }
+      - { run: regular_rod_casting_no_coat,    share: 0.01344 }
+      - { run: regular_rod_casting_paint,      share: 0.00576 }
+      - { run: regular_rod_stamping_no_coat,   share: 0.04704 }
+      - { run: regular_rod_stamping_paint,     share: 0.02016 }
+      - { run: regular_rod_machining_no_coat,  share: 0.06048 }
+      - { run: regular_rod_machining_paint,    share: 0.02592 }
+
+      # high_hot (0.1216)
+      - { run: high_hot_direct_no_coat,        share: 0.008512 }
+      - { run: high_hot_direct_paint,          share: 0.003648 }
+      - { run: high_hot_casting_no_coat,       share: 0.008512 }
+      - { run: high_hot_casting_paint,         share: 0.003648 }
+      - { run: high_hot_stamping_no_coat,      share: 0.029792 }
+      - { run: high_hot_stamping_paint,        share: 0.012768 }
+      - { run: high_hot_machining_no_coat,     share: 0.038304 }
+      - { run: high_hot_machining_paint,       share: 0.016416 }
+
+      # high_cold (0.0304)
+      - { run: high_cold_direct_no_coat,       share: 0.002128 }
+      - { run: high_cold_direct_paint,         share: 0.000912 }
+      - { run: high_cold_casting_no_coat,      share: 0.002128 }
+      - { run: high_cold_casting_paint,        share: 0.000912 }
+      - { run: high_cold_stamping_no_coat,     share: 0.007448 }
+      - { run: high_cold_stamping_paint,       share: 0.003192 }
+      - { run: high_cold_machining_no_coat,    share: 0.009576 }
+      - { run: high_cold_machining_paint,      share: 0.004104 }
+
+      # high_rod (0.048)
+      - { run: high_rod_direct_no_coat,        share: 0.00336 }
+      - { run: high_rod_direct_paint,          share: 0.00144 }
+      - { run: high_rod_casting_no_coat,       share: 0.00336 }
+      - { run: high_rod_casting_paint,         share: 0.00144 }
+      - { run: high_rod_stamping_no_coat,      share: 0.01176 }
+      - { run: high_rod_stamping_paint,        share: 0.00504 }
+      - { run: high_rod_machining_no_coat,     share: 0.01512 }
+      - { run: high_rod_machining_paint,       share: 0.00648 }

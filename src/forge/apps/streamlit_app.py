@@ -444,8 +444,9 @@ def _load_for_picks(
 
     # Apply optional uniform/scheduled efficiency improvements to intensities BEFORE adjustments
     try:
-        from forge.steel_core_api_v2 import _apply_energy_int_efficiency_scaling
+        from forge.steel_core_api_v2 import _apply_energy_int_efficiency_scaling, _apply_energy_int_floor
         _apply_energy_int_efficiency_scaling(energy_int, scenario)
+        _apply_energy_int_floor(energy_int, scenario)
     except Exception:
         pass
 

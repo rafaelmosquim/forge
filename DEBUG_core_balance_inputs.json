@@ -3,14 +3,14 @@
     "Finished Products": 1000.0
   },
   "production_routes": {
-    "No Coating": 1,
+    "Organic or Sintetic Coating (painting)": 1,
+    "No Coating": 0,
     "Hot Dip Metal Coating FP": 0,
     "Electrolytic Metal Coating FP": 0,
-    "Organic or Sintetic Coating (painting)": 0,
-    "Stamping/calendering/lamination": 1,
+    "Machining": 1,
     "Direct use of Basic Steel Products": 0,
     "Casting/Extrusion/Conformation": 0,
-    "Machining": 0,
+    "Stamping/calendering/lamination": 0,
     "Bypass Raw\u2192IP3": 1,
     "Steel Thermal Treatment": 0,
     "Hot Dip Metal Coating": 0,
@@ -38,11 +38,7 @@
     "Burnt Lime from market": 0,
     "Direct Reduction Iron": 1,
     "Blast Furnace": 0,
-    "Natural gas from Market": 1,
-    "LPG from Market": 0,
-    "Biomethane from Market": 0,
-    "Hydrogen (Electrolysis) from Market": 0,
-    "Hydrogen (Methane reforming) from Market": 0,
+    "Scrap Purchase": 1,
     "Manganese from Market": 1,
     "Chromium from Market": 1,
     "Nickel from Market": 1,
@@ -54,17 +50,48 @@
     "Niobium from market": 1,
     "Aluminium from market": 1,
     "Limestone from Market": 1,
-    "Sintering": 1,
     "Pelletizing": 1,
     "Iron Ore from Market": 1,
-    "Coke Production": 1,
-    "Coke Petroleum from Market": 0,
-    "Coke Mineral from Market": 0,
-    "Anthracite Coal from Market": 1,
-    "Coal from Market": 0,
-    "PCI Coal from Market": 0
+    "Natural gas from Market": 1,
+    "LPG from Market": 0,
+    "Biomethane from Market": 0,
+    "Hydrogen (Electrolysis) from Market": 0,
+    "Hydrogen (Methane reforming) from Market": 0
   },
   "scenario_dict": {
+    "route_overrides": {
+      "Blast Furnace": 0.0,
+      "Basic Oxygen Furnace": 0.0,
+      "Electric Arc Furnace": 1,
+      "Direct Reduction Iron": 1,
+      "Charcoal from Market": 0.0,
+      "Charcoal Production": 0,
+      "Coke Production": 0,
+      "Sintering": 0
+    },
+    "recipe_overrides": {
+      "Electric Arc Furnace": {
+        "inputs": {
+          "Nitrogen": 0.113,
+          "Oxygen": 0.025,
+          "Dolomite": 0.012,
+          "Burnt Lime": 0.041,
+          "Pig Iron": 0.9,
+          "Scrap": 0.1
+        }
+      }
+    },
+    "param_overrides": {
+      "blend": {
+        "sinter": 0.0,
+        "pellet": 0.9,
+        "lump": 0.1
+      },
+      "iron_content_pig_iron": 0.69,
+      "feo3_sinter": 0.8,
+      "feo3_pellet": 0.9,
+      "feo3_lump": 0.987
+    },
     "dri_mix": "Custom",
     "dri_mix_definitions": {
       "Custom": {
@@ -87,8 +114,8 @@
     },
     "snapshot_year": 2032,
     "gas_routing": {
-      "direct_use_fraction": 0.5,
-      "electricity_fraction": 0.5
+      "direct_use_fraction": 0.0,
+      "electricity_fraction": 1.0
     },
     "fallback_materials": [],
     "prefer_internal_processes": {
@@ -111,13 +138,13 @@
       ]
     },
     "external_purchase_rows": [
-      "Burnt Lime from market",
-      "External Inputs",
-      "Nitrogen from market",
-      "Scrap Purchase",
       "Oxygen from market",
+      "External Inputs",
       "Dolomite from market",
-      "Limestone from Market"
+      "Burnt Lime from market",
+      "Limestone from Market",
+      "Nitrogen from market",
+      "Scrap Purchase"
     ],
     "energy_int": {}
   },

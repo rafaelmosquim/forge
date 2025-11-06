@@ -1,4 +1,37 @@
 {
+  "route_overrides": {
+    "Blast Furnace": 0.0,
+    "Basic Oxygen Furnace": 0.0,
+    "Electric Arc Furnace": 1,
+    "Direct Reduction Iron": 1,
+    "Charcoal from Market": 0.0,
+    "Charcoal Production": 0,
+    "Coke Production": 0,
+    "Sintering": 0
+  },
+  "recipe_overrides": {
+    "Electric Arc Furnace": {
+      "inputs": {
+        "Nitrogen": 0.113,
+        "Oxygen": 0.025,
+        "Dolomite": 0.012,
+        "Burnt Lime": 0.041,
+        "Pig Iron": 0.9,
+        "Scrap": 0.1
+      }
+    }
+  },
+  "param_overrides": {
+    "blend": {
+      "sinter": 0.0,
+      "pellet": 0.9,
+      "lump": 0.1
+    },
+    "iron_content_pig_iron": 0.69,
+    "feo3_sinter": 0.8,
+    "feo3_pellet": 0.9,
+    "feo3_lump": 0.987
+  },
   "dri_mix": "Custom",
   "dri_mix_definitions": {
     "Custom": {
@@ -21,7 +54,7 @@
   },
   "snapshot_year": 2032,
   "gas_routing": {
-    "direct_use_fraction": 0.5,
-    "electricity_fraction": 0.5
+    "direct_use_fraction": 0.0,
+    "electricity_fraction": 1.0
   }
 }

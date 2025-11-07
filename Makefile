@@ -13,6 +13,9 @@ help:
 	@echo "  parallel        - run 'finished' and 'paper' in parallel"
 	@echo "  mc-as-cast      - example Monte Carlo (as-cast, ALL countries)"
 	@echo "  mc-finished     - example Monte Carlo (finished portfolio, ALL countries)"
+	@echo "  docker-build    - build Docker image (tag: forge:paper)"
+	@echo "  docker-finished - run 'finished' profile inside Docker"
+	@echo "  docker-paper    - run 'paper' profile inside Docker"
 
 list:
 	$(PY) scripts/run_profiles.py --list
@@ -55,3 +58,28 @@ mc-finished:
 		--n 500 \
 		--out results/mc_finished
 
+# --- Docker helpers ---
+docker-build:
+	docker build -t forge:paper .
+
+docker-finished: docker-build
+	docker run --rm \
+	  -v "$(PWD)/results:/app/results" \
+	  -v "$(PWD)/configs:/app/configs" \
+	  -e FORGE_PAPER_PRODUCT_CONFIG=portfolio \
+	  -e FORGE_PAPER_PORTFOLIO_SPEC=configs/finished_steel_portfolio.yml \
+	  -e FORGE_PAPER_PORTFOLIO_BLEND=finished_portfolio \
+	  -e FORGE_PAPER_CACHE_DIR=results/cache_finished \
+	  -e FORGE_OUTPUT_LABEL=finished \
+	  forge:paper python3 scripts/run_profiles.py finished
+
+docker-paper: docker-build
+	docker run --rm \
+	  -v "$(PWD)/results:/app/results" \
+	  -v "$(PWD)/configs:/app/configs" \
+	  -e FORGE_PAPER_PRODUCT_CONFIG=portfolio \
+	  -e FORGE_PAPER_PORTFOLIO_SPEC=configs/paper_portfolio.yml \
+	  -e FORGE_PAPER_PORTFOLIO_BLEND=paper_portfolio \
+	  -e FORGE_PAPER_CACHE_DIR=results/cache_paper \
+	  -e FORGE_OUTPUT_LABEL=paper \
+	  forge:paper python3 scripts/run_profiles.py paper

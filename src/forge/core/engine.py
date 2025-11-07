@@ -6,7 +6,6 @@ emissions to the legacy monolith to preserve behavior.
 """
 from __future__ import annotations
 
-from forge import steel_model_core as _core
 import pandas as pd
 from collections import defaultdict, deque
 from typing import Dict

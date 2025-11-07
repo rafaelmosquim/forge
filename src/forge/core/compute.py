@@ -7,11 +7,12 @@ precedence; otherwise we delegate to `forge.steel_model_core`.
 """
 from __future__ import annotations
 
-from forge import steel_model_core as _core
-from typing import Dict, List
+from typing import Dict, List, Optional, Set
 import pandas as pd
 import os
 from .models import Process
+from .routing import STAGE_MATS, build_route_mask
+from .engine import calculate_balance_matrix, calculate_energy_balance
 
 # -----------------------
 # Local implementations
@@ -372,9 +373,163 @@ from .transforms import (
 
 # Transforms/overrides (gas routing implemented locally)
 
-# Reference helpers
-compute_inside_elec_reference_for_share = getattr(_core, "compute_inside_elec_reference_for_share", lambda *a, **k: 0.0)
-compute_inside_gas_reference_for_share = getattr(_core, "compute_inside_gas_reference_for_share", lambda *a, **k: 0.0)
+# Reference helpers (local implementations)
+
+DEFAULT_PRODUCER_PRIORITY = (
+    "Continuous Casting (R)",
+    "Hot Rolling",
+    "Cold Rolling",
+    "Basic Oxygen Furnace",
+    "Electric Arc Furnace",
+)
+
+
+def _build_producers_index(recipes: List[Process]) -> Dict[str, List[Process]]:
+    prod: Dict[str, List[Process]] = {}
+    for r in recipes:
+        for m in r.outputs:
+            prod.setdefault(m, []).append(r)
+    return prod
+
+
+def _build_routes_from_picks(
+    recipes: List[Process],
+    demand_mat: str,
+    picks_by_material: Dict[str, str],
+    pre_mask: Optional[Dict[str, int]] = None,
+    pre_select: Optional[Dict[str, int]] = None,
+    fallback_materials: Optional[Set[str]] = None,
+) -> Dict[str, int]:
+    producers = _build_producers_index(recipes)
+    pre_mask = dict(pre_mask or {})
+    pre_select = dict(pre_select or {})
+    chosen: Dict[str, int] = {}
+
+    def score(proc: Process):
+        try:
+            idx = DEFAULT_PRODUCER_PRIORITY.index(proc.name)
+            return (0, idx, proc.name)
+        except ValueError:
+            return (1, 0, proc.name)
+
+    from collections import deque
+    q = deque([demand_mat])
+    visited_mats: Set[str] = {demand_mat}
+
+    while q:
+        mat = q.popleft(); visited_mats.discard(mat)
+        cand_all = producers.get(mat, [])
+        if not cand_all:
+            continue
+        allowed = [p for p in cand_all if pre_mask.get(p.name, 1) > 0]
+        if not allowed:
+            continue
+        pick_name = picks_by_material.get(mat, "")
+        pick = next((p for p in allowed if p.name == pick_name), None) if pick_name else None
+        if pick is None:
+            enabled = [p for p in allowed if pre_select.get(p.name, 1) > 0] or allowed
+            enabled.sort(key=score)
+            pick = enabled[0]
+        chosen[pick.name] = 1
+        for r in cand_all:
+            if r.name != pick.name:
+                chosen[r.name] = 0
+        for im in pick.inputs.keys():
+            if im not in visited_mats:
+                q.append(im); visited_mats.add(im)
+    return chosen
+
+
+def _ensure_fallback_processes(
+    recipes: List[Process],
+    production_routes: Dict[str, int],
+    fallback_materials: Optional[Set[str]],
+) -> None:
+    if not fallback_materials:
+        return
+    fallback_set = {str(m).strip() for m in fallback_materials if str(m).strip()}
+    existing = {r.name for r in recipes}
+    for mat in fallback_set:
+        proc_name = f"External {mat} (auto)"
+        if proc_name not in existing:
+            recipes.append(Process(proc_name, inputs={}, outputs={mat: 1.0}))
+            existing.add(proc_name)
+        production_routes.setdefault(proc_name, 1)
+
+
+def compute_inside_gas_reference_for_share(
+    recipes: List[Process],
+    energy_int: Dict[str, float],
+    energy_shares: Dict[str, Dict[str, float]],
+    energy_content: Dict[str, float],
+    params,
+    route_key: str,
+    demand_qty: float,
+    stage_ref: str = "IP3",
+    stage_lookup: Optional[Dict[str, str]] = None,
+    gas_carrier: str = "Gas",
+    fallback_materials: Optional[Set[str]] = None,
+) -> float:
+    pre_mask = build_route_mask(route_key, recipes)
+    stage_map = stage_lookup or STAGE_MATS
+    if stage_ref not in stage_map:
+        raise KeyError(f"Stage '{stage_ref}' not found while computing gas reference.")
+    demand_mat = stage_map[stage_ref]
+    production_routes_full = _build_routes_from_picks(
+        recipes, demand_mat, picks_by_material={}, pre_mask=pre_mask, fallback_materials=fallback_materials
+    )
+    final_demand_full = {demand_mat: float(demand_qty)}
+    import copy as _copy
+    recipes_full = _copy.deepcopy(recipes)
+    _ensure_fallback_processes(recipes_full, production_routes_full, fallback_materials)
+    balance_matrix_full, prod_levels_full = calculate_balance_matrix(
+        recipes_full, final_demand_full, production_routes_full
+    )
+    if balance_matrix_full is None:
+        return 0.0
+    energy_balance_full = calculate_energy_balance(prod_levels_full, energy_int, energy_shares)
+    total = 0.0
+    if gas_carrier in energy_balance_full.columns:
+        rows = [r for r in energy_balance_full.index if r not in ("TOTAL",)]
+        total = float(energy_balance_full.loc[rows, gas_carrier].clip(lower=0).sum())
+    return total
+
+
+def compute_inside_elec_reference_for_share(
+    recipes: List[Process],
+    energy_int: Dict[str, float],
+    energy_shares: Dict[str, Dict[str, float]],
+    energy_content: Dict[str, float],
+    params,
+    route_key: str,
+    demand_qty: float,
+    stage_ref: str = "IP3",
+    stage_lookup: Optional[Dict[str, str]] = None,
+    fallback_materials: Optional[Set[str]] = None,
+) -> float:
+    pre_mask = build_route_mask(route_key, recipes)
+    stage_map = stage_lookup or STAGE_MATS
+    if stage_ref not in stage_map:
+        raise KeyError(f"Stage '{stage_ref}' not found while computing electricity reference.")
+    demand_mat = stage_map[stage_ref]
+    production_routes_full = _build_routes_from_picks(
+        recipes, demand_mat, picks_by_material={}, pre_mask=pre_mask, fallback_materials=fallback_materials
+    )
+    final_demand_full = {demand_mat: float(demand_qty)}
+    import copy as _copy
+    recipes_full = _copy.deepcopy(recipes)
+    _ensure_fallback_processes(recipes_full, production_routes_full, fallback_materials)
+    balance_matrix_full, prod_levels_full = calculate_balance_matrix(
+        recipes_full, final_demand_full, production_routes_full
+    )
+    if balance_matrix_full is None:
+        return 0.0
+    energy_balance_full = calculate_energy_balance(prod_levels_full, energy_int, energy_shares)
+    total = 0.0
+    if 'Electricity' in energy_balance_full.columns:
+        rows = [r for r in energy_balance_full.index if r not in ("TOTAL",)]
+        total = float(energy_balance_full.loc[rows, 'Electricity'].clip(lower=0).sum())
+    return total
 
 __all__ = [
     # calcs

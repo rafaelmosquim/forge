@@ -7,13 +7,7 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, Optional
 
-try:
-    from forge.core.routing import STAGE_MATS  # preferred path
-except Exception:  # pragma: no cover
-    try:
-        from forge.steel_model_core import STAGE_MATS  # fallback to monolith
-    except Exception:
-        STAGE_MATS: Dict[str, str] = {}
+from forge.core.routing import STAGE_MATS
 
 from .sector_descriptor import SectorDescriptor, RoutePreset
 
@@ -130,4 +124,3 @@ def resolve_feed_mode(
             if feed is not None:
                 return feed
     return _DEFAULT_FEED_MODES.get(route_id)
-

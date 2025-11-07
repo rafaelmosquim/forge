@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Iterable
+import os
+from typing import Dict, Iterable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -24,29 +25,70 @@ STAGE_MATS = {
 }
 
 
-try:
-    # Delegate to monolith if available to preserve behavior
-    from forge.steel_model_core import set_prefer_internal_processes as _mon_set_prefer
-except Exception:  # pragma: no cover
-    _mon_set_prefer = None
+INHOUSE_FORCE = {
+    # Note: Nitrogen intentionally left market by default; others prefer in-house
+    "Oxygen Production": "Oxygen from market",
+    "Dolomite Production": "Dolomite from market",
+    "Burnt Lime Production": "Burnt Lime from market",
+    "Coke Production": [
+        "Coke from market",
+        "Coke Mineral from Market",
+        "Coke Petroleum from Market",
+    ],
+}
+
+PREFER_INTERNAL_OVERRIDE: Dict[str, object] = {}
 
 
 def set_prefer_internal_processes(mapping: dict | None) -> None:
-    if _mon_set_prefer is not None:
-        return _mon_set_prefer(mapping)
-    return None
+    """Override default in-house preference mapping (descriptor-driven)."""
+    global PREFER_INTERNAL_OVERRIDE
+    if not mapping:
+        PREFER_INTERNAL_OVERRIDE = {}
+        return
+    converted: Dict[str, object] = {}
+    for k, v in mapping.items():
+        key = str(k)
+        if isinstance(v, (list, tuple, set)):
+            converted[key] = [str(item) for item in v]
+        else:
+            converted[key] = str(v)
+    PREFER_INTERNAL_OVERRIDE = converted
 
 
-try:
-    from forge.steel_model_core import apply_inhouse_clamp as _mon_inhouse_clamp
-except Exception:  # pragma: no cover
-    _mon_inhouse_clamp = None
+def apply_inhouse_clamp(
+    pre_select: Optional[dict], pre_mask: Optional[dict], prefer_map: Optional[dict] = None
+):
+    """Prefer in-house production and optionally force market in validation stage."""
+    ps = dict(pre_select or {})
+    pm = dict(pre_mask or {})
 
+    stage = os.environ.get('STEEL_MODEL_STAGE', '')
+    if stage == 'validation':
+        # Force auxiliaries to be market-purchased
+        aux_rules = {
+            "Nitrogen Production": ("Nitrogen from market", 0),
+            "Oxygen Production": ("Oxygen from market", 0),
+            "Dolomite Production": ("Dolomite from market", 0),
+            "Burnt Lime Production": ("Burnt Lime from market", 0),
+        }
+        for prod_proc, (market_proc, _) in aux_rules.items():
+            pm[prod_proc] = 0
+            ps[market_proc] = 1
+        return ps, pm
 
-def apply_inhouse_clamp(pre_select: dict | None, pre_mask: dict | None, prefer_map: dict | None = None):
-    if _mon_inhouse_clamp is not None:
-        return _mon_inhouse_clamp(pre_select, pre_mask, prefer_map)
-    return dict(pre_select or {}), dict(pre_mask or {})
+    mapping = prefer_map or PREFER_INTERNAL_OVERRIDE or INHOUSE_FORCE
+    for prod_proc, market_proc in mapping.items():
+        ps[prod_proc] = 1
+        targets = list(market_proc) if isinstance(market_proc, (list, tuple, set)) else [market_proc]
+        for target in targets:
+            if not target:
+                continue
+            if pm.get(target) == 0:
+                pm.pop(target, None)
+            if target not in ps:
+                ps[target] = 1
+    return ps, pm
 
 
 def build_route_mask(route_name, recipes):

@@ -130,18 +130,18 @@ calculate_balance_matrix = _core.calculate_balance_matrix
 calculate_energy_balance = _core.calculate_energy_balance
 from .costs import analyze_energy_costs, analyze_material_costs
 from .lci import calculate_lci
+from .transforms import (
+    apply_fuel_substitutions,
+    apply_dict_overrides,
+    apply_recipe_overrides,
+    adjust_blast_furnace_intensity,
+    adjust_process_gas_intensity,
+)
 calculate_emissions = _core.calculate_emissions
 calculate_lci = getattr(_core, "calculate_lci", lambda *a, **k: None)
 
-# Transforms/overrides
-apply_fuel_substitutions = getattr(_core, "apply_fuel_substitutions", lambda *a, **k: None)
-apply_dict_overrides = getattr(_core, "apply_dict_overrides", lambda *a, **k: None)
-apply_recipe_overrides = getattr(_core, "apply_recipe_overrides", lambda *a, **k: None)
+# Transforms/overrides (gas routing still delegated for now)
 apply_gas_routing_and_credits = getattr(_core, "apply_gas_routing_and_credits", lambda *a, **k: (None, None, {}))
-
-# Specific intensity adjustment helpers (if present)
-adjust_blast_furnace_intensity = getattr(_core, "adjust_blast_furnace_intensity", lambda *a, **k: None)
-adjust_process_gas_intensity = getattr(_core, "adjust_process_gas_intensity", lambda *a, **k: None)
 
 # Reference helpers
 compute_inside_elec_reference_for_share = getattr(_core, "compute_inside_elec_reference_for_share", lambda *a, **k: 0.0)
@@ -163,9 +163,9 @@ __all__ = [
     "apply_fuel_substitutions",
     "apply_dict_overrides",
     "apply_recipe_overrides",
-    "apply_gas_routing_and_credits",
     "adjust_blast_furnace_intensity",
     "adjust_process_gas_intensity",
+    "apply_gas_routing_and_credits",
     # refs
     "compute_inside_elec_reference_for_share",
     "compute_inside_gas_reference_for_share",

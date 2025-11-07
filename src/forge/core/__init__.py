@@ -16,7 +16,8 @@ Submodules:
 Downstream code can start importing from `forge.core.*` immediately.
 """
 
-from . import models, io, routing, compute, viz  # re-exported for convenience
+from . import models, io, routing, compute, viz  # baseline
+from . import costs, lci, transforms  # additional subpackages
 
 __all__ = [
     "models",
@@ -24,5 +25,7 @@ __all__ = [
     "routing",
     "compute",
     "viz",
+    "costs",
+    "lci",
+    "transforms",
 ]
-

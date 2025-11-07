@@ -9,7 +9,7 @@ from forge.steel_core_api_v2 import (
     RouteConfig,
     is_lci_enabled,
 )
-from forge.steel_model_core import load_data_from_yaml
+from forge.core.io import load_data_from_yaml
 
 
 @pytest.mark.integration

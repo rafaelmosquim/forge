@@ -9,7 +9,9 @@ SRC_DIR = pathlib.Path(__file__).resolve().parents[1] / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from forge.steel_model_core import Process, apply_gas_routing_and_credits, calculate_energy_balance
+from forge.core.models import Process
+from forge.core.compute import apply_gas_routing_and_credits
+from forge.core.engine import calculate_energy_balance
 
 
 def make_minimal_recipes():

@@ -90,6 +90,15 @@ def is_lci_enabled() -> bool:
     return _env_flag_truthy("FORGE_ENABLE_LCI")
 
 
+def _is_debug_io_enabled() -> bool:
+    return _env_flag_truthy("FORGE_DEBUG_IO")
+
+
+def _debug_print(*args, **kwargs) -> None:
+    if _is_debug_io_enabled():
+        print(*args, **kwargs)
+
+
 # ==============================
 # Scenario transforms
 # ==============================
@@ -570,16 +579,15 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
       6) Apply/disable internal-electricity credit per scenario
       7) Compute emissions (robust to signature)
     """
-        # ADD THIS - it will show you the exact structure
-    print("🎯 SCENARIO STRUCTURE CAPTURED:")
-    print("Scenario keys:", list(scn.scenario.keys()))
-    print("Full scenario:")
-    import json
-    print(json.dumps(scn.scenario, indent=2, default=str))
-    
-    # Save to file for inspection
-    with open('DEBUG_scenario_structure.json', 'w') as f:
-        json.dump(scn.scenario, f, indent=2, default=str)
+    # Optional debug dump of scenario payload
+    if _is_debug_io_enabled():
+        _debug_print("🎯 SCENARIO STRUCTURE CAPTURED:")
+        _debug_print("Scenario keys:", list(scn.scenario.keys()))
+        _debug_print("Full scenario:")
+        import json
+        _debug_print(json.dumps(scn.scenario, indent=2, default=str))
+        with open('DEBUG_scenario_structure.json', 'w') as f:
+            json.dump(scn.scenario, f, indent=2, default=str)
         
     scenario: Dict[str, Any] = scn.scenario or {}
     route_preset: str = scn.route.route_preset or "auto"
@@ -604,7 +612,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     stage_role = _resolve_stage_role(descriptor, stage_key, stage_role_input)
     is_validation = (stage_role == 'validation')
     os.environ['STEEL_MODEL_STAGE'] = 'validation' if is_validation else ''
-    print(
+    _debug_print(
         f"🔍 Stage key: {stage_key}, Stage role: {stage_role or '(unspecified)'}, "
         f"Environment stage: {os.environ.get('STEEL_MODEL_STAGE', '')}"
     )

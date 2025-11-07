@@ -32,9 +32,11 @@ validation/summary.csv
 Thumbs.db
 .vscode/
 
-scripts/
+# project scripts are versioned
+# scripts/
 
-validation/
+# validation artifacts folder (keep specs elsewhere)
+# validation/
 
 # Cleanup artifacts
 _cleanup_*.txt

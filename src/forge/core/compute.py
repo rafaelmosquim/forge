@@ -129,6 +129,7 @@ calculate_balance_matrix = _core.calculate_balance_matrix
 # calculate_internal_electricity defined above
 calculate_energy_balance = _core.calculate_energy_balance
 from .costs import analyze_energy_costs, analyze_material_costs
+from .lci import calculate_lci
 calculate_emissions = _core.calculate_emissions
 calculate_lci = getattr(_core, "calculate_lci", lambda *a, **k: None)
 

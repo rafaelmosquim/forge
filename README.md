@@ -60,19 +60,43 @@ In the main UI:
 3. Main → Tab = Main Model → Run model
 4. Reported Crude steel (as-cast) CO₂e matches Table 1 in the paper.
 
-## CLI batch runner
-When you already know the scenario and route selections you can execute the model headlessly:
+## One‑line runs (Makefile)
+
+Convenience targets wrap the refactored API.
 
 ```bash
-python steel_batch_cli.py run \
-  --scenario datasets/steel/likely/scenarios/BF_BOF_coal.yml \
-  --route BF-BOF \
-  --stage-key Cast \
-  --stage-role validation \
-  --country-code BRA
+make list           # list profiles
+make finished       # finished steel portfolio (paper_scenarios)
+make paper          # paper portfolio (paper_scenarios)
+make parallel       # run both in parallel
+make engine-smoke   # single refactored engine run (BF-BOF, Finished, 1000 kg)
 ```
 
-`steel_batch_cli.py --help` lists additional options for supplying batches, override files, and pick lists.
+## Engine CLI (refactored core)
+
+Run a single scenario through the refactored engine via the public API:
+
+```bash
+PYTHONPATH=src python3 -m forge.cli.engine_cli \
+  --data datasets/steel/likely --route BF-BOF --stage Finished \
+  --country BRA --demand 1000 --lci --out results/engine_demo
+```
+
+Equivalent Python usage:
+
+```python
+from forge.steel_core_api_v2 import RouteConfig, ScenarioInputs, run_scenario
+
+out = run_scenario(
+    data_dir="datasets/steel/likely",
+    scn=ScenarioInputs(
+        country_code="BRA",
+        scenario={},
+        route=RouteConfig(route_preset="BF-BOF", stage_key="Finished", demand_qty=1000.0),
+    ),
+)
+print(out.total_co2e_kg)
+```
 
 ## Tests
 Run the lightweight consistency checks:

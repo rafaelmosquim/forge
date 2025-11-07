@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.3
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy --ignore-missing-imports --follow-imports=silent src/forge/core src/forge/descriptor
+        language: system
+        pass_filenames: false
+      - id: pytest-smoke
+        name: pytest smoke
+        entry: pytest -q -m "not slow"
+        language: system
+        pass_filenames: false

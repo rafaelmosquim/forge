@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import json
 import sys
 
 import pandas as pd
@@ -64,10 +65,26 @@ def main(argv: list[str] | None = None) -> int:
     if args.lci and out.lci is not None and not out.lci.empty:
         out.lci.to_csv(out_dir / "lci.csv", index=False)
 
+    # Write a lightweight manifest for reproducibility
+    try:
+        import subprocess as sp
+        sha = sp.check_output(["git", "rev-parse", "HEAD"], cwd=str(ROOT)).decode().strip()
+    except Exception:
+        sha = None
+    manifest = {
+        "data": str(Path(args.data).resolve()),
+        "route": args.route,
+        "stage": args.stage,
+        "demand": args.demand,
+        "country": args.country,
+        "enable_lci": bool(args.lci),
+        "git_sha": sha,
+    }
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
     print(f"Wrote outputs to: {out_dir}")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -75,8 +75,8 @@ from forge.steel_model_core import (
     enforce_eaf_feed,
 )
 
-from forge.sector_descriptor import load_sector_descriptor, StageMenuItem
-from forge.scenario_resolver import (
+from forge.descriptor import load_sector_descriptor, StageMenuItem
+from forge.descriptor import (
     build_route_mask_for_descriptor,
     build_stage_material_map,
     match_route,

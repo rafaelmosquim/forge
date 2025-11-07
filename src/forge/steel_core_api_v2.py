@@ -40,21 +40,23 @@ from forge.core.routing import (
     apply_inhouse_clamp,
 )
 from forge.core.compute import (
-    calculate_balance_matrix,
     expand_energy_tables_for_active,
     calculate_internal_electricity,
-    calculate_energy_balance,
     calculate_lci,
     adjust_energy_balance,
     analyze_energy_costs,
     analyze_material_costs,
-    calculate_emissions,  # signature may vary; we guard below
     apply_fuel_substitutions,
     apply_dict_overrides,
     apply_recipe_overrides,
     compute_inside_elec_reference_for_share,
     compute_inside_gas_reference_for_share,
     apply_gas_routing_and_credits,
+)
+from forge.core.engine import (
+    calculate_balance_matrix,
+    calculate_energy_balance,
+    calculate_emissions,  # signature may vary; we guard below
 )
 
 from forge.descriptor import load_sector_descriptor

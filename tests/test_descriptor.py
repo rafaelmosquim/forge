@@ -6,6 +6,7 @@ from forge.descriptor import (
     build_stage_material_map,
     match_route,
     resolve_feed_mode,
+    build_route_mask_for_descriptor,
 )
 
 
@@ -22,3 +23,12 @@ def test_descriptor_stage_map_and_route(repo_root):
     # Default feed mode for EAF-Scrap is 'scrap'
     assert resolve_feed_mode(d, 'EAF-Scrap') == 'scrap'
 
+    # build_route_mask_for_descriptor should disable EAF on BF-BOF
+    class R:  # minimal Process-like
+        def __init__(self, name):
+            self.name = name
+    recs = [R('Blast Furnace'), R('Direct Reduction Iron'), R('Electric Arc Furnace')]
+    mask = build_route_mask_for_descriptor(d, 'BF-BOF', recs)
+    assert mask['Electric Arc Furnace'] == 0
+    assert mask['Direct Reduction Iron'] == 0
+    assert mask['Blast Furnace'] == 1

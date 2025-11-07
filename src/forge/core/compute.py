@@ -360,12 +360,6 @@ def apply_gas_routing_and_credits(
 
     return eb, e_efs, meta
 
-# Calculations
-calculate_balance_matrix = _core.calculate_balance_matrix
-# Use our local implementations (names shadow the getattr fallbacks)
-# expand_energy_tables_for_active defined above
-# calculate_internal_electricity defined above
-calculate_energy_balance = _core.calculate_energy_balance
 from .costs import analyze_energy_costs, analyze_material_costs
 from .lci import calculate_lci
 from .transforms import (
@@ -375,8 +369,6 @@ from .transforms import (
     adjust_blast_furnace_intensity,
     adjust_process_gas_intensity,
 )
-calculate_emissions = _core.calculate_emissions
-calculate_lci = getattr(_core, "calculate_lci", lambda *a, **k: None)
 
 # Transforms/overrides (gas routing implemented locally)
 
@@ -386,15 +378,12 @@ compute_inside_gas_reference_for_share = getattr(_core, "compute_inside_gas_refe
 
 __all__ = [
     # calcs
-    "calculate_balance_matrix",
     "expand_energy_tables_for_active",
     "calculate_internal_electricity",
-    "calculate_energy_balance",
     "adjust_energy_balance",
     "derive_energy_shares",
     "analyze_energy_costs",
     "analyze_material_costs",
-    "calculate_emissions",
     "calculate_lci",
     # transforms
     "apply_fuel_substitutions",

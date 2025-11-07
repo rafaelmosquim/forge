@@ -57,8 +57,8 @@ from forge.core.compute import (
     apply_gas_routing_and_credits,
 )
 
-from forge.sector_descriptor import load_sector_descriptor
-from forge.scenario_resolver import (
+from forge.descriptor import load_sector_descriptor
+from forge.descriptor import (
     build_stage_material_map,
     build_route_mask_for_descriptor,
     reference_stage_for_gas,

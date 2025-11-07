@@ -106,23 +106,22 @@ def _label_from_spec_path(spec_path: Optional[str]) -> str:
 def _auto_output_roots():
     fig_dir_env = _os.getenv('FORGE_FIG_DIR')
     table_dir_env = _os.getenv('FORGE_TABLE_DIR')
-    if fig_dir_env and table_dir_env:
-        return
-    # Prefer explicit label override
+    # Prefer explicit label override: if present, force-reset roots even if already set
     label = _os.getenv('FORGE_OUTPUT_LABEL', '').strip()
     if not label:
         # If a portfolio spec is provided, derive label from it regardless of PRODUCT_CONFIG
         if PORTFOLIO_SPEC_OVERRIDE:
             label = _label_from_spec_path(PORTFOLIO_SPEC_OVERRIDE)
+        elif fig_dir_env and table_dir_env:
+            # Pre-existing dirs and no explicit label → keep as-is
+            return
         elif PRODUCT_CONFIG == 'portfolio':
             label = 'portfolio'
         else:
             label = 'simple'
     base = _Path('results') / label
-    if not fig_dir_env:
-        _os.environ['FORGE_FIG_DIR'] = str(base / 'figs')
-    if not table_dir_env:
-        _os.environ['FORGE_TABLE_DIR'] = str(base / 'tables')
+    _os.environ['FORGE_FIG_DIR'] = str(base / 'figs')
+    _os.environ['FORGE_TABLE_DIR'] = str(base / 'tables')
 
 # Configure output roots then install safe show
 _auto_output_roots()

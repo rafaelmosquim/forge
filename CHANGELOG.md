@@ -1,17 +1,41 @@
 # Changelog
 
 ## Unreleased
-- Repackaged the core modules under `src/forge` with package metadata so app, CLI, and tests share the same import path.
-- Updated Streamlit app, CLI entrypoints, and test harness to reference `forge.*` modules after the reorg.
-- Ensured helper scripts export `PYTHONPATH` when invoking the relocated CLI tools.
-- Generalized core/app via sector descriptors (multi-industry datasets).
-- Added dataset-specific `sector.yml` configs and descriptor loader module.
-- Enabled fallback external supplies to avoid loops when internal utilities absent.
-- Updated cost/emissions calculations to honor descriptor metadata.
-- Validation (as-cast) stage now clamps auxiliaries to market purchases while other stages respect user picks.
-- Restored deterministic internal-electricity reference so validation routing doesn’t skew emission factors.
-- Upstream clamp logic relaxed so radios control onsite vs market choices outside validation.
-- Restored BF-BOF charcoal scenario behaviour and clarified scenario labels; kept biomethane optional by lowering its priority.
+- Core refactor: no `steel_model_core` dependency
+  - Introduced `forge.core.engine` (engine trio): `calculate_balance_matrix`, `calculate_energy_balance`, `calculate_emissions`.
+  - Split helpers into `forge.core.compute` (gas routing, intensity adjustments, reference helpers), `forge.core.io`, `forge.core.models`, `forge.core.routing`, `forge.core.transforms`, `forge.core.costs`, `forge.core.lci`, and `forge.core.viz`.
+  - Moved descriptor code to `forge.descriptor.{sector_descriptor,scenario_resolver}`; app and API updated.
+  - Streamlit app now imports exclusively from refactored core modules.
+
+- Unified API path
+  - All runs (paper/finished/MC/engine CLI) funnel through `forge.steel_core_api_v2.run_scenario`.
+  - Added internal-electricity/gas reference helpers in core for consistent plant‑wide splits.
+
+- New Engine CLI and Make targets
+  - `src/forge/cli/engine_cli.py` for single scenario runs; writes `manifest.json` (commit SHA, args, dataset path).
+  - Make targets: `finished`, `paper`, `parallel`, `engine-smoke`.
+
+- Paper pipeline hygiene
+  - Deterministic output roots under `results/<label>/{figs,tables}`.
+  - Portfolio label derived from portfolio spec; safe overwrite by design.
+
+- Monte Carlo scenario driver
+  - Triangular sampling across min/mode/max datasets; stage clamping by stage key; country sweep.
+  - Headless plotting and per‑run stats JSONs.
+
+- CI/tooling improvements
+  - Added coverage collection and artifact upload; nightly numeric workflow.
+  - Added mypy type check (non‑blocking) for core/descriptor.
+  - Pre‑commit with ruff (fix/format), YAML checks, mypy, and pytest smoke.
+  - Tests updated to refactored API/core; added new light tests for transforms, LCI, viz, descriptor, gas routing, engine imports, and batch CLI.
+
+- Descriptor‑driven behavior
+  - Validation (as‑cast) clamps auxiliaries to market; other stages respect user picks.
+  - Route masks, process roles, gas config, and fallback materials applied consistently.
+
+- Miscellaneous
+  - Added provenance manifest to Engine CLI outputs.
+  - Removed unused legacy CLI wrapper.
 
 ## v1.0.2 — 2025-10-06
 - JOSS submission snapshot.

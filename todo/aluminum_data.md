@@ -2,6 +2,8 @@
 
 Work items to bring the aluminum sector pack up to the same quality as the steel datasets.
 
+Status: not started (steel refactor took priority)
+
 ## Data Quality & Validation
 - [ ] Reconcile current aluminum model outputs with empirical references (World Aluminum data, peer-reviewed LCAs) to diagnose the “values still wrong” note from Oct 24 summary.
 - [ ] Build a validation scenario (analogous to Steel “Validation (as cast)”) with expected intensities and add pytest coverage that enforces tolerances.

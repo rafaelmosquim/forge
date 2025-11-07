@@ -1,18 +1,19 @@
-import pytest, pathlib
+import os
+import pytest
 
-# Import the library entrypoint without invoking any CLI.
-forge_run = pytest.importorskip("forge_core.run")
+from forge.steel_core_api_v2 import run_scenario, ScenarioInputs, RouteConfig
 
-# Use a small, canonical resolved config present in the repo.
-CONFIG = pathlib.Path("configs/BF-BOF_resolved.yml")
 
-@pytest.mark.skipif(not CONFIG.exists(), reason="requires resolved config")
-def test_compute_produces_nonnegative_emissions_and_rows():
-    # Expect the run module to expose a `run` function that returns a dict-like result.
-    result = forge_run.run(config_path=str(CONFIG))
-    # Minimal invariant: has rows and a total emissions scalar that is nonnegative.
-    # Adapt keys minimally if your API uses different naming.
-    assert result, "empty result"
-    total = result.get("emissions_total") or result.get("total_emissions") or result.get("emissions", 0)
-    assert total is not None, "missing total emissions"
-    assert float(total) >= 0.0
+def test_compute_produces_nonnegative_emissions_and_rows(data_dir):
+    # Minimal invariant via public API
+    scn = ScenarioInputs(
+        country_code=None,
+        scenario={},
+        route=RouteConfig(route_preset='BF-BOF', stage_key='Finished', demand_qty=1000.0),
+    )
+    out = run_scenario(str(data_dir), scn)
+    assert out is not None
+    # Emissions table exists and totals nonnegative
+    assert out.emissions is not None and not out.emissions.empty
+    total = float(out.emissions.get('TOTAL CO2e', out.emissions.sum(axis=1)).sum())
+    assert total >= 0.0

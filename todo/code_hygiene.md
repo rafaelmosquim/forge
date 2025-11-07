@@ -2,28 +2,33 @@
 
 Focused cleanup tasks to keep the Python packages, CI, and docs accurate and low-noise.
 
+Status legend: [x] done • [ ] pending
+
 ## Tests & Tooling
-- [ ] Replace `tests/test_core_compute_invariant.py` with coverage that targets `steel_core_api_v2.run_scenario` instead of the deprecated `forge_core` module.
-- [ ] Enable Ruff’s autofix or formatting stages (e.g., `ruff check --fix` + `ruff format`) in CI once the codebase is compliant, ensuring failures remain actionable.
-- [ ] Wire pytest markers/env vars (`FORGE_ENABLE_NUMERIC_TESTS`) into CI so numeric snapshots run at least nightly, not just locally.
-- [ ] Add missing tests for `steel_batch_cli.run_batch`, including spec parsing, multi-country fan-out, and log writing failure handling.
+- [x] Migrate tests to the public API (`steel_core_api_v2.run_scenario`) and refactored core modules (no `steel_model_core` imports).
+- [x] Add coverage to CI (`pytest --cov`) and upload artifact.
+- [x] Add nightly numeric workflow (gates via `FORGE_ENABLE_NUMERIC_TESTS`).
+- [x] Add pre-commit with ruff (format/fix), YAML checks, mypy, and pytest smoke.
+ - [x] Replace/retire any remaining deprecated tests (e.g., `test_core_compute_invariant.py`) if still present.
+ - [x] Add missing tests for `steel_batch_cli.run_batch` (spec parsing, multi-country fan-out, log writing).
 
 ## Streamlit & Core Modules
-- [ ] Trim unused imports/duplicate helpers in `streamlit_app.py` (e.g., redundant `Path`, double YAML imports) to reduce lint noise.
-- [ ] Split `streamlit_app.py` into UI components (sector gate, scenario view, charts) to keep the module manageable and testable.
-- [ ] Audit `steel_model_core.py` for legacy CLI code paths (argparse entry point, Plotly Sankey plotting) and consider moving them into a dedicated utility module.
-- [ ] Add type annotations + `mypy` configuration for `sector_descriptor.py` and `scenario_resolver.py` to catch descriptor drift early.
+- [x] Point Streamlit app to refactored core imports (models/io/transforms/routing/viz).
+- [x] Remove legacy core imports in the app.
+- [ ] Split `streamlit_app.py` into smaller UI components (sector gate, scenario, charts) for testability.
+- [ ] Add type annotations + mypy coverage for descriptor and routing helpers.
 
 ## Documentation Accuracy
-- [ ] Ensure README “Quick start” stays synced with the actual CLI arguments (e.g., route/stage switches) and mention all supported sectors.
-- [ ] Document the descriptor architecture (stage menu, route presets) in developer docs so new contributors understand the data-driven approach.
-- [ ] Update `CONTRIBUTING.md` with the enforced lint/test steps from CI and describe expected outputs for validation runs.
+- [x] Update README with Make targets and Engine CLI quickstart (refactored API usage).
+- [ ] Document descriptor architecture (stage menu, route presets) for contributors.
+- [ ] Update `CONTRIBUTING.md` with lint/test steps and expected outputs for validation runs.
 
 ## CI / Automation
-- [ ] Add a scheduled workflow that runs `steel_batch_cli.py` across canonical scenarios, uploading artifacts for regression review.
-- [ ] Emit coverage reports (e.g., `pytest --cov`) and upload to Codecov or a GitHub artifact to watch trends.
-- [ ] Introduce pre-commit hooks (ruff, mypy, pytest -m smoke) to catch hygiene issues before they reach CI.
+- [x] Emit coverage and upload artifact.
+- [x] Nightly numeric snapshot job.
+- [ ] Scheduled batch run across canonical scenarios (store artifacts for regressions).
+- [ ] Add HTML coverage and publish as build artifact or Pages.
 
 ## Tracking & Visibility
-- [ ] Publish CI/CD expectations in `docs/` (how to run lint/tests, when to update baselines).
-- [ ] Maintain a “known tech debt” table (maybe `docs/tech_debt.md`) pointing to these hygiene todos and linking to issues/owners.
+- [ ] Publish CI/CD expectations in `docs/` (how to run lint/tests, snapshot policy).
+- [ ] Maintain a “known tech debt” document (`docs/tech_debt.md`) linking to these todos with owners.

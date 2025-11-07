@@ -4,7 +4,7 @@ Comprehensive backlog to keep FORGE aligned with transparency, reproducibility, 
 
 ## 1. Reproducible Execution & Environments
 - [ ] Publish resolver-locked dependencies (`requirements-lock.txt`, optional Conda/UV lock) plus documentation describing the relationship to `pyproject.toml` / `requirements.txt`.
-- [ ] Ship a container image (Dockerfile or Apptainer) that bundles datasets, CLI tools, and pinned Python. Exercise it in CI for smoke-testing release artifacts.
+- [x] Ship a container image (Dockerfile present); Make targets wrap it. [ ] Exercise in CI (smoke-testing release artifacts).
 - [ ] Add a `make reproduce-validation` (or `python -m forge.reproduce`) command that seeds randomness, runs the Likely/BRA validation scenario, and records provenance (git SHA, dataset hash, CLI args).
 - [ ] Capture hardware/software fingerprints (OS, Python version, BLAS vendor) in `steel_core_api_v2.run_scenario` metadata and surface them inside exported logs.
 
@@ -15,7 +15,7 @@ Comprehensive backlog to keep FORGE aligned with transparency, reproducibility, 
 - [ ] Add a `datasets/README.md` that outlines versioning policies, source attribution requirements, and a contact for corrections.
 
 ## 3. Automated Validation & Regression Proofs
-- [ ] Extend pytest coverage to hit the descriptor-aware `run_scenario` path with golden JSON fixtures per sector/route; block merges on these checks instead of manual UI runs.
+- [x] Extend pytest coverage to hit the descriptor-aware `run_scenario` path (light unit tests for core modules). [ ] Add golden JSON fixtures and block on them.
 - [ ] Promote `run_descriptor_checks.py` into a CLI subcommand that CI can execute (nightly or on-demand), storing balance/emission artifacts for regression review.
 - [ ] Maintain the Table 1 validation baselines as versioned CSV/Parquet and load them directly in snapshot tests with documented tolerances.
 - [ ] Cover Streamlit-only helpers (sector gate, route matching, pick resolution) with UI-focused tests (e.g., `pytest-streamlit` components) to prevent silent regressions.
@@ -36,3 +36,6 @@ Comprehensive backlog to keep FORGE aligned with transparency, reproducibility, 
 - [ ] Automate changelog, DOI, and metadata updates during release tagging so every artifact references an immutable snapshot.
 - [ ] Attach checksums and SBOMs to each release so downstream users can verify integrity.
 - [ ] Register the repository with long-term preservation partners (Software Heritage, institutional repositories) for durability beyond GitHub.
+
+## 7. Provenance Artifacts
+- [x] Write run manifest for Engine CLI (commit SHA, args, dataset path). [ ] Port manifest to paper/finished profiles.

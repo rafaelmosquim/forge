@@ -8,6 +8,8 @@ plotly==5.18.0
 
 # Plotting (avoid old wheels compiled against NumPy 1.x)
 matplotlib>=3.9,<3.11
+seaborn>=0.13,<0.14
+tqdm>=4.66,<5
 
 # Tests (7.x predates 3.13; use 8.x)
 pytest>=8.1,<9

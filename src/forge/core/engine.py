@@ -106,7 +106,102 @@ def calculate_energy_balance(prod_level, energy_int, energy_shares):
     return bal
 
 
-calculate_emissions = _core.calculate_emissions
+def calculate_emissions(
+    mkt_cfg,
+    prod_level,
+    energy_df,
+    energy_efs,
+    process_efs,
+    internal_elec,  # kept for signature compatibility (not used here)
+    final_demand,
+    total_gas_MJ,
+    EF_process_gas,
+    internal_fraction_plant=None,
+    ef_internal_electricity=None,
+    outside_mill_procs: set | None = None,
+    allow_direct_onsite: set | None = None,
+):
+    """
+    Enforce mutual exclusivity per process row:
+    - Onsite production  → Energy Emissions only (Direct=0), unless whitelisted chemistry.
+    - Market/outside     → Direct Emissions only (Energy=0).
+
+    Electricity EF for onsite rows uses the plant-wide blend:
+        ef_elec_mix = f_internal * ef_int + (1 - f_internal) * EF_grid
+    Electricity for outside-mill rows is grid-only.
+    Returns a DataFrame indexed by process with columns:
+        [Energy Emissions, Direct Emissions, TOTAL CO2e] in tonnes.
+    """
+    # Helpers
+    def _is_market_process(name: str) -> bool:
+        n = name.lower()
+        return (" from market" in n) or (" purchase" in n)
+
+    # Determine outside-mill processes
+    if outside_mill_procs is not None:
+        outside_set = set(outside_mill_procs)
+    else:
+        try:
+            outside_set = set(mkt_cfg.get('outside_mill_procs', [])) if isinstance(mkt_cfg, dict) else set()
+        except Exception:
+            outside_set = set()
+        for name in list(process_efs.keys()):
+            n = name.lower()
+            if ' from market' in n or ' purchase' in n:
+                outside_set.add(name)
+
+    ALLOW_DIRECT_ONSITE = set(allow_direct_onsite or [])
+
+    f_internal = float(internal_fraction_plant or 0.0)
+    ef_grid = float(energy_efs.get('Electricity', 0.0))
+    ef_int_e = float(ef_internal_electricity or 0.0)
+    ef_elec_mix = f_internal * ef_int_e + (1.0 - f_internal) * ef_grid
+
+    rows = []
+    # Iterate over all processes appearing anywhere
+    proc_index = list({*energy_df.index.tolist(), *process_efs.keys(), *prod_level.keys()})
+
+    for proc_name in proc_index:
+        runs = float(prod_level.get(proc_name, 0.0))
+        if runs <= 1e-12:
+            continue
+
+        is_purchase = _is_market_process(proc_name)
+        is_outside = proc_name in outside_set
+
+        row = {"Process": proc_name, "Energy Emissions": 0.0, "Direct Emissions": 0.0}
+
+        if is_purchase:
+            row["Direct Emissions"] = runs * 1000.0 * float(process_efs.get(proc_name, 0.0))
+            row["Energy Emissions"] = 0.0
+        else:
+            elec_ef_for_proc = ef_grid if is_outside else ef_elec_mix
+            if proc_name in energy_df.index:
+                for carrier, cons in energy_df.loc[proc_name].items():
+                    if carrier == 'Electricity':
+                        row['Energy Emissions'] += float(cons) * elec_ef_for_proc
+                    else:
+                        row['Energy Emissions'] += float(cons) * float(energy_efs.get(carrier, 0.0))
+
+            # Direct emissions only when whitelisted chemistry for onsite
+            if proc_name in ALLOW_DIRECT_ONSITE:
+                row['Direct Emissions'] = runs * 1000.0 * float(process_efs.get(proc_name, 0.0))
+            else:
+                row['Direct Emissions'] = 0.0
+
+        rows.append(row)
+
+    if not rows:
+        return None
+
+    emissions_df = pd.DataFrame(rows).set_index('Process') / 1000.0  # kg -> t
+    emissions_df['TOTAL CO2e'] = emissions_df['Energy Emissions'] + emissions_df['Direct Emissions']
+
+    # Optional: Zero Coke Production totals if following the convention
+    if 'Coke Production' in emissions_df.index:
+        emissions_df.loc['Coke Production', ['Energy Emissions', 'Direct Emissions', 'TOTAL CO2e']] = 0.0
+
+    return emissions_df
 
 __all__ = [
     "calculate_balance_matrix",

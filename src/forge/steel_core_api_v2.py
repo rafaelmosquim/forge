@@ -580,7 +580,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         _debug_print("🎯 SCENARIO STRUCTURE CAPTURED:")
         _debug_print("Scenario keys:", list(scn.scenario.keys()))
         _debug_print("Full scenario:")
-        import json
         _debug_print(json.dumps(scn.scenario, indent=2, default=str))
         with open('DEBUG_scenario_structure.json', 'w') as f:
             json.dump(scn.scenario, f, indent=2, default=str)

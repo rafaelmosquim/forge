@@ -1,23 +1,37 @@
-"""Models and core data structures.
-
-For now, these are thin aliases to the legacy monolith
-`forge.steel_model_core` to avoid duplication during the transition.
-"""
+"""Models and core data structures (duplicated from monolith)."""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict
 
-# Import from the monolith and re-export
-from forge import steel_model_core as _core
 
-# Classes
-Process = _core.Process
+class Process:
+    """Represents a single recipe with its inputs and outputs."""
+    __slots__ = ("name", "inputs", "outputs")
 
-# Common constants (if present)
-OUTSIDE_MILL_PROCS: Any = getattr(_core, "OUTSIDE_MILL_PROCS", None)
+    def __init__(self, name: str, inputs: Dict[str, float], outputs: Dict[str, float]):
+        self.name = name
+        self.inputs = dict(inputs or {})
+        self.outputs = dict(outputs or {})
 
-__all__ = [
-    "Process",
-    "OUTSIDE_MILL_PROCS",
-]
+
+# Keep the same constant as the monolith so route utilities can reference it.
+OUTSIDE_MILL_PROCS = {
+    "Ship Pig Iron (Exit)",
+    "Ingot Casting (R) – Exit",
+    "Ingot Casting (L) – Exit",
+    "Ingot Casting (H) – Exit",
+    "Direct use of Basic Steel Products (Exit)",
+    "Direct use after Cold Rolling (Exit)",
+    "Direct use of Basic Steel Products (IP4)",
+    "Casting/Extrusion/Conformation",
+    "Stamping/calendering/lamination",
+    "Machining",
+    "No Coating",
+    "Hot Dip Metal Coating FP",
+    "Electrolytic Metal Coating FP",
+    "Organic or Sintetic Coating (painting)",
+}
+
+
+__all__ = ["Process", "OUTSIDE_MILL_PROCS"]
 

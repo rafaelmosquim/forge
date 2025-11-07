@@ -97,6 +97,7 @@ def load_recipes_from_yaml(filepath: str | Path, params, energy_int, energy_shar
         "energy_content": energy_content,
     }
 
+    from .models import Process
     recipes = []
 
     def _restricted_eval(expr: str, ctx: dict):
@@ -134,8 +135,7 @@ def load_recipes_from_yaml(filepath: str | Path, params, energy_int, energy_shar
             else:
                 outputs[mat] = float(formula)
 
-        # Return simple objects with the expected attributes
-        recipes.append(type("_Recipe", (), {"name": name, "inputs": inputs, "outputs": outputs})())
+        recipes.append(Process(name, inputs, outputs))
 
     return recipes
 

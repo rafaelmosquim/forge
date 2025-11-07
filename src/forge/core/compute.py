@@ -287,8 +287,11 @@ def apply_gas_routing_and_credits(
     f_internal_gas = (min(1.0, direct_use_gas_MJ / total_gas_consumption_plant)
                       if total_gas_consumption_plant > 1e-9 else 0.0)
 
-    ef_natural_gas = e_efs.get(natural_gas_carrier, 0.0)
-    ef_gas_blended = (f_internal_gas * EF_process_gas + (1 - f_internal_gas) * ef_natural_gas)
+    # Capture grid/baseline factors before any in-place updates
+    ef_natural_gas_grid = float(e_efs.get(natural_gas_carrier, 0.0) or 0.0)
+    ef_electricity_grid = float(e_efs.get('Electricity', 0.0) or 0.0)
+
+    ef_gas_blended = (f_internal_gas * EF_process_gas + (1 - f_internal_gas) * ef_natural_gas_grid)
 
     e_efs = dict(e_efs)
     e_efs[natural_gas_carrier] = ef_gas_blended
@@ -312,6 +315,8 @@ def apply_gas_routing_and_credits(
 
     f_internal = min(1.0, internal_elec / inside_elec_ref) if inside_elec_ref > 1e-9 else 0.0
     ef_internal_electricity = (EF_process_gas / util_eff) if util_eff > 1e-9 else 0.0
+    # Blended electricity EF actually used at plant level
+    ef_electricity_used = (f_internal * ef_internal_electricity) + ((1.0 - f_internal) * ef_electricity_grid)
 
     eb = energy_balance.copy()
     if credit_on:
@@ -357,6 +362,10 @@ def apply_gas_routing_and_credits(
         'natural_gas_carrier': natural_gas_carrier,
         'utility_process': utility_process_name,
         'fallback_materials': list(fallback_materials),
+        # Additional diagnostics for debugging EFs (units: g CO2e/MJ)
+        'ef_nat_gas_grid': ef_natural_gas_grid,
+        'ef_electricity_grid': ef_electricity_grid,
+        'ef_electricity_used': ef_electricity_used,
     }
 
     return eb, e_efs, meta

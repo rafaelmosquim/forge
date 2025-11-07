@@ -1282,6 +1282,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "total_gas_consumption_plant": gas_meta.get('total_gas_consumption_plant', 0.0),
         "f_internal_gas": gas_meta.get('f_internal_gas', 0.0),
         "ef_gas_blended": gas_meta.get('ef_gas_blended', 0.0),
+        "ef_nat_gas_grid": gas_meta.get('ef_nat_gas_grid', e_efs.get('Gas', 0.0)),
         "EF_coke_gas": gas_meta.get('EF_coke_gas', 0.0),
         "EF_bf_gas": gas_meta.get('EF_bf_gas', 0.0),
         "EF_process_gas": gas_meta.get('EF_process_gas', 0.0),
@@ -1291,6 +1292,9 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "process_gas_carrier": gas_meta.get('process_gas_carrier', None),
         "natural_gas_carrier": gas_meta.get('natural_gas_carrier', None),
         "utility_process": gas_meta.get('utility_process', None),
+        # Electricity EF diagnostics (units: g CO2e/MJ)
+        "ef_electricity_grid": gas_meta.get('ef_electricity_grid', e_efs.get('Electricity', 0.0)),
+        "ef_electricity_used": gas_meta.get('ef_electricity_used', f_internal * gas_meta.get('ef_internal_electricity', 0.0) + (1 - f_internal) * e_efs.get('Electricity', 0.0)),
     }
 
     enable_lci = is_lci_enabled()
@@ -1665,13 +1669,21 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
                 # Derive from LCI energy inputs (Process Gas (Internal)) per process/output
                 pg_additions = []
                 net_additions = []
-                # Model provides EF_process_gas in g/MJ; convert to kg/MJ for LCI math
-                ef_pg = float(gas_meta.get('EF_process_gas', 0.0) or 0.0) / 1000.0
-    
+
                 def _add_pg_credit_for_process(proc_name: str):
                     sub_proc = lci_df[lci_df['Process'] == proc_name]
                     if sub_proc.empty:
                         return
+                    # Choose EF per process: BF uses EF_bf_gas; Coke uses EF_coke_gas; otherwise blended EF
+                    if proc_name == 'Blast Furnace':
+                        ef_pg_local = float(gas_meta.get('EF_bf_gas', gas_meta.get('EF_process_gas', 0.0)) or 0.0) / 1000.0
+                    elif proc_name == 'Coke Production':
+                        # If custom rows were created for Coke Production, skip generic credit to avoid duplicates
+                        if coke_custom_rows:
+                            return
+                        ef_pg_local = float(gas_meta.get('EF_coke_gas', gas_meta.get('EF_process_gas', 0.0)) or 0.0) / 1000.0
+                    else:
+                        ef_pg_local = float(gas_meta.get('EF_process_gas', 0.0) or 0.0) / 1000.0
                     for out_val, sub_out in sub_proc.groupby('Output', dropna=False):
                         # Preferred for BF: use synthesized Output Process Gas MJ/kg if available
                         mj_per_kg = 0.0
@@ -1695,7 +1707,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
                             'Input': 'CO2e (Process Gas)',
                             'Category': 'Emissions',
                             'ValueUnit': 'kgCO2e',
-                            'Amount': - mj_per_kg * ef_pg,  # negative credit
+                            'Amount': - mj_per_kg * ef_pg_local,  # negative credit
                             'Unit': f'kg CO2e per kg {out_val}',
                         })
                         # Net row = total (LCI) + PG credit; find the total added above
@@ -1708,7 +1720,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
                             'Input': 'CO2e (Net)',
                             'Category': 'Emissions',
                             'ValueUnit': 'kgCO2e',
-                            'Amount': total_val - (mj_per_kg * ef_pg),
+                            'Amount': total_val - (mj_per_kg * ef_pg_local),
                             'Unit': f'kg CO2e per kg {out_val}',
                         })
     
@@ -1746,19 +1758,29 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
             # Non-fatal: if protocol file or mapping missing, skip augmentation
             pass
     
-        # Debug prints for emission factors
+        # Debug prints for emission factors (units: g CO2e/MJ)
         print("\n=== EMISSION FACTOR DEBUG ===")
-        print(f"ELECTRICITY:")
-        print(f"  Grid EF: {e_efs.get('Electricity', 0.0):.2f} kg CO2e/MJ")
-        print(f"  Internal EF: {ef_internal_electricity:.2f} kg CO2e/MJ")
-        print(f"  Internal Fraction: {f_internal:.3f}")
-        print(f"  Blended EF: {f_internal * ef_internal_electricity + (1 - f_internal) * e_efs.get('Electricity', 0.0):.2f} kg CO2e/MJ")
-    
-        print(f"\nGAS:")
-        print(f"  Natural Gas EF: {gas_meta.get('Gas', e_efs.get('Gas',0.0)):.2f} kg CO2e/MJ")
-        print(f"  Process Gas EF: {gas_meta.get('EF_process_gas', 0.0):.2f} kg CO2e/MJ")
-        print(f"  Internal Fraction: {gas_meta.get('f_internal_gas', 0.0):.3f}")
-        print(f"  Blended EF: {gas_meta.get('ef_gas_blended', 0.0):.2f} kg CO2e/MJ")
+        # Electricity
+        elec_grid = float(e_efs.get('Electricity', 0.0) or 0.0)
+        elec_internal = float(gas_meta.get('ef_internal_electricity', meta.get('ef_internal_electricity', 0.0)) or 0.0)
+        elec_f_int = float(gas_meta.get('f_internal', meta.get('f_internal', 0.0)) or 0.0)
+        elec_used = float(gas_meta.get('ef_electricity_used', elec_f_int * elec_internal + (1 - elec_f_int) * elec_grid))
+        print("ELECTRICITY:")
+        print(f"  Grid EF: {elec_grid:.2f} g CO2e/MJ")
+        print(f"  Internal EF: {elec_internal:.2f} g CO2e/MJ")
+        print(f"  Internal Fraction: {elec_f_int:.3f}")
+        print(f"  Used EF (blended): {elec_used:.2f} g CO2e/MJ")
+
+        # Gas
+        gas_grid = float(gas_meta.get('ef_nat_gas_grid', e_efs.get('Gas', 0.0)) or 0.0)
+        gas_proc = float(gas_meta.get('EF_process_gas', 0.0) or 0.0)
+        gas_f_int = float(gas_meta.get('f_internal_gas', 0.0) or 0.0)
+        gas_used = float(gas_meta.get('ef_gas_blended', e_efs.get('Gas', 0.0)) or 0.0)
+        print("\nGAS:")
+        print(f"  Natural Gas EF (grid): {gas_grid:.2f} g CO2e/MJ")
+        print(f"  Process Gas EF (internal): {gas_proc:.2f} g CO2e/MJ")
+        print(f"  Internal Fraction: {gas_f_int:.3f}")
+        print(f"  Used EF (blended): {gas_used:.2f} g CO2e/MJ")
     
         print(f"\nPROCESS GAS BREAKDOWN:")
         print(f"  Coke Gas: {gas_meta.get('gas_coke_MJ',0.0):.1f} MJ (EF: {gas_meta.get('EF_coke_gas',0.0):.1f})")

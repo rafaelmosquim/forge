@@ -8,9 +8,12 @@ from __future__ import annotations
 from typing import Dict, Iterable, Optional
 
 try:
-    from forge.steel_model_core import STAGE_MATS  # type: ignore
-except Exception:  # pragma: no cover - steel_model_core optional during doc builds
-    STAGE_MATS: Dict[str, str] = {}
+    from forge.core.routing import STAGE_MATS  # preferred path
+except Exception:  # pragma: no cover
+    try:
+        from forge.steel_model_core import STAGE_MATS  # fallback to monolith
+    except Exception:
+        STAGE_MATS: Dict[str, str] = {}
 
 from forge.sector_descriptor import SectorDescriptor, RoutePreset
 

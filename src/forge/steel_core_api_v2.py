@@ -24,22 +24,22 @@ from functools import partial
 import pandas as pd
 
 # Core functions & models from your existing engine
-from forge.steel_model_core import (
-    # IO
+from forge.core.io import (
     load_data_from_yaml,
     load_parameters,
     load_recipes_from_yaml,
     load_market_config,
     load_electricity_intensity,
-    # Overrides
-    apply_fuel_substitutions,
-    apply_dict_overrides,
-    apply_recipe_overrides,
-    # Route helpers
+)
+from forge.core.models import Process, OUTSIDE_MILL_PROCS
+from forge.core.routing import (
     STAGE_MATS,
     build_route_mask,
     enforce_eaf_feed,
-    # Calculations
+    set_prefer_internal_processes,
+    apply_inhouse_clamp,
+)
+from forge.core.compute import (
     calculate_balance_matrix,
     expand_energy_tables_for_active,
     calculate_internal_electricity,
@@ -49,14 +49,12 @@ from forge.steel_model_core import (
     analyze_energy_costs,
     analyze_material_costs,
     calculate_emissions,  # signature may vary; we guard below
-    # Data classes/types
-    Process,
-    OUTSIDE_MILL_PROCS,
+    apply_fuel_substitutions,
+    apply_dict_overrides,
+    apply_recipe_overrides,
     compute_inside_elec_reference_for_share,
     compute_inside_gas_reference_for_share,
     apply_gas_routing_and_credits,
-    set_prefer_internal_processes,
-    apply_inhouse_clamp,
 )
 
 from forge.sector_descriptor import load_sector_descriptor
@@ -527,8 +525,6 @@ def compute_inside_gas_reference_for_share(
     This provides a fixed reference regardless of user's stop-at-stage.
     """
     # Build a production route for the entire plant (to final product)
-    from forge.steel_model_core import build_route_mask, calculate_balance_matrix
-    
     pre_mask = build_route_mask(route_key, recipes)
     stage_map = stage_lookup or STAGE_MATS
     if stage_ref not in stage_map:
@@ -898,7 +894,15 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     _recursive_ns_update(params, _param_patch)
 
     # Intensity adjustments
-    from forge.steel_model_core import adjust_blast_furnace_intensity, adjust_process_gas_intensity
+    # Intensity adjustments (use legacy functions via core if available)
+    try:
+        from forge.core.compute import (
+            adjust_blast_furnace_intensity, adjust_process_gas_intensity
+        )
+    except Exception:
+        from forge.steel_model_core import (
+            adjust_blast_furnace_intensity, adjust_process_gas_intensity
+        )  # fallback
     adjust_blast_furnace_intensity(energy_int, energy_shares, params)
     adjust_process_gas_intensity('Coke Production', 'process_gas_coke', energy_int, energy_shares, params)
 
@@ -915,7 +919,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     # 2. Keep other route choices (BF/EAF etc) flexible according to picks
     # 3. Not apply the fixed downstream path from build_pre_for_route
     if is_validation:
-        print("🔍 Applying validation stage constraints")
+        _debug_print("🔍 Applying validation stage constraints")
         # For validation stage, explicitly force market purchases
         pre_mask = {
             "Nitrogen Production": 0,
@@ -1007,25 +1011,24 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     balance_matrix, prod_levels = calculate_balance_matrix(recipes_calc, final_demand, production_routes)
 
-    # ADD DEBUG CODE RIGHT HERE:
-    print("🎯 CORE INPUTS CAPTURED:")
-    print("1. final_demand:", final_demand)
-    print("2. production_routes sample:", dict(list(production_routes.items())[:3]))
-    print("3. recipes_calc count:", len(recipes_calc))
-    print("4. scenario keys:", list(scenario.keys()))
+    # Optional debug capture
+    if _is_debug_io_enabled():
+        _debug_print("🎯 CORE INPUTS CAPTURED:")
+        _debug_print("1. final_demand:", final_demand)
+        _debug_print("2. production_routes sample:", dict(list(production_routes.items())[:3]))
+        _debug_print("3. recipes_calc count:", len(recipes_calc))
+        _debug_print("4. scenario keys:", list(scenario.keys()))
 
-    # Save what core actually receives
-    core_inputs = {
-        "final_demand": final_demand,
-        "production_routes": production_routes,
-        "scenario_dict": scenario,
-        "recipes_sample": [r.name for r in recipes_calc[:5]],  # Just names to avoid large output
-    }
-
-    with open('DEBUG_core_balance_inputs.json', 'w') as f:
-        json.dump(core_inputs, f, indent=2, default=str)
-
-    print("✅ Saved balance inputs to DEBUG_core_balance_inputs.json")
+        # Save what core actually receives
+        core_inputs = {
+            "final_demand": final_demand,
+            "production_routes": production_routes,
+            "scenario_dict": scenario,
+            "recipes_sample": [r.name for r in recipes_calc[:5]],  # Just names
+        }
+        with open('DEBUG_core_balance_inputs.json', 'w') as f:
+            json.dump(core_inputs, f, indent=2, default=str)
+        _debug_print("✅ Saved balance inputs to DEBUG_core_balance_inputs.json")
     
     if balance_matrix is None:
         # Return empty-ish structures with a message rather than crashing
@@ -1043,7 +1046,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     # Ensure energy tables have rows for all active variants
     active_procs = [p for p, r in prod_levels.items() if r > 1e-9]
-    from forge.steel_model_core import expand_energy_tables_for_active
     expand_energy_tables_for_active(active_procs, energy_shares, energy_int)
 
     # Internal electricity from recovered gases (before credit)

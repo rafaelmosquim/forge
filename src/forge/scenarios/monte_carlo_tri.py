@@ -146,16 +146,71 @@ def _merge(a: Dict[str, Any], b: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return out
 
 
-def _run_single(data_dir: Path, route: str, picks: Dict[str, str], scenario: Dict[str, Any]) -> float:
+def _clamp_downstream_processes(stage_key: Optional[str], scenario: Dict[str, Any]) -> Dict[str, Any]:
+    """Add route_overrides to disable downstream processes beyond a stage.
+
+    This is a pragmatic clamp for the steel dataset to ensure that when the
+    demand is set at 'Cast' (as-cast), default downstream chains (IP3/IP4/
+    finishing) are not accidentally activated by picks elsewhere.
+    """
+    sk = (stage_key or '').strip().lower()
+    if not sk or sk == 'finished':
+        return scenario
+    disable: list[str] = []
+    # IP3 and below producers
+    ip3 = [
+        'Hot Rolling', 'Cold Rolling', 'Rod/bar/section Mill',
+        'Bypass Raw→IP3', 'Bypass CR→IP3',
+    ]
+    # IP4 producers
+    ip4 = [
+        'Direct use of Basic Steel Products',
+        'Casting/Extrusion/Conformation',
+        'Stamping/calendering/lamination',
+        'Machining',
+    ]
+    # Finishing producers
+    finishing = [
+        'No Coating',
+        'Hot Dip Metal Coating FP',
+        'Electrolytic Metal Coating FP',
+        'Organic or Sintetic Coating (painting)',
+    ]
+    if sk == 'cast':
+        disable = ip3 + ip4 + finishing
+    elif sk == 'ip3':
+        disable = ip4 + finishing
+    elif sk == 'ip4':
+        disable = finishing
+    if not disable:
+        return scenario
+    ro = dict((scenario.get('route_overrides') or {}))
+    for proc in disable:
+        ro[proc] = 0
+    scenario = dict(scenario)
+    scenario['route_overrides'] = ro
+    return scenario
+
+
+def _run_single(
+    data_dir: Path,
+    route: str,
+    picks: Dict[str, str],
+    scenario: Dict[str, Any],
+    *,
+    country_code: Optional[str] = None,
+    stage_key: str = "Finished",
+    stage_role: Optional[str] = None,
+) -> float:
     rc = RouteConfig(
         route_preset=route,
-        stage_key="Finished",
-        stage_role=None,
+        stage_key=stage_key or "Finished",
+        stage_role=stage_role,
         demand_qty=1000.0,
         picks_by_material=dict(picks or {}),
         pre_select_soft={},
     )
-    si = ScenarioInputs(country_code=None, scenario=scenario, route=rc)
+    si = ScenarioInputs(country_code=country_code, scenario=scenario, route=rc)
     out = run_scenario(str(data_dir), si)
     return float(getattr(out, "total_co2e_kg", 0.0) or 0.0)
 
@@ -194,83 +249,122 @@ def run_mc(
     portfolio: Optional[Path] = None,
     *,
     plot: bool = True,
+    countries: Optional[list[str]] = None,
+    stage_key: str = "Finished",
+    stage_role: Optional[str] = None,
 ) -> Path:
     np.random.seed()
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
+    # Resolve country list
+    country_list: list[Optional[str]] = [None]
+    if countries:
+        # Special 'ALL' → take keys from electricity_intensity.yml in mode_dir
+        if len(countries) == 1 and countries[0].strip().upper() == 'ALL':
+            try:
+                ein = _load_yaml_map(mode_dir / 'electricity_intensity.yml')
+                keys = list(ein.keys()) if isinstance(ein, dict) else []
+                country_list = [str(k) for k in keys]
+            except Exception:
+                country_list = [None]
+        else:
+            country_list = [str(c) for c in countries]
+
     for i in range(n):
         sampled = _sample_overrides(min_dir, mode_dir, max_dir)
         scn = _merge(sampled, scenario_defaults)
-        if portfolio and portfolio.exists():
-            defaults, run_picks, comps = _load_portfolio(portfolio)
-            scn = _merge(scn, defaults.get("scenario") or {})
-            total = 0.0
-            total_w = 0.0
-            for run_name, share in comps:
-                pp = dict(defaults.get("picks_by_material") or {})
-                pp.update(run_picks.get(run_name, {}))
-                val = _run_single(base_dir, route, pp, scn)
-                total += float(share) * val
-                total_w += float(share)
-            total = total / total_w if total_w > 0 else total
-        else:
-            total = _run_single(base_dir, route, picks or {}, scn)
-        rows.append({"sample": i+1, "total_co2e_kg": total, "ef_kg_per_unit": total/1000.0})
+        for cc in country_list:
+            if portfolio and portfolio.exists():
+                defaults, run_picks, comps = _load_portfolio(portfolio)
+                scn_eff = _merge(scn, defaults.get("scenario") or {})
+                # Use stage from portfolio defaults.route if present
+                d_route = (defaults.get("route") or {})
+                sk = str(d_route.get("stage_key") or stage_key or "Finished")
+                sr = d_route.get("stage_role", stage_role)
+                scn_eff = _clamp_downstream_processes(sk, scn_eff)
+                total = 0.0
+                total_w = 0.0
+                for run_name, share in comps:
+                    pp = dict(defaults.get("picks_by_material") or {})
+                    pp.update(run_picks.get(run_name, {}))
+                    val = _run_single(base_dir, route, pp, scn_eff, country_code=cc, stage_key=sk, stage_role=sr)
+                    total += float(share) * val
+                    total_w += float(share)
+                total = total / total_w if total_w > 0 else total
+            else:
+                scn_eff = _clamp_downstream_processes(stage_key, scn)
+                total = _run_single(base_dir, route, picks or {}, scn_eff, country_code=cc, stage_key=stage_key, stage_role=stage_role)
+            rows.append({
+                "sample": i+1,
+                "country_code": cc or "",
+                "total_co2e_kg": total,
+                "ef_kg_per_unit": total/1000.0,
+            })
     out_path = out_dir / "mc_summary.csv"
     import csv
     with out_path.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=["sample", "total_co2e_kg", "ef_kg_per_unit"])
+        has_cc = any("country_code" in r for r in rows)
+        has_stage = any("stage_key" in r for r in rows)
+        fieldnames = ["sample"] + (["country_code"] if has_cc else []) + (["stage_key"] if has_stage else []) + ["total_co2e_kg", "ef_kg_per_unit"]
+        w = csv.DictWriter(fh, fieldnames=fieldnames)
         w.writeheader(); w.writerows(rows)
 
     # Optional plots and stats
     if plot and rows:
-        ef = np.array([float(r["ef_kg_per_unit"]) for r in rows], dtype=float)
-        mean = float(np.mean(ef))
-        median = float(np.median(ef))
-        p05 = float(np.percentile(ef, 5))
-        p95 = float(np.percentile(ef, 95))
+        # Stage label for titles (assumes one stage per run/spec)
+        stage_lbl_global = rows[0].get("stage_key") if rows and rows[0].get("stage_key") else stage_key
+        # Plot per-country (or one combined when country codes omitted)
+        def _write_plots(label: str, vals: np.ndarray):
+            mean = float(np.mean(vals)); median = float(np.median(vals))
+            p05 = float(np.percentile(vals, 5)); p95 = float(np.percentile(vals, 95))
+            title_suffix = f"route={route}, n={n}"
+            if portfolio and portfolio.exists():
+                title_suffix += f", basket={portfolio.name}"
+            title_suffix += f", stage={stage_lbl_global}"
+            title_suffix += f", country={label}"
+            # Hist
+            plt.figure(figsize=(8,5))
+            plt.hist(vals, bins=40, color="#4C72B0", alpha=0.85, edgecolor="black")
+            for x, color, lbl, ls in [
+                (median, "#D62728", "median", "-"),
+                (p05, "#2CA02C", "p05", "--"),
+                (p95, "#2CA02C", "p95", "--"),
+            ]:
+                plt.axvline(x, color=color, linestyle=ls, linewidth=1.8, label=f"{lbl}: {x:.4f}")
+            plt.title(f"MC EF Histogram ({title_suffix})")
+            plt.xlabel("EF (kg CO₂ per unit)")
+            plt.ylabel("Frequency")
+            plt.legend(); plt.tight_layout()
+            plt.savefig(out_dir / f"mc_ef_hist_{(label or 'ALL')}_{stage_lbl_global}.png", dpi=160); plt.close()
+            # ECDF
+            xs = np.sort(vals); ys = np.linspace(0, 1, len(xs), endpoint=True)
+            plt.figure(figsize=(8,5))
+            plt.plot(xs, ys, color="#4C72B0", linewidth=2)
+            for x, color, lbl, ls in [
+                (median, "#D62728", "median", "-"),
+                (p05, "#2CA02C", "p05", "--"),
+                (p95, "#2CA02C", "p95", "--"),
+            ]:
+                plt.axvline(x, color=color, linestyle=ls, linewidth=1.4)
+            plt.title(f"MC EF ECDF ({title_suffix})")
+            plt.xlabel("EF (kg CO₂ per unit)")
+            plt.ylabel("Cumulative probability")
+            plt.tight_layout(); plt.savefig(out_dir / f"mc_ef_ecdf_{(label or 'ALL')}_{stage_lbl_global}.png", dpi=160); plt.close()
+            # Stats JSON
+            with (out_dir / f"mc_stats_{(label or 'ALL')}_{stage_lbl_global}.json").open("w", encoding="utf-8") as fh:
+                json.dump({"mean": mean, "median": median, "p05": p05, "p95": p95, "n": int(len(vals))}, fh, indent=2)
 
-        title_suffix = f"route={route}, n={n}"
-        if portfolio and portfolio.exists():
-            title_suffix += f", basket={portfolio.name}"
-
-        # Histogram
-        plt.figure(figsize=(8,5))
-        plt.hist(ef, bins=40, color="#4C72B0", alpha=0.85, edgecolor="black")
-        for x, color, lbl, ls in [
-            (median, "#D62728", "median", "-"),
-            (p05, "#2CA02C", "p05", "--"),
-            (p95, "#2CA02C", "p95", "--"),
-        ]:
-            plt.axvline(x, color=color, linestyle=ls, linewidth=1.8, label=f"{lbl}: {x:.4f}")
-        plt.title(f"MC EF Histogram ({title_suffix})")
-        plt.xlabel("EF (kg CO₂ per unit)")
-        plt.ylabel("Frequency")
-        plt.legend()
-        hist_path = out_dir / "mc_ef_hist.png"
-        plt.tight_layout(); plt.savefig(hist_path, dpi=160); plt.close()
-
-        # ECDF
-        xs = np.sort(ef)
-        ys = np.linspace(0, 1, len(xs), endpoint=True)
-        plt.figure(figsize=(8,5))
-        plt.plot(xs, ys, color="#4C72B0", linewidth=2)
-        for x, color, lbl, ls in [
-            (median, "#D62728", "median", "-"),
-            (p05, "#2CA02C", "p05", "--"),
-            (p95, "#2CA02C", "p95", "--"),
-        ]:
-            plt.axvline(x, color=color, linestyle=ls, linewidth=1.4)
-        plt.title(f"MC EF ECDF ({title_suffix})")
-        plt.xlabel("EF (kg CO₂ per unit)")
-        plt.ylabel("Cumulative probability")
-        ecdf_path = out_dir / "mc_ef_ecdf.png"
-        plt.tight_layout(); plt.savefig(ecdf_path, dpi=160); plt.close()
-
-        # Stats JSON
-        stats_path = out_dir / "mc_stats.json"
-        with stats_path.open("w", encoding="utf-8") as fh:
-            json.dump({"mean": mean, "median": median, "p05": p05, "p95": p95, "n": n}, fh, indent=2)
+        # Split by country
+        if any(r.get("country_code") for r in rows):
+            by_cc: Dict[str, list[float]] = {}
+            for r in rows:
+                key = r.get("country_code") or "ALL"
+                by_cc.setdefault(key, []).append(float(r["ef_kg_per_unit"]))
+            for cc, vals in by_cc.items():
+                _write_plots(cc, np.array(vals, dtype=float))
+        else:
+            vals = np.array([float(r["ef_kg_per_unit"]) for r in rows], dtype=float)
+            _write_plots("ALL", vals)
     return out_path
 
 
@@ -285,6 +379,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--out", dest="out_dir", default="results/mc")
     p.add_argument("--picks", dest="picks", help="YAML/JSON file with picks_by_material (simple mode).")
     p.add_argument("--portfolio", dest="portfolio", help="Portfolio YAML for downstream basket.")
+    p.add_argument("--countries", nargs="+", help="List of country codes to sweep, or 'ALL' to use all codes from electricity_intensity.yml.")
+    p.add_argument("--stage-key", dest="stage_key", default=None, help="Stage key to stop at (e.g., Cast, IP3, IP4, Finished).")
+    p.add_argument("--stage-role", dest="stage_role", default=None, help="Optional stage role (validation/crude/finished).")
     p.add_argument("--no-plot", action="store_true", help="Disable PNG plots (hist/cdf).")
     args = p.parse_args(argv)
 
@@ -317,6 +414,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         scenario_defaults=None,
         portfolio=portfolio,
         plot=not args.no_plot,
+        countries=args.countries,
+        stage_key=args.stage_key or "Finished",
+        stage_role=args.stage_role,
     )
     print(f"Monte Carlo summary written to {out_path}")
     return 0

@@ -1,0 +1,30 @@
+defaults:
+  route:
+    stage_key: Cast
+    demand_qty: 1000
+  picks_by_material:
+    Nitrogen: Nitrogen Production
+    Oxygen: Oxygen Production
+    Dolomite: Dolomite Production
+    Burnt Lime: Burnt Lime Production
+
+runs:
+  - name: regular_as_cast
+    picks_by_material:
+      Liquid Steel: Regular Steel
+      Cast Steel (IP1): Continuous Casting (R)
+
+#   - name: highalloy_as_cast
+#     picks_by_material:
+#       Liquid Steel: Steel Refining (High Alloy)
+#       Cast Steel (IP1): Continuous Casting (L)
+
+# blends:
+#   - name: as_cast_portfolio
+#     notes: "As-cast basket: 80% Regular, 20% High Alloy (upstream only)"
+#     components:
+#       - run: regular_as_cast
+#         share: 0.8
+#       - run: highalloy_as_cast
+#         share: 0.2
+

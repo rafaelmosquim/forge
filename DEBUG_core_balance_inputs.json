@@ -1,26 +1,8 @@
 {
   "final_demand": {
-    "Finished Products": 1000.0
+    "Cast Steel (IP1)": 1000.0
   },
   "production_routes": {
-    "No Coating": 1,
-    "Hot Dip Metal Coating FP": 0,
-    "Electrolytic Metal Coating FP": 0,
-    "Organic or Sintetic Coating (painting)": 0,
-    "Stamping/calendering/lamination": 1,
-    "Direct use of Basic Steel Products": 0,
-    "Casting/Extrusion/Conformation": 0,
-    "Machining": 0,
-    "Bypass Raw\u2192IP3": 1,
-    "Steel Thermal Treatment": 0,
-    "Hot Dip Metal Coating": 0,
-    "Electrolytic Metal Coating": 0,
-    "Steel Thermal Treatment (CR)": 0,
-    "Hot Dip Metal Coating (CR)": 0,
-    "Electrolytic Metal Coating (CR)": 0,
-    "Bypass CR\u2192IP3": 0,
-    "Rod/bar/section Mill": 1,
-    "Hot Rolling": 0,
     "Continuous Casting (L)": 1,
     "Continuous Casting (R)": 0,
     "Continuous Casting (H)": 0,
@@ -62,813 +44,827 @@
   },
   "scenario_dict": {
     "energy_int": {
-      "Blast Furnace": 12.408257389985659
+      "Blast Furnace": 12.51970532209833
     },
     "energy_matrix": {
-      "Electricity Biomass from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Limestone from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Charcoal from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Electricity Eolic from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Nitrogen Production": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 1.0
-      },
-      "Cold Rolling": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.6,
-        "Electricity": 0.4
-      },
-      "Process Gas": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Coke Production": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.995,
-        "Gas": 0.0,
-        "Electricity": 0.005
-      },
-      "Biomethane from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Steel Refining (High Alloy)": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.9,
-        "Electricity": 0.1
-      },
-      "Molibdenium from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Zinc from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Hot Rolling": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.8,
-        "Electricity": 0.2
-      },
-      "Burnt Lime from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
       "Machining": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
         "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
+        "FLF": 0.0,
         "Gas": 0.0,
-        "Electricity": 1.0
-      },
-      "Electricity from Market": {
+        "Coal": 0.0,
+        "RLF": 0.0,
         "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Coke Petroleum from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Oxygen from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Alloys Mix for High Alloy Steel (HAS)": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "PCI Coal from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Utility Plant": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 1.0,
-        "Electricity": 0.0
-      },
-      "Sintering": {
-        "Coke": 0.77,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.23
-      },
-      "Electricity Hydro from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Direct Iron ore": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Rod/bar/section Mill": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.8,
-        "Electricity": 0.2
-      },
-      "Silicon from market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Ethanol from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Dolomite Production": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.976,
-        "Electricity": 0.024
-      },
-      "Organic or Sintetic Coating (painting)": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.5,
-        "Electricity": 0.5
-      },
-      "Biodiesel from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Electrolytic Metal Coating": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.8,
-        "Electricity": 0.2
-      },
-      "Dolomite from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Hot Dip Metal Coating": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.8,
-        "Electricity": 0.2
-      },
-      "Nickel from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Direct Reduction Iron": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.94,
-        "Electricity": 0.06
-      },
-      "Basic Oxygen Furnace": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 1.0
-      },
-      "Steel Refining (Low Alloy)": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.99,
-        "Electricity": 0.01
-      },
-      "Iron Foundry": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 1.0
-      },
-      "Chromium from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "No Coating": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "LPG from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Steel Thermal Treatment": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.8,
-        "Electricity": 0.2
-      },
-      "Hot Dip Metal Coating FP": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.8,
-        "Electricity": 0.2
-      },
-      "Electricity Production": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 1.0,
-        "Electricity": 0.0
-      },
-      "Ingot Casting": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 1.0
-      },
-      "Fuel Oil from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Niobium from market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Iron Ore from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Anthracite Coal from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Nitrogen from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Pelletizing": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.9,
-        "Electricity": 0.1
-      },
-      "Electrolytic Metal Coating FP": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.8,
-        "Electricity": 0.2
-      },
-      "Titanium from market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Oxygen Production": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 1.0
-      },
-      "Casting/Extrusion/Conformation": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 1.0,
-        "Electricity": 0.0
-      },
-      "Hydrogen (Electrolysis) from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
+        "Electricity": 1.0,
+        "Wood": 0.0
       },
       "Electricity Solar from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
         "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
+        "FLF": 0.0,
         "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Manganese from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
         "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Nitrogen Production": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
         "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Wood from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
         "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Aluminium from market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
         "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Coke Mineral from Market": {
         "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
+        "Electricity": 1.0,
+        "Wood": 0.0
       },
-      "Burnt Lime Production": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
+      "Dolomite Production": {
         "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
+        "FLF": 0.0,
         "Gas": 0.976,
-        "Electricity": 0.024
-      },
-      "Blast Furnace": {
-        "Coke": 0.768,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
+        "Coal": 0.0,
         "RLF": 0.0,
-        "Coal": 0.192,
-        "Gas": 0.0,
-        "Electricity": 0.04
+        "Coke": 0.0,
+        "Electricity": 0.024,
+        "Wood": 0.0
       },
       "Steam Production": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
         "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
+        "FLF": 0.0,
         "Gas": 0.9900990099009901,
-        "Electricity": 0.009900990099009901
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.009900990099009901,
+        "Wood": 0.0
+      },
+      "Ingot Casting": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 1.0,
+        "Wood": 0.0
+      },
+      "Burnt Lime Production": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.976,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.024,
+        "Wood": 0.0
+      },
+      "Niobium from market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Pelletizing": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.9,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.1,
+        "Wood": 0.0
       },
       "Scrap Purchase": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
         "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
+        "FLF": 0.0,
         "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Direct use of Basic Steel Products": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
         "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Diesel from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
         "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Hydrogen (Methane reforming) from Market": {
         "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Continuous Casting": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.02,
-        "Electricity": 0.98
-      },
-      "Natural gas from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Electric Arc Furnace": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.2376237623762376,
-        "Electricity": 0.7623762376237624
-      },
-      "Regular Steel": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
-      },
-      "Alloys Mix for Low Alloy Steel (LAS)": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
-        "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
+        "Electricity": 0.0,
+        "Wood": 0.0
       },
       "Coal from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
         "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
+        "FLF": 0.0,
         "Gas": 0.0,
-        "Electricity": 0.0
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
       },
-      "Copper from Market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
+      "Hot Dip Metal Coating FP": {
         "Charcoal": 0.0,
-        "RLF": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.8,
         "Coal": 0.0,
-        "Gas": 0.0,
-        "Electricity": 0.0
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.2,
+        "Wood": 0.0
       },
-      "Vanadium from market": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
+      "Electricity from Market": {
         "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
+        "FLF": 0.0,
         "Gas": 0.0,
-        "Electricity": 0.0
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
       },
-      "Stamping/calendering/lamination": {
-        "Coke": 0.0,
-        "Wood": 0.0,
-        "FLF": 0.0,
+      "Ethanol from Market": {
         "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
+        "FLF": 0.0,
         "Gas": 0.0,
-        "Electricity": 1.0
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Regular Steel": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Aluminium from market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Diesel from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Fuel Oil from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Wood from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Nickel from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Hot Dip Metal Coating": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.8,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.2,
+        "Wood": 0.0
+      },
+      "Anthracite Coal from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Electricity Hydro from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Iron Foundry": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 1.0,
+        "Wood": 0.0
+      },
+      "Continuous Casting": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.02,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.98,
+        "Wood": 0.0
+      },
+      "Direct Iron ore": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Blast Furnace": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.192,
+        "RLF": 0.0,
+        "Coke": 0.768,
+        "Electricity": 0.04,
+        "Wood": 0.0
+      },
+      "Cold Rolling": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.6,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.4,
+        "Wood": 0.0
+      },
+      "Alloys Mix for High Alloy Steel (HAS)": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "No Coating": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Titanium from market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Coke Production": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.995,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.005,
+        "Wood": 0.0
+      },
+      "Dolomite from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Electric Arc Furnace": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.2376237623762376,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.7623762376237624,
+        "Wood": 0.0
+      },
+      "Sintering": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.77,
+        "Electricity": 0.23,
+        "Wood": 0.0
+      },
+      "Silicon from market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Biomethane from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Steel Thermal Treatment": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.8,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.2,
+        "Wood": 0.0
+      },
+      "Direct use of Basic Steel Products": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Direct Reduction Iron": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.94,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.06,
+        "Wood": 0.0
+      },
+      "Coke Petroleum from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Limestone from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
       },
       "Charcoal Production": {
-        "Coke": 0.0,
-        "Wood": 0.9947916666666666,
-        "FLF": 0.0,
         "Charcoal": 0.0,
-        "RLF": 0.0,
-        "Coal": 0.0,
+        "FLF": 0.0,
         "Gas": 0.0,
-        "Electricity": 0.005208333333333334
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.005208333333333334,
+        "Wood": 0.9947916666666666
+      },
+      "Electricity Eolic from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Electrolytic Metal Coating": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.8,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.2,
+        "Wood": 0.0
+      },
+      "Manganese from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Charcoal from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Process Gas": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Iron Ore from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Zinc from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Steel Refining (Low Alloy)": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.99,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.01,
+        "Wood": 0.0
+      },
+      "Hot Rolling": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.8,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.2,
+        "Wood": 0.0
+      },
+      "Burnt Lime from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Casting/Extrusion/Conformation": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 1.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Stamping/calendering/lamination": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 1.0,
+        "Wood": 0.0
+      },
+      "Copper from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Oxygen Production": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 1.0,
+        "Wood": 0.0
+      },
+      "Coke Mineral from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Electrolytic Metal Coating FP": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.8,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.2,
+        "Wood": 0.0
+      },
+      "Rod/bar/section Mill": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.8,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.2,
+        "Wood": 0.0
+      },
+      "Chromium from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Utility Plant": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 1.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Electricity Biomass from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Basic Oxygen Furnace": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 1.0,
+        "Wood": 0.0
+      },
+      "Natural gas from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Electricity Production": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 1.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Molibdenium from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "PCI Coal from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "LPG from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Oxygen from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Alloys Mix for Low Alloy Steel (LAS)": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Nitrogen from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Vanadium from market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Hydrogen (Methane reforming) from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Steel Refining (High Alloy)": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.9,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.1,
+        "Wood": 0.0
+      },
+      "Biodiesel from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
+      },
+      "Organic or Sintetic Coating (painting)": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.5,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.5,
+        "Wood": 0.0
+      },
+      "Hydrogen (Electrolysis) from Market": {
+        "Charcoal": 0.0,
+        "FLF": 0.0,
+        "Gas": 0.0,
+        "Coal": 0.0,
+        "RLF": 0.0,
+        "Coke": 0.0,
+        "Electricity": 0.0,
+        "Wood": 0.0
       }
     },
     "energy_content": {
-      "Coke": 28.87,
-      "Wood": 12.97,
       "Charcoal": 28.4,
       "Coal": 30.96,
-      "Gas": 49.76
+      "Gas": 49.76,
+      "Coke": 28.87,
+      "Wood": 12.97
     },
     "emission_factors": {
-      "Coke": 135.82,
-      "FLF": 94.12,
       "Charcoal": 20.43,
-      "Coal": 111.95,
-      "Green hydrogen": 21.47,
-      "Electricity": 38.5,
-      "Wood": 9.82,
-      "Blue hydrogen": 89.88,
-      "RLF": 23.58,
+      "FLF": 94.12,
+      "Gas": 72.73,
       "Biomethane": 5.55,
-      "Gas": 72.73
+      "Blue hydrogen": 89.88,
+      "Electricity": 38.5,
+      "Green hydrogen": 21.47,
+      "Wood": 9.82,
+      "Coal": 111.95,
+      "RLF": 23.58,
+      "Coke": 135.82
+    },
+    "route_overrides": {
+      "Hot Rolling": 0,
+      "Cold Rolling": 0,
+      "Rod/bar/section Mill": 0,
+      "Bypass Raw\u2192IP3": 0,
+      "Bypass CR\u2192IP3": 0,
+      "Direct use of Basic Steel Products": 0,
+      "Casting/Extrusion/Conformation": 0,
+      "Stamping/calendering/lamination": 0,
+      "Machining": 0,
+      "No Coating": 0,
+      "Hot Dip Metal Coating FP": 0,
+      "Electrolytic Metal Coating FP": 0,
+      "Organic or Sintetic Coating (painting)": 0
     },
     "gas_routing": {
-      "direct_use_fraction": 0.5,
-      "electricity_fraction": 0.5
+      "direct_use_fraction": 0.5
     },
     "fallback_materials": [],
     "prefer_internal_processes": {
@@ -891,13 +887,13 @@
       ]
     },
     "external_purchase_rows": [
-      "Burnt Lime from market",
-      "Limestone from Market",
-      "Oxygen from market",
-      "Dolomite from market",
-      "Nitrogen from market",
       "Scrap Purchase",
-      "External Inputs"
+      "Nitrogen from market",
+      "Limestone from Market",
+      "Burnt Lime from market",
+      "External Inputs",
+      "Oxygen from market",
+      "Dolomite from market"
     ]
   },
   "recipes_sample": [

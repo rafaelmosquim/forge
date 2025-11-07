@@ -36,7 +36,6 @@ from forge.steel_core_api_v2 import RouteConfig, ScenarioInputs, run_scenario
 # ---- Make plt.show() safe in headless runs ----
 import matplotlib as _mpl
 import matplotlib.pyplot as _plt
-from datetime import datetime as _dt
 _FIG_INDEX = 0
 
 def _install_safe_show():
@@ -47,9 +46,8 @@ def _install_safe_show():
     if not save_mode:
         return
     base_dir = _os.getenv('FORGE_FIG_DIR', 'results/figs')
-    # Always save into a unique run subfolder to avoid overwriting prior runs
-    run_tag = _os.getenv('FORGE_RUN_TAG') or _dt.now().strftime('run_%Y%m%d_%H%M%S')
-    out_path = _Path(base_dir) / run_tag
+    # Overwrite in-place within the configured figs folder
+    out_path = _Path(base_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
     _orig_show = _plt.show
@@ -67,7 +65,7 @@ def _install_safe_show():
 
     _plt.show = _safe_show
 
-_install_safe_show()
+# defer installing safe show until output dirs are configured
 
 
 
@@ -89,6 +87,46 @@ FINAL_PICKS = {
 PRODUCT_CONFIG = _os.getenv('FORGE_PAPER_PRODUCT_CONFIG', 'simple').strip().lower()
 PORTFOLIO_SPEC_OVERRIDE = _os.getenv('FORGE_PAPER_PORTFOLIO_SPEC', '').strip() or None
 PORTFOLIO_BLEND_OVERRIDE = _os.getenv('FORGE_PAPER_PORTFOLIO_BLEND', '').strip() or None
+
+def _label_from_spec_path(spec_path: Optional[str]) -> str:
+    if not spec_path:
+        return 'simple'
+    name = _Path(spec_path).stem
+    mapping = {
+        'finished_steel_portfolio': 'finished',
+        'paper_portfolio': 'paper',
+        'as_cast_portfolio': 'as_cast',
+    }
+    if name in mapping:
+        return mapping[name]
+    if name.endswith('_portfolio'):
+        return name[:-10] or name
+    return name
+
+def _auto_output_roots():
+    fig_dir_env = _os.getenv('FORGE_FIG_DIR')
+    table_dir_env = _os.getenv('FORGE_TABLE_DIR')
+    if fig_dir_env and table_dir_env:
+        return
+    # Prefer explicit label override
+    label = _os.getenv('FORGE_OUTPUT_LABEL', '').strip()
+    if not label:
+        # If a portfolio spec is provided, derive label from it regardless of PRODUCT_CONFIG
+        if PORTFOLIO_SPEC_OVERRIDE:
+            label = _label_from_spec_path(PORTFOLIO_SPEC_OVERRIDE)
+        elif PRODUCT_CONFIG == 'portfolio':
+            label = 'portfolio'
+        else:
+            label = 'simple'
+    base = _Path('results') / label
+    if not fig_dir_env:
+        _os.environ['FORGE_FIG_DIR'] = str(base / 'figs')
+    if not table_dir_env:
+        _os.environ['FORGE_TABLE_DIR'] = str(base / 'tables')
+
+# Configure output roots then install safe show
+_auto_output_roots()
+_install_safe_show()
 
 def _scenario_for_bf_config(config: str) -> Dict[str, Any]:
     """Scenario for BF configs; 'Charcoal' uses dataset scenario file for consistency."""
@@ -705,8 +743,7 @@ def _write_aggregate_ef_table(df: pd.DataFrame) -> None:
                .sort_values(['scenario', 'Year'])
         )
         base_dir = _os.getenv('FORGE_TABLE_DIR', 'results/tables')
-        run_tag = _os.getenv('FORGE_RUN_TAG') or _dt.now().strftime('run_%Y%m%d_%H%M%S')
-        out_dir = _Path(base_dir) / run_tag
+        out_dir = _Path(base_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / 'aggregate_ef.csv'
         stats.to_csv(out_path, index=False)

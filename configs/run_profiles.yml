@@ -1,0 +1,21 @@
+profiles:
+  finished:
+    desc: "Run finished steel portfolio (paper_scenarios)"
+    env:
+      FORGE_PAPER_PRODUCT_CONFIG: portfolio
+      FORGE_PAPER_PORTFOLIO_SPEC: configs/finished_steel_portfolio.yml
+      FORGE_PAPER_PORTFOLIO_BLEND: finished_portfolio
+      FORGE_PAPER_CACHE_DIR: results/cache_finished
+      FORGE_OUTPUT_LABEL: finished
+    cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
+
+  paper:
+    desc: "Run paper portfolio (paper_scenarios)"
+    env:
+      FORGE_PAPER_PRODUCT_CONFIG: portfolio
+      FORGE_PAPER_PORTFOLIO_SPEC: configs/paper_portfolio.yml
+      FORGE_PAPER_PORTFOLIO_BLEND: paper_portfolio
+      FORGE_PAPER_CACHE_DIR: results/cache_paper
+      FORGE_OUTPUT_LABEL: paper
+    cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
+

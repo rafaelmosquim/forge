@@ -31,17 +31,14 @@ from forge.core.io import (
     load_electricity_intensity,
 )
 from forge.core.models import Process, OUTSIDE_MILL_PROCS
-from forge.core.routing import (
-    STAGE_MATS,
-    set_prefer_internal_processes,
-    apply_inhouse_clamp,
-)
+from forge.core.routing import STAGE_MATS
 from forge.core.compute import (
     calculate_lci,
     compute_inside_elec_reference_for_share,
 )
 from forge.core.runner import run_core_scenario
 from forge.scenarios.builder import build_core_scenario
+from forge.scenarios.transforms import apply_dri_mix, apply_charcoal_expansion
 from forge.reporting.lci_aug import augment_lci_and_debug
 from forge.core.transforms import (
     apply_fuel_substitutions,
@@ -55,10 +52,8 @@ from forge.core.transforms import (
 from forge.descriptor import load_sector_descriptor
 from forge.descriptor import (
     build_stage_material_map,
-    build_route_mask_for_descriptor,
     reference_stage_for_gas,
     reference_stage_for_electricity,
-    resolve_feed_mode,
     resolve_stage_material,
 )
 
@@ -202,64 +197,6 @@ def _credit_enabled(scn: dict | None) -> bool:
     return True
 
 
-## Route building uses the canonical core implementation (_build_routes_from_picks)
-
-
-def _resolve_stage_role(descriptor, stage_key: str, provided_role: Optional[str]) -> str:
-    """Derive the stage role key ('validation', 'crude', etc.) when possible."""
-    stage_role = (provided_role or "").strip().lower()
-    if stage_role:
-        return stage_role
-    matches = [
-        (item.key or "").strip().lower()
-        for item in descriptor.stage_menu
-        if str(item.stage_id).strip().lower() == str(stage_key).strip().lower()
-    ]
-    if len(matches) == 1:
-        return matches[0]
-    return stage_role
-
-
-def _apply_route_overrides(
-    pre_select: Dict[str, int],
-    pre_mask: Dict[str, int],
-    overrides: Optional[Dict[str, Any]],
-) -> Tuple[Dict[str, int], Dict[str, int]]:
-    """Blend scenario route_overrides into the current pre-select/mask dictionaries."""
-    if not overrides:
-        return pre_select, pre_mask
-    ps = dict(pre_select or {})
-    pm = dict(pre_mask or {})
-    for proc, raw in overrides.items():
-        key = str(proc)
-        try:
-            val = float(raw)
-        except Exception:
-            val = 1.0 if bool(raw) else 0.0
-        enabled = 1 if val > 0.0 else 0
-        ps[key] = enabled
-        if enabled:
-            # remove hard bans when scenario explicitly forces enable
-            if pm.get(key, 1) == 0:
-                pm.pop(key, None)
-        else:
-            pm[key] = 0
-    return ps, pm
-
-
-## Fallback process injection uses canonical core implementation (_ensure_fallback_processes)
-
-
-def _infer_eaf_mode(route_preset: str) -> Optional[str]:
-    return {
-        "EAF-Scrap": "scrap",
-        "DRI-EAF": "dri",
-        "BF-BOF": None,
-        "External": None,
-        "auto": None,
-    }.get(route_preset, None)
-
-
 ## Emissions call robustness handled by core.runner
 
 
@@ -338,53 +275,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         f"Environment stage: {os.environ.get('STEEL_MODEL_STAGE', '')}"
     )
 
-    # For validation stage, override any user picks for auxiliaries
-    if is_validation:
-        # Force market purchases for auxiliaries
-        picks_by_material.update({
-            'Nitrogen': 'Nitrogen from market',
-            'Oxygen': 'Oxygen from market',
-            'Dolomite': 'Dolomite from market',
-            'Burnt Lime': 'Burnt Lime from market'
-        })
-        # Ensure these cannot be overridden
-        pre_select_soft.update({
-            'Nitrogen Production': 0,
-            'Oxygen Production': 0,
-            'Dolomite Production': 0,
-            'Burnt Lime Production': 0,
-            'Nitrogen from market': 1,
-            'Oxygen from market': 1,
-            'Dolomite from market': 1,
-            'Burnt Lime from market': 1
-        })
-
     fallback_materials = set(descriptor.balance_fallback_materials or set())
-    scenario['fallback_materials'] = list(fallback_materials)
-    # Determine process preferences based on stage
-    if is_validation:
-        # For validation stage, force market purchases
-        prefer_internal_map = {
-            "Nitrogen Production": ["Nitrogen from market"],
-            "Oxygen Production": ["Oxygen from market"],
-            "Dolomite Production": ["Dolomite from market"],
-            "Burnt Lime Production": ["Burnt Lime from market"]
-        }
-    else:
-        # For other stages, use descriptor preferences
-        raw_prefer_internal = descriptor.prefer_internal_processes or {}
-        prefer_internal_map = {}
-        for market_proc, internal_proc in raw_prefer_internal.items():
-            if not internal_proc:
-                continue
-            internal_key = str(internal_proc)
-            prefer_internal_map.setdefault(internal_key, []).append(str(market_proc))
-    
-    # Set the preferences in the scenario
-    scenario['prefer_internal_processes'] = prefer_internal_map
     external_purchase_rows = list(descriptor.costing.external_purchase_rows or [])
-    scenario['external_purchase_rows'] = external_purchase_rows
-    set_prefer_internal_processes(prefer_internal_map)
     gas_reference_stage = reference_stage_for_gas(descriptor)
     gas_config = {
         "process_gas_carrier": descriptor.gas.process_gas_carrier or "Process Gas",
@@ -468,137 +360,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     # Optional per-process minimum floors (applied after schedule)
     apply_energy_int_floor(energy_int, scenario)
 
-    # Optional: DRI fuel mix transformations relative to baseline gas share
-    def _apply_dri_mix(energy_shares: Dict[str, Dict[str, float]], scenario: Dict[str, Any]) -> None:
-        mix_name = (scenario.get('dri_mix') or '').strip()
-        if not mix_name:
-            return
-        try:
-            year = int(scenario.get('snapshot_year', 2030))
-        except Exception:
-            year = 2030
-        # Default definitions based on the paper table
-        default_defs = {
-            'Blue': {
-                2030: {'Gas': 1.0},
-                2040: {'Gas': 0.70, 'Biomethane': 0.10, 'Green hydrogen': 0.20},
-            },
-            'Green': {
-                2030: {'Gas': 0.70, 'Biomethane': 0.10, 'Green hydrogen': 0.20},
-                2040: {'Gas': 0.40, 'Biomethane': 0.20, 'Green hydrogen': 0.40},
-            },
-        }
-        defs = scenario.get('dri_mix_definitions') or default_defs
-        plan = None
-        try:
-            options = defs.get(mix_name) or {}
-            if isinstance(options, dict):
-                # accept string keys (e.g., '2040') or int
-                keys = []
-                for k in options.keys():
-                    try:
-                        keys.append(int(k))
-                    except Exception:
-                        continue
-                keys = sorted(set(keys))
-                chosen = None
-                for k in keys:
-                    if k <= year:
-                        chosen = k
-                if chosen is None and keys:
-                    chosen = min(keys)
-                if chosen is not None:
-                    plan = options.get(str(chosen), options.get(chosen))
-        except Exception:
-            plan = None
-        if not isinstance(plan, dict):
-            return
-        es = energy_shares.get('Direct Reduction Iron')
-        if not isinstance(es, dict):
-            return
-        try:
-            base_gas = float(es.get('Gas', 0.0) or 0.0)
-        except Exception:
-            base_gas = 0.0
-        if base_gas <= 0:
-            return
-        # Normalize plan values: accept 0-100 or 0-1
-        def _as_frac(x):
-            try:
-                v = float(x)
-                if v > 1.0:
-                    return v / 100.0
-                return v
-            except Exception:
-                return 0.0
-        fractions = {str(k): _as_frac(v) for k, v in plan.items()}
-        # Rebuild shares derived from baseline Gas
-        gas_left = base_gas
-        ordered = []
-        for carrier in ('Gas', 'Biomethane', 'Green hydrogen'):
-            f = float(fractions.get(carrier, 0.0) or 0.0)
-            if carrier == 'Gas':
-                new_val = base_gas * f
-                es['Gas'] = new_val
-                gas_left = max(0.0, base_gas - new_val)
-            else:
-                add_val = base_gas * f
-                if add_val > 0:
-                    es[carrier] = es.get(carrier, 0.0) + add_val
-            ordered.append((carrier, f))
-        # If plan doesn't sum to 1, leave remaining gas as-is
-        # (i.e., keep existing es['Gas'] value which already captures the 'Gas' fraction)
-
-    def _apply_charcoal_expansion(energy_shares: Dict[str, Dict[str, float]], scenario: Dict[str, Any]) -> None:
-        mode = (scenario.get('charcoal_expansion') or '').strip().lower()
-        if mode not in {'expansion'}:
-            return
-        try:
-            year = int(scenario.get('snapshot_year', 2030))
-        except Exception:
-            year = 2030
-        schedule = scenario.get('charcoal_share_schedule') or {}
-        frac = None
-        if isinstance(schedule, dict):
-            # pick nearest <= year
-            try:
-                years = sorted({int(k) for k in schedule.keys()})
-                chosen = None
-                for y in years:
-                    if y <= year:
-                        chosen = y
-                if chosen is None and years:
-                    chosen = min(years)
-                if chosen is not None:
-                    raw = schedule.get(str(chosen), schedule.get(chosen))
-                    try:
-                        val = float(raw)
-                        frac = val / 100.0 if val > 1.0 else val
-                    except Exception:
-                        frac = None
-            except Exception:
-                pass
-        if frac is None:
-            # If no schedule, do nothing (explicit only)
-            return
-        frac = max(0.0, min(1.0, float(frac)))
-        es_bf = energy_shares.get('Blast Furnace')
-        if not isinstance(es_bf, dict):
-            return
-        coal = float(es_bf.get('Coal', 0.0) or 0.0)
-        coke = float(es_bf.get('Coke', 0.0) or 0.0)
-        if (coal + coke) <= 0:
-            return
-        # Shift a fraction of fossil solid fuels to Charcoal
-        new_coal = coal * (1.0 - frac)
-        new_coke = coke * (1.0 - frac)
-        moved = (coal - new_coal) + (coke - new_coke)
-        es_bf['Coal'] = new_coal
-        es_bf['Coke'] = new_coke
-        es_bf['Charcoal'] = es_bf.get('Charcoal', 0.0) + moved
-
-    _apply_dri_mix(energy_shares, scenario)
-    _apply_charcoal_expansion(energy_shares, scenario)
+    apply_dri_mix(energy_shares, scenario)
+    apply_charcoal_expansion(energy_shares, scenario)
 
     # Parameters (light/deep merge)
     from types import SimpleNamespace
@@ -632,74 +395,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     )
     recipes = apply_recipe_overrides(recipes, scenario.get('recipe_overrides', {}), params, energy_int, energy_shares, energy_content)
 
-    # ---------- Build route constraints ----------
-    # For validation stage, we want to:
-    # 1. Only clamp auxiliary processes (nitrogen, oxygen, etc) to be market-purchased
-    # 2. Keep other route choices (BF/EAF etc) flexible according to picks
-    # 3. Not apply the fixed downstream path from build_pre_for_route
-    if is_validation:
-        _debug_print("🔍 Applying validation stage constraints")
-        # For validation stage, explicitly force market purchases
-        pre_mask = {
-            "Nitrogen Production": 0,
-            "Oxygen Production": 0,
-            "Dolomite Production": 0,
-            "Burnt Lime Production": 0
-        }
-        # Forcibly enable market purchases AND add to picks
-        market_purchases = {
-            "Nitrogen from market": 1,
-            "Oxygen from market": 1,
-            "Dolomite from market": 1,
-            "Burnt Lime from market": 1
-        }
-        pre_select_soft.update(market_purchases)
-        # Also force these in picks_by_material
-        picks_by_material.update({
-            'Nitrogen': 'Nitrogen from market',
-            'Oxygen': 'Oxygen from market',
-            'Dolomite': 'Dolomite from market',
-            'Burnt Lime': 'Burnt Lime from market'
-        })
-        
-        # Add EAF feed mode for validation if needed
-        eaf_mode = resolve_feed_mode(descriptor, route_preset)
-        if eaf_mode is None:
-            eaf_mode = _infer_eaf_mode(route_preset)
-            
-        # Ensure validation stage is set in environment
-        os.environ['STEEL_MODEL_STAGE'] = 'validation'
-    else:
-        # Non-validation: apply full route masks and in-house preferences
-        pre_mask = (
-            build_route_mask_for_descriptor(descriptor, route_preset, recipes)
-            or {}
-        )
-        eaf_mode = resolve_feed_mode(descriptor, route_preset)
-        if eaf_mode is None:
-            eaf_mode = _infer_eaf_mode(route_preset)
-
-        # Apply in-house preferences for auxiliaries based on stage
-        if is_validation:
-            # For validation, force market purchase of auxiliaries
-            aux_mask = {
-                "Nitrogen Production": 0,
-                "Oxygen Production": 0,
-                "Dolomite Production": 0,
-                "Burnt Lime Production": 0,
-            }
-            aux_select = {
-                "Nitrogen from market": 1,
-                "Oxygen from market": 1,
-                "Dolomite from market": 1,
-                "Burnt Lime from market": 1,
-            }
-            pre_mask.update(aux_mask)
-            pre_select_soft.update(aux_select)
-        else:
-            # Apply normal in-house clamp for non-validation stages
-            pre_select_soft, pre_mask = apply_inhouse_clamp(pre_select_soft, pre_mask, prefer_internal_map)
-
     # ---------- Build demand material (builder constructs route) ----------
     demand_mat = resolve_stage_material(descriptor, stage_key)
 
@@ -710,9 +405,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     energy_prices = load_data_from_yaml(os.path.join(base, 'energy_prices.yml')) or {}
     material_prices = load_data_from_yaml(os.path.join(base, 'material_prices.yml')) or {}
 
-    core_inputs = build_core_scenario(
+    build_result = build_core_scenario(
         descriptor=descriptor,
-        stage_key=stage_key,
         stage_role=stage_role,
         route_preset=route_preset,
         demand_qty=demand_qty,
@@ -727,8 +421,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         pre_select_soft=pre_select_soft,
         route_overrides=scenario.get('route_overrides'),
         fallback_materials=fallback_materials,
-        stage_lookup=stage_material_map,
-        gas_config={**gas_config, 'gas_routing': scenario.get('gas_routing', {})},
+        gas_config=gas_config,
+        gas_routing=scenario.get('gas_routing', {}),
         process_efs=process_emissions_table,
         external_purchase_rows=external_purchase_rows,
         energy_prices=energy_prices,
@@ -736,6 +430,9 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         outside_mill_procs=set(OUTSIDE_MILL_PROCS or []),
         enable_lci=is_lci_enabled(),
     )
+    core_inputs = build_result.core
+    prefer_internal_map = build_result.prefer_internal_map
+    fallback_materials = build_result.fallback_materials
 
     core_res = run_core_scenario(core_inputs)
 
@@ -859,22 +556,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
             process_gas_carrier=gas_meta.get('process_gas_carrier', process_gas_carrier),
             f_internal=f_internal,
         )
-        lci_df = augment_lci_and_debug(
-            lci_df=lci_df,
-            prod_levels=prod_levels,
-            recipes=core_inputs.recipes,
-            energy_balance=energy_balance,
-            energy_shares=energy_shares,
-            energy_content=energy_content,
-            params=params,
-            gas_meta=gas_meta,
-            e_efs=e_efs,
-            meta=meta,
-            base_path=base,
-            natural_gas_carrier=gas_meta.get('natural_gas_carrier', natural_gas_carrier),
-            process_gas_carrier=gas_meta.get('process_gas_carrier', process_gas_carrier),
-            f_internal=f_internal,
-        )
     else:
         lci_df = None
 
@@ -890,3 +571,16 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         lci=lci_df,
         meta=meta,
     )
+def _resolve_stage_role(descriptor, stage_key: str, provided_role: Optional[str]) -> str:
+    """Derive the stage role key ('validation', 'crude', etc.) when possible."""
+    stage_role = (provided_role or "").strip().lower()
+    if stage_role:
+        return stage_role
+    matches = [
+        (item.key or "").strip().lower()
+        for item in descriptor.stage_menu
+        if str(item.stage_id).strip().lower() == str(stage_key).strip().lower()
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    return stage_role

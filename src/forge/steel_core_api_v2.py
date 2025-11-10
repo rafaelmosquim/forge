@@ -33,17 +33,16 @@ from forge.core.io import (
 from forge.core.models import Process, OUTSIDE_MILL_PROCS
 from forge.core.routing import (
     STAGE_MATS,
-    build_route_mask,
-    enforce_eaf_feed,
     set_prefer_internal_processes,
     apply_inhouse_clamp,
 )
 from forge.core.compute import (
     calculate_lci,
     compute_inside_elec_reference_for_share,
-    _build_routes_from_picks,
-    _ensure_fallback_processes,
 )
+from forge.core.runner import run_core_scenario
+from forge.scenarios.builder import build_core_scenario
+from forge.reporting.lci_aug import augment_lci_and_debug
 from forge.core.transforms import (
     apply_fuel_substitutions,
     apply_dict_overrides,
@@ -674,7 +673,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         # Non-validation: apply full route masks and in-house preferences
         pre_mask = (
             build_route_mask_for_descriptor(descriptor, route_preset, recipes)
-            or build_route_mask(route_preset, recipes)
+            or {}
         )
         eaf_mode = resolve_feed_mode(descriptor, route_preset)
         if eaf_mode is None:
@@ -701,63 +700,41 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
             # Apply normal in-house clamp for non-validation stages
             pre_select_soft, pre_mask = apply_inhouse_clamp(pre_select_soft, pre_mask, prefer_internal_map)
 
-    # Apply explicit route overrides from scenario (defensive copy)
-    pre_select_soft, pre_mask = _apply_route_overrides(
-        pre_select_soft,
-        pre_mask,
-        scenario.get('route_overrides'),
-    )
-
-    # Work on a copy for calculations (enforce feed)
-    import copy
-    recipes_calc = copy.deepcopy(recipes)
-    enforce_eaf_feed(recipes_calc, eaf_mode)
-
-    # ---------- Build production route from picks ----------
+    # ---------- Build demand material (builder constructs route) ----------
     demand_mat = resolve_stage_material(descriptor, stage_key)
-    production_routes: Dict[str, int] = _build_routes_from_picks(
-        recipes_calc,
-        demand_mat,
-        picks_by_material,
-        pre_mask=pre_mask,
-        pre_select=pre_select_soft,
-        fallback_materials=fallback_materials,
-    )
-
-    _ensure_fallback_processes(recipes_calc, production_routes, fallback_materials)
 
     # ---------- Compute via core runner ----------
     # Load process-emissions yaml for direct process emissions mapping
     process_emissions_table = load_data_from_yaml(os.path.join(base, 'process_emissions.yml')) or {}
-
-    from forge.core.runner import CoreScenario, run_core_scenario
-
     # Load optional price tables (API does I/O, core does math)
     energy_prices = load_data_from_yaml(os.path.join(base, 'energy_prices.yml')) or {}
     material_prices = load_data_from_yaml(os.path.join(base, 'material_prices.yml')) or {}
 
-    core_inputs = CoreScenario(
-        recipes=recipes_calc,
+    core_inputs = build_core_scenario(
+        descriptor=descriptor,
+        stage_key=stage_key,
+        stage_role=stage_role,
+        route_preset=route_preset,
+        demand_qty=demand_qty,
+        demand_material=demand_mat,
+        recipes=recipes,
         energy_int=energy_int,
         energy_shares=energy_shares,
         energy_content=energy_content,
+        e_efs=e_efs,
         params=params,
-        production_routes=production_routes,
-        demand_material=demand_mat,
-        demand_qty=demand_qty,
-        mkt_cfg=mkt_cfg,
-        energy_efs=e_efs,
-        process_efs=process_emissions_table,
-        route_preset=route_preset,
-        stage_ref=gas_reference_stage,
-        gas_config=gas_config,
-        gas_routing=scenario.get('gas_routing', {}),
+        picks_by_material=picks_by_material,
+        pre_select_soft=pre_select_soft,
+        route_overrides=scenario.get('route_overrides'),
         fallback_materials=fallback_materials,
-        outside_mill_procs=set(OUTSIDE_MILL_PROCS or []),
-        enable_lci=is_lci_enabled(),
+        stage_lookup=stage_material_map,
+        gas_config={**gas_config, 'gas_routing': scenario.get('gas_routing', {})},
+        process_efs=process_emissions_table,
+        external_purchase_rows=external_purchase_rows,
         energy_prices=energy_prices,
         material_prices=material_prices,
-        external_purchase_rows=external_purchase_rows,
+        outside_mill_procs=set(OUTSIDE_MILL_PROCS or []),
+        enable_lci=is_lci_enabled(),
     )
 
     core_res = run_core_scenario(core_inputs)
@@ -858,498 +835,51 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         # Build final LCI with carrier splits
         lci_df = calculate_lci(
             prod_level=prod_levels,
-            recipes=recipes_calc,
+            recipes=core_inputs.recipes,
             energy_balance=energy_balance,
             electricity_internal_fraction=f_internal,
             gas_internal_fraction=f_internal_gas,
             natural_gas_carrier=gas_meta.get('natural_gas_carrier', natural_gas_carrier),
             process_gas_carrier=gas_meta.get('process_gas_carrier', process_gas_carrier),
         )
-    
-        # Augment LCI with per-process emission totals (kg CO2e per kg output)
-        try:
-            gp_path = os.path.join(base, 'ghg_protocol.yml')
-            gp_raw = load_data_from_yaml(gp_path) or {}
-            # file can be { emission_ghg: {Carrier: kg/GJ} } or flat mapping
-            ghg_map = gp_raw.get('emission_ghg', gp_raw) or {}
-            # Convert to kg/MJ for YAML-sourced EFs
-            ef_ghg_per_mj = {str(k): float(v) / 1000.0 for k, v in ghg_map.items() if v is not None}
-    
-            # Internal EFs: treat in-house gas and electricity as zero-emission for LCI totals
-            ef_internal_electricity = 0.0
-            ef_process_gas = float(gas_meta.get('EF_process_gas', 0.0) or 0.0)  # used only for credit line
-    
-            nat_gas_label = gas_meta.get('natural_gas_carrier', natural_gas_carrier) or 'Gas'
-            proc_gas_label = gas_meta.get('process_gas_carrier', process_gas_carrier) or 'Process Gas'
-    
-            def _ef_for_lci_input(input_name: str) -> float:
-                name = str(input_name)
-                if name == 'Electricity (Grid)':
-                    return float(ef_ghg_per_mj.get('Electricity', 0.0))
-                if name == 'Electricity (In-house)':
-                    return 0.0  # in-house electricity is zero-emission in LCI
-                if name == f'{nat_gas_label} (Natural)':
-                    return float(ef_ghg_per_mj.get(nat_gas_label, ef_ghg_per_mj.get('Gas', 0.0)))
-                if name == f'{proc_gas_label} (Internal)':
-                    return 0.0  # in-house process gas is zero-emission in LCI
-                # Strip split suffixes like " (Natural)"/" (Internal)"
-                base = name.split(' (')[0]
-                return float(ef_ghg_per_mj.get(base, 0.0))
-    
-            if isinstance(lci_df, pd.DataFrame) and not lci_df.empty:
-                additions = []
-                output_additions = []
-                trace_additions = []
-                coke_custom_rows = []
-                # Track BF synthesized process gas output (MJ per kg) by output name
-                bf_pg_output_by_out = {}
-                # Group by process-output combo (normalize per that output)
-                for (proc, out), sub in lci_df.groupby(['Process', 'Output'], dropna=False):
-                    # Sum energy inputs only
-                    proc_name = str(proc)
-    
-                    # Special handling: Coke Production LCI normalized per MJ of coke produced
-                    if proc_name == 'Coke Production':
-                        try:
-                            # Totals
-                            runs_cp = float(prod_levels.get('Coke Production', 0.0) or 0.0)
-                            # Per-run inputs/outputs from recipe
-                            r_cp = next((r for r in recipes_calc if r.name == 'Coke Production'), None)
-                            coke_per_run = float((r_cp.outputs.get('Coke', 1.0)) if r_cp else 1.0)
-                            coal_per_run = float((r_cp.inputs.get('Coal', 0.0)) if r_cp else 0.0)
-                            n2_per_run   = float((r_cp.inputs.get('Nitrogen', 0.0)) if r_cp else 0.0)
-                            # Totals
-                            coke_total_kg = runs_cp * coke_per_run
-                            coal_total_kg = runs_cp * coal_per_run
-                            lhv_coke = float(energy_content.get('Coke', 0.0) or 0.0)
-                            lhv_coal = float(energy_content.get('Coal', 0.0) or 0.0)
-                            denom_MJ = coke_total_kg * lhv_coke
-                            coal_energy_MJ = coal_total_kg * lhv_coal
-                            # Electricity share from energy matrix
-                            sh_cp = energy_shares.get('Coke Production', {}) or {}
-                            sh_elec = float(sh_cp.get('Electricity', 0.0) or 0.0)
-                            # Normalized per MJ of coke product
-                            coal_per_MJprod = (coal_energy_MJ / denom_MJ) if denom_MJ > 1e-12 else 0.0
-                            elec_per_MJprod = (((coal_energy_MJ / max(coke_total_kg, 1e-12)) * sh_elec) / max(lhv_coke, 1e-12))
-                            # Split electricity by internal fraction (grid vs in-house)
-                            elec_grid_per_MJprod = elec_per_MJprod * (1.0 - float(f_internal or 0.0))
-                            elec_in_per_MJprod   = elec_per_MJprod * float(f_internal or 0.0)
-                            # Nitrogen material input normalized per MJ coke
-                            n2_total_kg = runs_cp * n2_per_run
-                            n2_per_MJprod = (n2_total_kg / denom_MJ) if denom_MJ > 1e-12 else 0.0
-    
-                            # Build replacement LCI rows for Coke Production
-                            out_label = str(out) if str(out) else 'Coke'
-                            coke_custom_rows.extend([
-                                {
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Input',
-                                    'Input': 'Coal (Energy)',
-                                    'Category': 'Energy',
-                                    'ValueUnit': 'MJ',
-                                    'Amount': float(coal_per_MJprod),
-                                    'Unit': 'MJ per MJ Coke',
-                                },
-                                {
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Input',
-                                    'Input': 'Electricity (Grid)',
-                                    'Category': 'Energy',
-                                    'ValueUnit': 'MJ',
-                                    'Amount': float(elec_grid_per_MJprod),
-                                    'Unit': 'MJ per MJ Coke',
-                                },
-                                {
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Input',
-                                    'Input': 'Electricity (In-house)',
-                                    'Category': 'Energy',
-                                    'ValueUnit': 'MJ',
-                                    'Amount': float(elec_in_per_MJprod),
-                                    'Unit': 'MJ per MJ Coke',
-                                },
-                                # Nitrogen as material input (normalized per MJ Coke)
-                                {
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Input',
-                                    'Input': 'Nitrogen',
-                                    'Category': 'Material',
-                                    'ValueUnit': 'kg',
-                                    'Amount': float(n2_per_MJprod),
-                                    'Unit': 'kg per MJ Coke',
-                                },
-                                # Optional: Show the product energy as an output line
-                                {
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Output',
-                                    'Input': 'Coke (Energy)',
-                                    'Category': 'Output',
-                                    'ValueUnit': 'MJ',
-                                    'Amount': 1.0,
-                                    'Unit': 'MJ per MJ Coke',
-                                },
-                                # New: process gas recovered as output, normalized per MJ coke
-                                {
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Output',
-                                    'Input': proc_gas_label,
-                                    'Category': 'Output',
-                                    'ValueUnit': 'MJ',
-                                    'Amount': float((gas_meta.get('gas_coke_MJ', 0.0) or 0.0) / max(denom_MJ, 1e-12)),
-                                    'Unit': 'MJ per MJ Coke',
-                                },
-                                # Brute-force co-products normalized per MJ Coke (kg per MJ Coke)
-                                # Using: amount = coef * (total energy entering coke-making / coal LHV) / denom_MJ
-                                # Assumption: total energy entering coke-making ~= coal energy (dominant term)
-                                {
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Output',
-                                    'Input': 'Óleo Alcatrão',
-                                    'Category': 'Output',
-                                    'ValueUnit': 'kg',
-                                    'Amount': float(((30.0 / 1000.0) * (coal_energy_MJ / max(lhv_coal, 1e-12))) / max(denom_MJ, 1e-12)),
-                                    'Unit': 'kg per MJ Coke',
-                                },
-                                {
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Output',
-                                    'Input': 'Óleo Leve Bruto',
-                                    'Category': 'Output',
-                                    'ValueUnit': 'kg',
-                                    'Amount': float(((8.0 / 1000.0) * (coal_energy_MJ / max(lhv_coal, 1e-12))) / max(denom_MJ, 1e-12)),
-                                    'Unit': 'kg per MJ Coke',
-                                },
-                                {
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Output',
-                                    'Input': 'Amônia Anidra',
-                                    'Category': 'Output',
-                                    'ValueUnit': 'kg',
-                                    'Amount': float(((3.0 / 1000.0) * (coal_energy_MJ / max(lhv_coal, 1e-12))) / max(denom_MJ, 1e-12)),
-                                    'Unit': 'kg per MJ Coke',
-                                },
-                            ])
-    
-                            # Compute emissions total for Coke (per MJ product) using ghg_protocol EFs
-                            # Electricity (Grid) contributes; Electricity (In-house) EF=0 per LCI rule
-                            ef_coal = float(ef_ghg_per_mj.get('Coal', 0.0))
-                            ef_elec = float(ef_ghg_per_mj.get('Electricity', 0.0))
-                            total_kg_per_kg = coal_per_MJprod * ef_coal + elec_grid_per_MJprod * ef_elec  # kg CO2e per MJ Coke
-                            # Append emissions summary row with appropriate unit
-                            additions.append({
-                                'Process': 'Coke Production',
-                                'Output': out_label,
-                                'Flow': 'Emissions',
-                                'Input': 'CO2e (LCI)',
-                                'Category': 'Emissions',
-                                'ValueUnit': 'kgCO2e',
-                                'Amount': float(total_kg_per_kg),
-                                'Unit': 'kg CO2e per MJ Coke',
-                            })
-                            # Add negative credit for Process Gas based on LCI output amount times EF
-                            try:
-                                pg_amount_per_MJ = float((gas_meta.get('gas_coke_MJ', 0.0) or 0.0) / max(denom_MJ, 1e-12))
-                            except Exception:
-                                pg_amount_per_MJ = 0.0
-                            # EF for coke gas provided in g/MJ; convert to kg/MJ
-                            ef_pg_coke = float(gas_meta.get('EF_coke_gas', gas_meta.get('EF_process_gas', 0.0)) or 0.0) / 1000.0
-                            if pg_amount_per_MJ > 0 and ef_pg_coke >= 0:
-                                additions.append({
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Emissions',
-                                    'Input': 'CO2e (Process Gas)',
-                                    'Category': 'Emissions',
-                                    'ValueUnit': 'kgCO2e',
-                                    'Amount': - float(pg_amount_per_MJ * ef_pg_coke),
-                                    'Unit': 'kg CO2e per MJ Coke',
-                                })
-    
-                            # Add negative credit for Coke produced (energy output line) times EF from ghg_protocol
-                            coke_out_mj_per_mj = 1.0
-                            ef_coke = float(ef_ghg_per_mj.get('Coke', 0.0) or 0.0)
-                            if ef_coke >= 0:
-                                additions.append({
-                                    'Process': 'Coke Production',
-                                    'Output': out_label,
-                                    'Flow': 'Emissions',
-                                    'Input': 'CO2e (Coke)',
-                                    'Category': 'Emissions',
-                                    'ValueUnit': 'kgCO2e',
-                                    'Amount': - float(coke_out_mj_per_mj * ef_coke),
-                                    'Unit': 'kg CO2e per MJ Coke',
-                                })
-    
-                            # Net = Total + credits (credits are negative)
-                            net_amount = float(total_kg_per_kg) - float(pg_amount_per_MJ * ef_pg_coke) - float(coke_out_mj_per_mj * ef_coke)
-                            additions.append({
-                                'Process': 'Coke Production',
-                                'Output': out_label,
-                                'Flow': 'Emissions',
-                                'Input': 'CO2e (Net)',
-                                'Category': 'Emissions',
-                                'ValueUnit': 'kgCO2e',
-                                'Amount': float(net_amount),
-                                'Unit': 'kg CO2e per MJ Coke',
-                            })
-                        except Exception:
-                            pass
-                        # Skip generic path for Coke Production
-                        continue
-    
-                    # Generic path for all other processes (per kg product)
-                    sub_energy = sub[(sub['Flow'] == 'Input') & (sub['Category'] == 'Energy')]
-                    if sub_energy.empty:
-                        continue
-                    total_kg_per_kg = 0.0
-                    for _, row in sub_energy.iterrows():
-                        try:
-                            amt_mj_per_kg = float(row.get('Amount', 0.0) or 0.0)
-                        except Exception:
-                            amt_mj_per_kg = 0.0
-                        ef_per_mj = _ef_for_lci_input(str(row.get('Input', '')))
-                        total_kg_per_kg += amt_mj_per_kg * ef_per_mj
-    
-                    # "Ugly but simple" additions requested for LCI totals only:
-                    # 1) Limestone process-chemistry: add 0.440 × Limestone input (kg/kg) for all
-                    #    processes EXCEPT Burnt Lime Production and Dolomite Production
-                    proc_name = str(proc)
-                    try:
-                        sub_limestone = sub[
-                            (sub['Flow'] == 'Input') & (sub['Category'] == 'Material') & (sub['Input'] == 'Limestone')
-                        ]
-                        limestone_kg_per_kg = float(sub_limestone['Amount'].sum()) if not sub_limestone.empty else 0.0
-                    except Exception:
-                        limestone_kg_per_kg = 0.0
-                    if limestone_kg_per_kg > 0 and proc_name not in ('Burnt Lime Production', 'Dolomite Production'):
-                        ls_add = 0.440 * limestone_kg_per_kg
-                        total_kg_per_kg += ls_add
-                        trace_additions.append({
-                            'Process': proc_name,
-                            'Output': out,
-                            'Flow': 'Emissions',
-                            'Input': 'CO2e (Limestone Chemistry)',
-                            'Category': 'Emissions',
-                            'ValueUnit': 'kgCO2e',
-                            'Amount': ls_add,
-                            'Unit': f'kg CO2e per kg {out}',
-                        })
-    
-                    # 2) Burnt Lime Production: add flat 0.786 kg CO2e per kg output and trace row
-                    if proc_name == 'Burnt Lime Production':
-                        total_kg_per_kg += 0.786
-                        trace_additions.append({
-                            'Process': proc_name,
-                            'Output': out,
-                            'Flow': 'Emissions',
-                            'Input': 'CO2e (Burnt Lime Chemistry)',
-                            'Category': 'Emissions',
-                            'ValueUnit': 'kgCO2e',
-                            'Amount': 0.786,
-                            'Unit': f'kg CO2e per kg {out}',
-                        })
-    
-                    # 3) Dolomite Production: add flat 0.917 kg CO2e per kg output and trace row
-                    if proc_name == 'Dolomite Production':
-                        total_kg_per_kg += 0.917
-                        trace_additions.append({
-                            'Process': proc_name,
-                            'Output': out,
-                            'Flow': 'Emissions',
-                            'Input': 'CO2e (Dolomite Chemistry)',
-                            'Category': 'Emissions',
-                            'ValueUnit': 'kgCO2e',
-                            'Amount': 0.917,
-                            'Unit': f'kg CO2e per kg {out}',
-                        })
-                    # Append a summary row per process-output
-                    additions.append({
-                        'Process': proc,
-                        'Output': out,
-                        'Flow': 'Emissions',
-                        'Input': 'CO2e (LCI)',
-                        'Category': 'Emissions',
-                        'ValueUnit': 'kgCO2e',
-                        'Amount': total_kg_per_kg,
-                        'Unit': f'kg CO2e per kg {out}',
-                    })
-    
-                    # For Blast Furnace: synthesize Output lines
-                    if str(proc) == 'Blast Furnace':
-                        try:
-                            bf_delta = max(0.0, float(getattr(params, 'bf_adj_intensity', 0.0)) - float(getattr(params, 'bf_base_intensity', 0.0)))
-                        except Exception:
-                            bf_delta = 0.0
-                        if bf_delta > 0.0:
-                            # Store for later emissions credit computation
-                            bf_pg_output_by_out[str(out)] = bf_delta
-                            output_additions.append({
-                                'Process': 'Blast Furnace',
-                                'Output': out,
-                                'Flow': 'Output',
-                                'Input': proc_gas_label,
-                                'Category': 'Output',
-                                'ValueUnit': 'MJ',
-                                'Amount': bf_delta,
-                                'Unit': f'MJ per kg {out}',
-                            })
-                        # Add Escória output: 0.330 kg per run, normalized per kg Pig Iron
-                        try:
-                            r_bf = next((r for r in recipes_calc if r.name == 'Blast Furnace'), None)
-                            pig_per_run = float((r_bf.outputs.get('Pig Iron', 1.0)) if r_bf else 1.0)
-                            escoria_per_kg = 0.330 / max(pig_per_run, 1e-12)
-                        except Exception:
-                            escoria_per_kg = 0.0
-                        if escoria_per_kg > 0.0:
-                            output_additions.append({
-                                'Process': 'Blast Furnace',
-                                'Output': out,
-                                'Flow': 'Output',
-                                'Input': 'Escória',
-                                'Category': 'Output',
-                                'ValueUnit': 'kg',
-                                'Amount': escoria_per_kg,
-                                'Unit': f'kg per kg {out}',
-                            })
-    
-                # Add process-gas credit lines (negative emissions) for BF and Coke Production
-                # Derive from LCI energy inputs (Process Gas (Internal)) per process/output
-                pg_additions = []
-                net_additions = []
-
-                def _add_pg_credit_for_process(proc_name: str):
-                    sub_proc = lci_df[lci_df['Process'] == proc_name]
-                    if sub_proc.empty:
-                        return
-                    # Choose EF per process: BF uses EF_bf_gas; Coke uses EF_coke_gas; otherwise blended EF
-                    if proc_name == 'Blast Furnace':
-                        ef_pg_local = float(gas_meta.get('EF_bf_gas', gas_meta.get('EF_process_gas', 0.0)) or 0.0) / 1000.0
-                    elif proc_name == 'Coke Production':
-                        # If custom rows were created for Coke Production, skip generic credit to avoid duplicates
-                        if coke_custom_rows:
-                            return
-                        ef_pg_local = float(gas_meta.get('EF_coke_gas', gas_meta.get('EF_process_gas', 0.0)) or 0.0) / 1000.0
-                    else:
-                        ef_pg_local = float(gas_meta.get('EF_process_gas', 0.0) or 0.0) / 1000.0
-                    for out_val, sub_out in sub_proc.groupby('Output', dropna=False):
-                        # Preferred for BF: use synthesized Output Process Gas MJ/kg if available
-                        mj_per_kg = 0.0
-                        if proc_name == 'Blast Furnace':
-                            mj_per_kg = float(bf_pg_output_by_out.get(str(out_val), 0.0) or 0.0)
-                        # Otherwise fall back to Input side: Process Gas (Internal)
-                        if mj_per_kg <= 0.0:
-                            mask = (
-                                (sub_out['Flow'] == 'Input')
-                                & (sub_out['Category'] == 'Energy')
-                                & (sub_out['Input'] == f"{proc_gas_label} (Internal)")
-                            )
-                            mj_per_kg = float(sub_out.loc[mask, 'Amount'].sum()) if not sub_out.loc[mask].empty else 0.0
-                        if mj_per_kg <= 0:
-                            continue
-                        # Negative credit row (just for process gas)
-                        pg_additions.append({
-                            'Process': proc_name,
-                            'Output': str(out_val),
-                            'Flow': 'Emissions',
-                            'Input': 'CO2e (Process Gas)',
-                            'Category': 'Emissions',
-                            'ValueUnit': 'kgCO2e',
-                            'Amount': - mj_per_kg * ef_pg_local,  # negative credit
-                            'Unit': f'kg CO2e per kg {out_val}',
-                        })
-                        # Net row = total (LCI) + PG credit; find the total added above
-                        total_rows = [r for r in additions if r['Process'] == proc_name and r['Output'] == str(out_val) and r['Input'] == 'CO2e (LCI)']
-                        total_val = float(total_rows[0]['Amount']) if total_rows else 0.0
-                        net_additions.append({
-                            'Process': proc_name,
-                            'Output': str(out_val),
-                            'Flow': 'Emissions',
-                            'Input': 'CO2e (Net)',
-                            'Category': 'Emissions',
-                            'ValueUnit': 'kgCO2e',
-                            'Amount': total_val - (mj_per_kg * ef_pg_local),
-                            'Unit': f'kg CO2e per kg {out_val}',
-                        })
-    
-                _add_pg_credit_for_process('Blast Furnace')
-                _add_pg_credit_for_process('Coke Production')
-    
-                # Replace Coke Production rows with custom LCI rows if we created any
-                if coke_custom_rows:
-                    try:
-                        lci_df = lci_df[lci_df['Process'] != 'Coke Production']
-                    except Exception:
-                        pass
-                    lci_df = pd.concat([lci_df, pd.DataFrame(coke_custom_rows)], ignore_index=True)
-    
-                if additions or pg_additions or net_additions or output_additions or trace_additions:
-                    to_add = additions + pg_additions + net_additions + output_additions + trace_additions
-                    lci_df = pd.concat([lci_df, pd.DataFrame(to_add)], ignore_index=True)
-                    # Order emissions rows so Net is last within each process/output
-                    try:
-                        _order_map = {
-                            'CO2e (LCI)': 0,
-                            'CO2e (Process Gas)': 1,
-                            'CO2e (Coke)': 2,
-                            'CO2e (Net)': 3,
-                        }
-                        lci_df['InputOrder'] = lci_df['Input'].map(_order_map)
-                        lci_df.loc[lci_df['Flow'] != 'Emissions', 'InputOrder'] = -1
-                        lci_df['InputOrder'] = lci_df['InputOrder'].fillna(50)
-                        lci_df.sort_values(["Process", "Output", "Flow", "Category", "InputOrder", "Input"], inplace=True)
-                        lci_df.drop(columns=['InputOrder'], inplace=True)
-                    except Exception:
-                        # Fallback to default sort
-                        lci_df.sort_values(["Process", "Output", "Flow", "Category", "Input"], inplace=True)
-        except Exception as _e:
-            # Non-fatal: if protocol file or mapping missing, skip augmentation
-            pass
-    
-        # Debug prints for emission factors (units: g CO2e/MJ)
-        print("\n=== EMISSION FACTOR DEBUG ===")
-        # Electricity
-        elec_grid = float(e_efs.get('Electricity', 0.0) or 0.0)
-        elec_internal = float(gas_meta.get('ef_internal_electricity', meta.get('ef_internal_electricity', 0.0)) or 0.0)
-        elec_f_int = float(gas_meta.get('f_internal', meta.get('f_internal', 0.0)) or 0.0)
-        elec_used = float(gas_meta.get('ef_electricity_used', elec_f_int * elec_internal + (1 - elec_f_int) * elec_grid))
-        print("ELECTRICITY:")
-        print(f"  Grid EF: {elec_grid:.2f} g CO2e/MJ")
-        print(f"  Internal EF: {elec_internal:.2f} g CO2e/MJ")
-        print(f"  Internal Fraction: {elec_f_int:.3f}")
-        print(f"  Used EF (blended): {elec_used:.2f} g CO2e/MJ")
-
-        # Gas
-        gas_grid = float(gas_meta.get('ef_nat_gas_grid', e_efs.get('Gas', 0.0)) or 0.0)
-        gas_proc = float(gas_meta.get('EF_process_gas', 0.0) or 0.0)
-        gas_f_int = float(gas_meta.get('f_internal_gas', 0.0) or 0.0)
-        gas_used = float(gas_meta.get('ef_gas_blended', e_efs.get('Gas', 0.0)) or 0.0)
-        print("\nGAS:")
-        print(f"  Natural Gas EF (grid): {gas_grid:.2f} g CO2e/MJ")
-        print(f"  Process Gas EF (internal): {gas_proc:.2f} g CO2e/MJ")
-        print(f"  Internal Fraction: {gas_f_int:.3f}")
-        print(f"  Used EF (blended): {gas_used:.2f} g CO2e/MJ")
-    
-        print(f"\nPROCESS GAS BREAKDOWN:")
-        print(f"  Coke Gas: {gas_meta.get('gas_coke_MJ',0.0):.1f} MJ (EF: {gas_meta.get('EF_coke_gas',0.0):.1f})")
-        print(f"  BF Gas: {gas_meta.get('gas_bf_MJ',0.0):.1f} MJ (EF: {gas_meta.get('EF_bf_gas',0.0):.1f})")
-        print(f"  Total: {gas_meta.get('total_process_gas_MJ',0.0):.1f} MJ (EF: {gas_meta.get('EF_process_gas',0.0):.1f})")
-        print(f"  Direct Use: {gas_meta.get('direct_use_gas_MJ',0.0):.1f} MJ")
-        print(f"  Electricity: {gas_meta.get('electricity_gas_MJ',0.0):.1f} MJ")
-        print("============================\n")
+        # Augment LCI and print EF debug
+        lci_df = augment_lci_and_debug(
+            lci_df=lci_df,
+            prod_levels=prod_levels,
+            recipes=core_inputs.recipes,
+            energy_balance=energy_balance,
+            energy_shares=energy_shares,
+            energy_content=energy_content,
+            params=params,
+            gas_meta=gas_meta,
+            e_efs=e_efs,
+            meta=meta,
+            base_path=base,
+            natural_gas_carrier=gas_meta.get('natural_gas_carrier', natural_gas_carrier),
+            process_gas_carrier=gas_meta.get('process_gas_carrier', process_gas_carrier),
+            f_internal=f_internal,
+        )
+        lci_df = augment_lci_and_debug(
+            lci_df=lci_df,
+            prod_levels=prod_levels,
+            recipes=core_inputs.recipes,
+            energy_balance=energy_balance,
+            energy_shares=energy_shares,
+            energy_content=energy_content,
+            params=params,
+            gas_meta=gas_meta,
+            e_efs=e_efs,
+            meta=meta,
+            base_path=base,
+            natural_gas_carrier=gas_meta.get('natural_gas_carrier', natural_gas_carrier),
+            process_gas_carrier=gas_meta.get('process_gas_carrier', process_gas_carrier),
+            f_internal=f_internal,
+        )
     else:
         lci_df = None
 
     return RunOutputs(
-        production_routes=production_routes,
+        production_routes=core_res.production_routes,
         prod_levels=prod_levels,
         energy_balance=energy_balance,
         emissions=emissions,

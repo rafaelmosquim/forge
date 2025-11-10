@@ -385,11 +385,25 @@ from .transforms import (
 # Reference helpers (local implementations)
 
 DEFAULT_PRODUCER_PRIORITY = (
+    # Core downstream/defaults
     "Continuous Casting (R)",
     "Hot Rolling",
     "Cold Rolling",
     "Basic Oxygen Furnace",
     "Electric Arc Furnace",
+    # Additional priorities aligned with API legacy to ensure deterministic picks
+    "Bypass Raw→IP3",
+    "Bypass CR→IP3",
+    "Nitrogen Production",
+    "Oxygen Production",
+    "Dolomite Production",
+    "Burnt Lime Production",
+    "Coke Production",
+    "Natural gas from Market",
+    "LPG from Market",
+    "Biomethane from Market",
+    "Hydrogen (Methane reforming) from Market",
+    "Hydrogen (Electrolysis) from Market",
 )
 
 

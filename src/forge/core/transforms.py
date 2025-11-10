@@ -128,5 +128,97 @@ __all__ = [
     'apply_recipe_overrides',
     'adjust_blast_furnace_intensity',
     'adjust_process_gas_intensity',
+    'apply_energy_int_efficiency_scaling',
+    'apply_energy_int_floor',
 ]
 
+
+def apply_energy_int_efficiency_scaling(energy_int: Dict[str, float], scenario: Dict[str, object]) -> None:
+    """Apply uniform and scheduled efficiency scaling to energy intensities.
+
+    Recognized keys in `scenario` (all optional):
+      - energy_int_factor: float multiplier applied to all numeric intensities
+      - energy_int_schedule: mapping with one or more of:
+            rate_pct_per_year | annual_pct | rate_pct | rate
+            baseline_year (default 2023)
+            target_year   (default 2050)
+            max_year      (default 2050)
+            years         (directly specify years)
+
+    Non-numeric entries and zeros are left untouched.
+    """
+    if not isinstance(energy_int, dict) or not isinstance(scenario, dict):
+        return
+
+    try:
+        factor = float(scenario.get('energy_int_factor', 1.0))
+    except Exception:
+        factor = 1.0
+
+    sched = scenario.get('energy_int_schedule') or scenario.get('efficiency_schedule')
+    if isinstance(sched, dict):
+        try:
+            rate = sched.get('rate_pct_per_year', sched.get('annual_pct', sched.get('rate_pct', sched.get('rate'))))
+            rate = float(rate) if rate is not None else None
+        except Exception:
+            rate = None
+        if rate is not None:
+            years = None
+            try:
+                y_raw = sched.get('years')
+                years = int(y_raw) if y_raw is not None else None
+            except Exception:
+                years = None
+            if years is None:
+                try:
+                    baseline = int(sched.get('baseline_year', 2023))
+                except Exception:
+                    baseline = 2023
+                try:
+                    tgt = int(sched.get('target_year', 2050))
+                except Exception:
+                    tgt = 2050
+                try:
+                    cap = int(sched.get('max_year', 2050))
+                except Exception:
+                    cap = 2050
+                tgt = min(tgt, cap)
+                years = max(0, tgt - baseline)
+            annual = max(0.0, 1.0 - float(rate) / 100.0)
+            factor *= (annual ** int(years))
+
+    if abs(factor - 1.0) < 1e-12:
+        return
+
+    for k, v in list(energy_int.items()):
+        try:
+            val = float(v)
+        except Exception:
+            continue
+        if val == 0.0:
+            continue
+        energy_int[k] = val * factor
+
+
+def apply_energy_int_floor(energy_int: Dict[str, float], scenario: Dict[str, object]) -> None:
+    """Apply per-process minimum intensity floors after schedule scaling.
+
+    Scenario may include::
+        energy_int_floor: { "Blast Furnace": 11.0, ... }
+    which enforces energy_int[proc] = max(floor, current) for numeric entries.
+    """
+    if not isinstance(energy_int, dict) or not isinstance(scenario, dict):
+        return
+    floors = scenario.get('energy_int_floor')
+    if not isinstance(floors, dict):
+        return
+    for k, v in floors.items():
+        try:
+            floor_val = float(v)
+        except Exception:
+            continue
+        try:
+            cur = float(energy_int.get(k, 0.0) or 0.0)
+        except Exception:
+            cur = 0.0
+        energy_int[k] = max(cur, floor_val)

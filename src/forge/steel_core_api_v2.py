@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional, Any, List, Tuple, Set
 from collections import deque
 from datetime import datetime
-import inspect
 from functools import partial
 
 import pandas as pd
@@ -41,22 +40,25 @@ from forge.core.routing import (
 )
 from forge.core.compute import (
     calculate_lci,
+    compute_inside_elec_reference_for_share,
+    _build_routes_from_picks,
+    _ensure_fallback_processes,
+)
+from forge.core.transforms import (
     apply_fuel_substitutions,
     apply_dict_overrides,
     apply_recipe_overrides,
-    compute_inside_elec_reference_for_share,
+    apply_energy_int_efficiency_scaling,
+    apply_energy_int_floor,
 )
-from forge.core.engine import (
-    calculate_balance_matrix,
-    calculate_energy_balance,
-    calculate_emissions,  # signature may vary; we guard below
-)
+# Engine compute is orchestrated via core.runner now
 
 from forge.descriptor import load_sector_descriptor
 from forge.descriptor import (
     build_stage_material_map,
     build_route_mask_for_descriptor,
     reference_stage_for_gas,
+    reference_stage_for_electricity,
     resolve_feed_mode,
     resolve_stage_material,
 )
@@ -95,107 +97,7 @@ def _debug_print(*args, **kwargs) -> None:
 # ==============================
 # Scenario transforms
 # ==============================
-def _apply_energy_int_efficiency_scaling(energy_int: Dict[str, float], scenario: Dict[str, Any]) -> None:
-    """Apply uniform scaling to energy intensities based on scenario.
-
-    Recognized keys (all optional):
-      - energy_int_factor: float multiplier applied to all numeric intensities
-      - energy_int_schedule: mapping with one or more of:
-            rate_pct_per_year: float (e.g., 1.0 for 1%/yr reduction)
-            baseline_year: int (default 2023)
-            target_year: int (year to apply against; default 2050)
-            max_year: int (upper clamp for target_year; default 2050)
-            years: int (directly specify years to apply)
-
-    Notes:
-      - Executed BEFORE intensity adjustment functions so downstream logic uses improved base values.
-      - Non-numeric entries and zeros are left untouched.
-    """
-    if not isinstance(energy_int, dict) or not isinstance(scenario, dict):
-        return
-
-    # 1) Uniform factor
-    try:
-        factor = float(scenario.get("energy_int_factor", 1.0))
-    except Exception:
-        factor = 1.0
-
-    # 2) Yearly schedule → multiplicative factor
-    sched = scenario.get("energy_int_schedule") or scenario.get("efficiency_schedule")
-    if isinstance(sched, dict):
-        try:
-            # Accept a variety of rate keys
-            rate = (
-                sched.get("rate_pct_per_year", sched.get("annual_pct", sched.get("rate_pct", sched.get("rate"))))
-            )
-            rate = float(rate) if rate is not None else None
-        except Exception:
-            rate = None
-
-        if rate is not None:
-            # Prefer explicit years, else baseline/target
-            years_raw = sched.get("years")
-            years = None
-            try:
-                years = int(years_raw) if years_raw is not None else None
-            except Exception:
-                years = None
-
-            if years is None:
-                try:
-                    baseline = int(sched.get("baseline_year", 2023))
-                except Exception:
-                    baseline = 2023
-                try:
-                    tgt = int(sched.get("target_year", 2050))
-                except Exception:
-                    tgt = 2050
-                try:
-                    cap = int(sched.get("max_year", 2050))
-                except Exception:
-                    cap = 2050
-                tgt = min(tgt, cap)
-                years = max(0, tgt - baseline)
-
-            # Convert percentage reduction per year into multiplicative factor
-            annual = max(0.0, 1.0 - float(rate) / 100.0)
-            factor *= (annual ** int(years))
-
-    if abs(factor - 1.0) < 1e-12:
-        return
-
-    for k, v in list(energy_int.items()):
-        try:
-            val = float(v)
-        except Exception:
-            continue
-        if val == 0.0:
-            # Keep explicit zeros
-            continue
-        energy_int[k] = val * factor
-
-def _apply_energy_int_floor(energy_int: Dict[str, float], scenario: Dict[str, Any]) -> None:
-    """Apply per-process minimum intensity floors after schedule scaling.
-
-    Scenario may include:
-      energy_int_floor: { "Blast Furnace": 11.0, ... }
-    which enforces energy_int[proc] = max(floor, current) for numeric entries.
-    """
-    if not isinstance(energy_int, dict) or not isinstance(scenario, dict):
-        return
-    floors = scenario.get("energy_int_floor")
-    if not isinstance(floors, dict):
-        return
-    for k, v in floors.items():
-        try:
-            floor_val = float(v)
-        except Exception:
-            continue
-        try:
-            cur = float(energy_int.get(k, 0.0) or 0.0)
-        except Exception:
-            cur = 0.0
-        energy_int[k] = max(cur, floor_val)
+# moved to forge.core.transforms: apply_energy_int_efficiency_scaling / apply_energy_int_floor
 
 
 # ==============================
@@ -301,102 +203,7 @@ def _credit_enabled(scn: dict | None) -> bool:
     return True
 
 
-DEFAULT_PRODUCER_PRIORITY: Tuple[str, ...] = (
-    "Continuous Casting (R)",
-    "Hot Rolling",
-    "Cold Rolling",
-    "Basic Oxygen Furnace",
-    "Electric Arc Furnace",
-    "Bypass Raw→IP3",
-    "Bypass CR→IP3",
-    "Nitrogen Production",
-    "Oxygen Production",
-    "Dolomite Production",
-    "Burnt Lime Production",
-    "Coke Production",
-    "Natural gas from Market",
-    "LPG from Market",
-    "Biomethane from Market",
-    "Hydrogen (Methane reforming) from Market",
-    "Hydrogen (Electrolysis) from Market",
-)
-
-
-def _build_producers_index(recipes: List[Process]) -> Dict[str, List[Process]]:
-    prod = {}
-    for r in recipes:
-        for m in r.outputs:
-            prod.setdefault(m, []).append(r)
-    return prod
-
-
-def _build_routes_from_picks(
-    recipes: List[Process],
-    demand_mat: str,
-    picks_by_material: Dict[str, str],
-    pre_mask: Optional[Dict[str, int]] = None,
-    pre_select: Optional[Dict[str, int]] = None,
-    fallback_materials: Optional[Set[str]] = None,
-) -> Dict[str, int]:
-    """
-    Traverse upstream from demand_mat and build a 0/1 mask of chosen processes.
-    If multiple producers exist for a material:
-      - use picks_by_material[material] if present,
-      - else pick the first enabled producer (deterministic).
-    pre_mask / pre_select can disable producers (0/1).
-    """
-    pre_mask = pre_mask or {}
-    pre_select = pre_select or {}
-    fallback_set: Set[str] = set(fallback_materials or [])
-    producers = _build_producers_index(recipes)
-    chosen: Dict[str, int] = {}
-    visited_mats: Set[str] = set()
-    q = deque([demand_mat])
-
-    while q:
-        mat = q.popleft()
-        if mat in visited_mats:
-            continue
-        visited_mats.add(mat)
-
-        cand = producers.get(mat, [])
-        if fallback_set and mat in fallback_set:
-            for r in cand:
-                chosen[r.name] = 0
-            continue
-        enabled = [r for r in cand if pre_mask.get(r.name, 1) > 0 and pre_select.get(r.name, 1) > 0]
-        if not enabled:
-            continue
-
-        # Decide pick
-        if len(enabled) == 1:
-            pick = enabled[0]
-        else:
-            pick_name = picks_by_material.get(mat)
-            if pick_name is None:
-                def _score(proc):
-                    try:
-                        idx = DEFAULT_PRODUCER_PRIORITY.index(proc.name)
-                        return (0, idx, proc.name)
-                    except ValueError:
-                        return (1, proc.name)
-
-                pick = min(enabled, key=_score)
-            else:
-                pick = next((r for r in enabled if r.name == pick_name), enabled[0])
-
-        # Record chosen vs others
-        chosen[pick.name] = 1
-        for r in cand:
-            if r.name != pick.name:
-                chosen[r.name] = 0
-
-        # Recurse on inputs
-        for im in pick.inputs.keys():
-            if im not in visited_mats:
-                q.append(im)
-
-    return chosen
+## Route building uses the canonical core implementation (_build_routes_from_picks)
 
 
 def _resolve_stage_role(descriptor, stage_key: str, provided_role: Optional[str]) -> str:
@@ -441,23 +248,7 @@ def _apply_route_overrides(
     return ps, pm
 
 
-def _ensure_fallback_processes(
-    recipes: List[Process],
-    production_routes: Dict[str, int],
-    fallback_materials: Optional[Set[str]],
-) -> None:
-    if not fallback_materials:
-        return
-    fallback_set = {str(mat).strip() for mat in (fallback_materials or set()) if str(mat).strip()}
-    if not fallback_set:
-        return
-    existing = {r.name for r in recipes}
-    for mat in fallback_set:
-        proc_name = f"External {mat} (auto)"
-        if proc_name not in existing:
-            recipes.append(Process(proc_name, inputs={}, outputs={mat: 1.0}))
-            existing.add(proc_name)
-        production_routes.setdefault(proc_name, 1)
+## Fallback process injection uses canonical core implementation (_ensure_fallback_processes)
 
 
 def _infer_eaf_mode(route_preset: str) -> Optional[str]:
@@ -470,14 +261,7 @@ def _infer_eaf_mode(route_preset: str) -> Optional[str]:
     }.get(route_preset, None)
 
 
-def _robust_call_calculate_emissions(calc_fn, **kwargs):
-    """
-    Call calculate_emissions with only the parameters it actually accepts.
-    This avoids crashes across slightly different local signatures.
-    """
-    sig = inspect.signature(calc_fn)
-    usable = {k: v for k, v in kwargs.items() if k in sig.parameters}
-    return calc_fn(**usable)
+## Emissions call robustness handled by core.runner
 
 
 def write_run_log(log_dir: str, payload: Dict[str, Any]) -> str:
@@ -502,59 +286,7 @@ def write_run_log(log_dir: str, payload: Dict[str, Any]) -> str:
         json.dump(payload, f, indent=2, ensure_ascii=False)
     return fpath
 
-def compute_inside_gas_reference_for_share(
-    recipes: List[Process],
-    energy_int: Dict[str, float],
-    energy_shares: Dict[str, Dict[str, float]],
-    energy_content: Dict[str, float],
-    params: Any,
-    route_key: str,
-    demand_qty: float,
-    stage_ref: str = "IP3",
-    stage_lookup: Optional[Dict[str, str]] = None,
-    gas_carrier: str = "Gas",
-    fallback_materials: Optional[Set[str]] = None,
-) -> float:
-    """
-    Compute total plant-level gas consumption for the entire production route.
-    This provides a fixed reference regardless of user's stop-at-stage.
-    """
-    # Build a production route for the entire plant (to final product)
-    pre_mask = build_route_mask(route_key, recipes)
-    stage_map = stage_lookup or STAGE_MATS
-    if stage_ref not in stage_map:
-        raise KeyError(f"Stage '{stage_ref}' not found while computing gas reference.")
-    demand_mat = stage_map[stage_ref]
-    
-    # Build production route deterministically (no picks)
-    production_routes_full = _build_routes_from_picks(
-        recipes,
-        demand_mat,
-        picks_by_material={},  # Use defaults
-        pre_mask=pre_mask,
-        fallback_materials=fallback_materials,
-    )
-    
-    final_demand_full = {demand_mat: demand_qty}
-    import copy as _copy
-    recipes_full = _copy.deepcopy(recipes)
-    _ensure_fallback_processes(recipes_full, production_routes_full, fallback_materials)
-    balance_matrix_full, prod_levels_full = calculate_balance_matrix(
-        recipes_full, final_demand_full, production_routes_full
-    )
-    
-    if balance_matrix_full is None:
-        return 0.0
-    
-    # Calculate energy balance for full route
-    energy_balance_full = calculate_energy_balance(prod_levels_full, energy_int, energy_shares)
-    
-    # Sum all gas consumption across the plant
-    total_gas_consumption = 0.0
-    if gas_carrier in energy_balance_full.columns:
-        total_gas_consumption = float(energy_balance_full[gas_carrier].sum())
-    
-    return total_gas_consumption
+## NOTE: Canonical gas reference is provided by forge.core.compute.compute_inside_gas_reference_for_share
 # ==============================
 # Main API
 # ==============================
@@ -733,9 +465,9 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     apply_dict_overrides(e_efs,          scenario.get('emission_factors', {}))
 
     # Apply uniform/scheduled efficiency improvements to intensities BEFORE adjustments
-    _apply_energy_int_efficiency_scaling(energy_int, scenario)
+    apply_energy_int_efficiency_scaling(energy_int, scenario)
     # Optional per-process minimum floors (applied after schedule)
-    _apply_energy_int_floor(energy_int, scenario)
+    apply_energy_int_floor(energy_int, scenario)
 
     # Optional: DRI fuel mix transformations relative to baseline gas share
     def _apply_dri_mix(energy_shares: Dict[str, Dict[str, float]], scenario: Dict[str, Any]) -> None:
@@ -1054,6 +786,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     # ensure we have plant-level inside_elec_ref and fixed internal ef values
     try:
+        elec_ref_stage = reference_stage_for_electricity(descriptor)
         inside_elec_ref = compute_inside_elec_reference_for_share(
             recipes=recipes,
             energy_int=energy_int,
@@ -1062,7 +795,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
             params=params,
             route_key=route_preset,
             demand_qty=demand_qty,
-            stage_ref="IP3",
+            stage_ref=elec_ref_stage,
         )
     except Exception:
         inside_elec_ref = 0.0

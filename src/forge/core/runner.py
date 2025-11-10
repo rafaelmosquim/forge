@@ -29,6 +29,7 @@ from .compute import (
     calculate_internal_electricity,
     apply_gas_routing_and_credits,
     calculate_lci,
+    compute_inside_gas_reference_for_share,
 )
 from .costs import analyze_energy_costs, analyze_material_costs
 
@@ -108,44 +109,6 @@ def _robust_call_calculate_emissions(calc_fn, **kwargs):
     return calc_fn(**usable)
 
 
-def _compute_inside_gas_reference_for_share(
-    *,
-    recipes: List[Process],
-    energy_int: Dict[str, float],
-    energy_shares: Dict[str, Dict[str, float]],
-    energy_content: Dict[str, float],
-    params: Any,
-    route_key: str,
-    demand_qty: float,
-    stage_ref: str = "IP3",
-    stage_lookup: Optional[Dict[str, str]] = None,
-    gas_carrier: str = "Gas",
-    fallback_materials: Optional[Set[str]] = None,
-) -> float:
-    """Plant-level gas consumption for the entire route to a reference stage."""
-    pre_mask = build_route_mask(route_key, recipes)
-    stage_map = stage_lookup or STAGE_MATS
-    if stage_ref not in stage_map:
-        return 0.0
-    demand_mat = stage_map[stage_ref]
-
-    # Deterministic build to the reference material
-    production_routes_full = {r.name: pre_mask.get(r.name, 1) for r in recipes}
-    final_demand_full = {demand_mat: demand_qty}
-
-    import copy as _copy
-    recipes_full = _copy.deepcopy(recipes)
-    bm_full, prod_full = calculate_balance_matrix(
-        recipes_full, final_demand_full, production_routes_full
-    )
-    if bm_full is None:
-        return 0.0
-    energy_balance_full = calculate_energy_balance(prod_full, energy_int, energy_shares)
-    if gas_carrier in energy_balance_full.columns:
-        return float(energy_balance_full[gas_carrier].sum())
-    return 0.0
-
-
 def run_core_scenario(scn: CoreScenario) -> CoreResults:
     """Execute the deterministic compute for a resolved scenario."""
     # 1) Balance
@@ -174,8 +137,9 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
 
     # 3) Gas routing + credit, EF blending
     gas_reference_fn = partial(
-        _compute_inside_gas_reference_for_share,
+        compute_inside_gas_reference_for_share,
         stage_lookup=STAGE_MATS,
+        gas_carrier=(scn.gas_config.get("natural_gas_carrier") if isinstance(scn.gas_config, dict) else None) or "Gas",
         fallback_materials=scn.fallback_materials or set(),
     )
     eb_adj, e_efs, gas_meta = apply_gas_routing_and_credits(
@@ -244,9 +208,9 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
             if "TOTAL" not in emissions.index and "TOTAL CO2e" in emissions.columns:
                 emissions.loc["TOTAL"] = emissions.sum()
             if "TOTAL" in emissions.index and "TOTAL CO2e" in emissions.columns:
-                total_co2 = float(emissions.loc["TOTAL", "TOTAL CO2e"]) * 1000.0
+                total_co2 = float(emissions.loc["TOTAL", "TOTAL CO2e"])  # already kg
             elif "TOTAL CO2e" in emissions.columns:
-                total_co2 = float(emissions["TOTAL CO2e"].sum()) * 1000.0
+                total_co2 = float(emissions["TOTAL CO2e"].sum())  # already kg
     except Exception:
         total_co2 = None
 

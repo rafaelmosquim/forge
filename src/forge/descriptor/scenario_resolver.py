@@ -42,6 +42,17 @@ def reference_stage_for_gas(descriptor: Optional[SectorDescriptor]) -> str:
     return "IP3"
 
 
+def reference_stage_for_electricity(descriptor: Optional[SectorDescriptor]) -> str:
+    """Return the stage_id to use for electricity reference calculations.
+
+    Uses the same configuration as gas by default to keep a single source of
+    truth in the descriptor. Falls back to IP3 if not specified.
+    """
+    if descriptor and descriptor.gas.reference_stage_id:
+        return descriptor.gas.reference_stage_id
+    return "IP3"
+
+
 def _route_aliases(preset: RoutePreset) -> Iterable[str]:
     aliases = {preset.id.lower(), *preset.aliases}
     for alias in aliases:

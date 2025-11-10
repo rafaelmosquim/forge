@@ -40,18 +40,11 @@ from forge.core.routing import (
     apply_inhouse_clamp,
 )
 from forge.core.compute import (
-    expand_energy_tables_for_active,
-    calculate_internal_electricity,
     calculate_lci,
-    adjust_energy_balance,
-    analyze_energy_costs,
-    analyze_material_costs,
     apply_fuel_substitutions,
     apply_dict_overrides,
     apply_recipe_overrides,
     compute_inside_elec_reference_for_share,
-    compute_inside_gas_reference_for_share,
-    apply_gas_routing_and_credits,
 )
 from forge.core.engine import (
     calculate_balance_matrix,
@@ -1001,162 +994,63 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     _ensure_fallback_processes(recipes_calc, production_routes, fallback_materials)
 
-    # ---------- Solve balances ----------
-    final_demand = {demand_mat: demand_qty}
+    # ---------- Compute via core runner ----------
+    # Load process-emissions yaml for direct process emissions mapping
+    process_emissions_table = load_data_from_yaml(os.path.join(base, 'process_emissions.yml')) or {}
 
-    balance_matrix, prod_levels = calculate_balance_matrix(recipes_calc, final_demand, production_routes)
+    from forge.core.runner import CoreScenario, run_core_scenario
 
-    # Optional debug capture
-    if _is_debug_io_enabled():
-        _debug_print("🎯 CORE INPUTS CAPTURED:")
-        _debug_print("1. final_demand:", final_demand)
-        _debug_print("2. production_routes sample:", dict(list(production_routes.items())[:3]))
-        _debug_print("3. recipes_calc count:", len(recipes_calc))
-        _debug_print("4. scenario keys:", list(scenario.keys()))
+    # Load optional price tables (API does I/O, core does math)
+    energy_prices = load_data_from_yaml(os.path.join(base, 'energy_prices.yml')) or {}
+    material_prices = load_data_from_yaml(os.path.join(base, 'material_prices.yml')) or {}
 
-        # Save what core actually receives
-        core_inputs = {
-            "final_demand": final_demand,
-            "production_routes": production_routes,
-            "scenario_dict": scenario,
-            "recipes_sample": [r.name for r in recipes_calc[:5]],  # Just names
-        }
-        with open('DEBUG_core_balance_inputs.json', 'w') as f:
-            json.dump(core_inputs, f, indent=2, default=str)
-        _debug_print("✅ Saved balance inputs to DEBUG_core_balance_inputs.json")
-    
-    if balance_matrix is None:
-        # Return empty-ish structures with a message rather than crashing
-        return RunOutputs(
-            production_routes=production_routes,
-            prod_levels={},
-            energy_balance=pd.DataFrame(),
-            emissions=None,
-            total_co2e_kg=None,
-            total_cost=None,
-            material_cost=None,
-            balance_matrix=pd.DataFrame(),
-            meta={"error": "Material balance failed"},
-        )
-
-    # Ensure energy tables have rows for all active variants
-    active_procs = [p for p, r in prod_levels.items() if r > 1e-9]
-    expand_energy_tables_for_active(active_procs, energy_shares, energy_int)
-
-    # Internal electricity from recovered gases (before credit)
-    recipes_dict = {r.name: r for r in recipes_calc}
-    internal_elec = calculate_internal_electricity(prod_levels, recipes_dict, params)
-
-    # Energy balance (base)
-    energy_balance = calculate_energy_balance(prod_levels, energy_int, energy_shares)
-
-    # Optional fix-ups to BF / Coke carriers (if your CLI does this)
-    try:
-        if 'Blast Furnace' in energy_balance.index:
-            bf_runs = float(prod_levels.get('Blast Furnace', 0.0))
-            bf_intensity = float(
-                getattr(
-                    params,
-                    'bf_adj_intensity',
-                    getattr(params, 'bf_base_intensity', energy_int.get('Blast Furnace', 0.0)),
-                )
-            )
-            bf_sh   = energy_shares.get('Blast Furnace', {})
-            for carrier in energy_balance.columns:
-                if carrier != 'Electricity':
-                    energy_balance.loc['Blast Furnace', carrier] = bf_runs * bf_intensity * float(bf_sh.get(carrier, 0.0))
-        cp_runs = float(prod_levels.get('Coke Production', 0.0))
-        base_cp = float(getattr(params, 'coke_production_base_intensity', energy_int.get('Coke Production', 0.0)))
-        cp_sh   = energy_shares.get('Coke Production', {})
-        if cp_runs and cp_sh:
-            for carrier in energy_balance.columns:
-                if carrier != 'Electricity':
-                    energy_balance.loc['Coke Production', carrier] = cp_runs * base_cp * float(cp_sh.get(carrier, 0.0))
-    except Exception:
-        pass  # if fields missing, skip the fix-up
-
-    # Defer LCI build until after gas routing adjustments
-    lci_df = None
-
-    # Delegate gas routing, EF blending and credit application to core helper
-    gas_reference_fn = partial(
-        compute_inside_gas_reference_for_share,
-        stage_lookup=stage_material_map,
-        gas_carrier=natural_gas_carrier,
-        fallback_materials=fallback_materials,
-    )
-
-    energy_balance, e_efs, gas_meta = apply_gas_routing_and_credits(
-        energy_balance=energy_balance,
+    core_inputs = CoreScenario(
         recipes=recipes_calc,
-        prod_levels=prod_levels,
-        params=params,
-        energy_shares=energy_shares,
         energy_int=energy_int,
+        energy_shares=energy_shares,
         energy_content=energy_content,
-        e_efs=e_efs,
-        scenario={
-            'gas_routing': scenario.get('gas_routing', {}),
-            'route_preset': route_preset,
-            'demand_qty': demand_qty,
-            'stage_ref': gas_reference_stage,
-            'gas_config': gas_config,
-            'process_roles': descriptor.process_roles,
-            'stage_lookup': stage_material_map,
-            'fallback_materials': list(fallback_materials),
-        },
-        credit_on=credit_on,
-        compute_inside_gas_reference_fn=gas_reference_fn,
+        params=params,
+        production_routes=production_routes,
+        demand_material=demand_mat,
+        demand_qty=demand_qty,
+        mkt_cfg=mkt_cfg,
+        energy_efs=e_efs,
+        process_efs=process_emissions_table,
+        route_preset=route_preset,
+        stage_ref=gas_reference_stage,
+        gas_config=gas_config,
+        gas_routing=scenario.get('gas_routing', {}),
+        fallback_materials=fallback_materials,
+        outside_mill_procs=set(OUTSIDE_MILL_PROCS or []),
+        enable_lci=is_lci_enabled(),
+        energy_prices=energy_prices,
+        material_prices=material_prices,
+        external_purchase_rows=external_purchase_rows,
     )
 
-    # Build a separate energy balance for emissions where BF uses BASE intensity
-    # while keeping the LCI/energy_balance with ADJUSTED intensity.
-    eb_for_emissions = energy_balance.copy()
+    core_res = run_core_scenario(core_inputs)
+
+    balance_matrix = core_res.balance_matrix
+    prod_levels = core_res.prod_levels
+    energy_balance = core_res.energy_balance
+    emissions = core_res.emissions
+    total_co2 = core_res.total_co2e_kg
+    lci_df = core_res.lci
+    gas_meta = core_res.meta
+    e_efs = core_res.energy_efs_out
+
+    # Diagnostics comparable to prior debug
     try:
-        if 'Blast Furnace' in eb_for_emissions.index:
-            bf_runs = float(prod_levels.get('Blast Furnace', 0.0))
-            # Fallback to energy_int if param not present (defensive)
-            bf_base = float(getattr(params, 'bf_base_intensity', energy_int.get('Blast Furnace', 0.0)))
-            bf_sh = energy_shares.get('Blast Furnace', {}) or {}
-            for carrier in eb_for_emissions.columns:
-                if carrier == 'Electricity':
-                    continue
-                share = float(bf_sh.get(carrier, 0.0))
-                eb_for_emissions.loc['Blast Furnace', carrier] = bf_runs * bf_base * share
-            # Recompute TOTAL row if present
-            if 'TOTAL' in eb_for_emissions.index:
-                eb_for_emissions.loc['TOTAL'] = eb_for_emissions.drop(index='TOTAL').sum()
+        emissions_inputs = {
+            "prod_levels_sample": dict(list(prod_levels.items())[:5]),
+            "energy_balance_sample": energy_balance.head(3).to_dict() if isinstance(energy_balance, pd.DataFrame) else {},
+            "energy_int_sample": dict(list(energy_int.items())[:3]),
+            "e_efs_sample": dict(list(e_efs.items())[:3]),
+        }
+        with open('DEBUG_core_emissions_inputs.json', 'w') as f:
+            json.dump(emissions_inputs, f, indent=2, default=str)
     except Exception:
-        # If anything goes wrong, keep original for robustness
-        eb_for_emissions = energy_balance
-
-    # merge gas_meta into local variables for meta reporting
-    total_gas_MJ = gas_meta.get('total_process_gas_MJ', 0.0)
-    direct_use_gas_MJ = gas_meta.get('direct_use_gas_MJ', 0.0)
-    electricity_gas_MJ = gas_meta.get('electricity_gas_MJ', 0.0)
-    total_gas_consumption_plant = gas_meta.get('total_gas_consumption_plant', 0.0)
-    f_internal_gas = gas_meta.get('f_internal_gas', 0.0)
-    ef_gas_blended = gas_meta.get('ef_gas_blended', 0.0)
-    # Load process-emissions yaml for direct process emissions (if needed)
-    process_emissions_table = load_data_from_yaml(os.path.join(base, 'process_emissions.yml'))
-
-    print("🎯 CORE ENERGY/EMISSIONS INPUTS:")
-    print("1. prod_levels sample:", dict(list(prod_levels.items())[:3]))
-    print("2. energy_balance shape:", energy_balance.shape)
-    print("3. energy_int sample:", dict(list(energy_int.items())[:3]))
-    print("4. e_efs sample:", dict(list(e_efs.items())[:3]))
-
-    emissions_inputs = {
-        "prod_levels_sample": dict(list(prod_levels.items())[:5]),
-        "energy_balance_sample": energy_balance.head(3).to_dict(),
-        "energy_int_sample": dict(list(energy_int.items())[:3]),
-        "e_efs_sample": dict(list(e_efs.items())[:3]),
-    }
-
-    with open('DEBUG_core_emissions_inputs.json', 'w') as f:
-        json.dump(emissions_inputs, f, indent=2, default=str)
-
-    print("✅ Saved emissions inputs to DEBUG_core_emissions_inputs.json")
+        pass
 
     # ensure we have plant-level inside_elec_ref and fixed internal ef values
     try:
@@ -1174,85 +1068,14 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         inside_elec_ref = 0.0
 
     # Pull internal electricity diagnostics from gas_meta if available
-    f_internal = gas_meta.get('f_internal', 0.0)
-    ef_internal_electricity = gas_meta.get('ef_internal_electricity', 0.0)
-
-    # Emissions (robust to differing signatures)
-    emissions = _robust_call_calculate_emissions(
-        calculate_emissions,
-        mkt_cfg=mkt_cfg,
-        prod_lvl=prod_levels,            # some versions expect prod_lvl
-        prod_level=prod_levels,          # others expect prod_level
-        energy_balance=eb_for_emissions,   # some versions expect energy_balance
-        energy_df=eb_for_emissions,        # others expect energy_df
-        # emission factors
-        e_efs=e_efs,                     # some versions expect e_efs
-        energy_efs=e_efs,                # others expect energy_efs
-        # process emissions table
-        process_emissions_table=process_emissions_table,  # some versions expect this name
-        process_efs=process_emissions_table,              # others expect process_efs
-        internal_elec=internal_elec,
-        final_demand=final_demand,
-        total_gas_MJ=total_gas_MJ,
-        EF_process_gas=gas_meta.get('EF_process_gas', 0.0),
-        # Fixed plant-level values
-        internal_fraction_plant=f_internal,
-        ef_internal_electricity=ef_internal_electricity,
-    )
-
-    # Ensure a TOTAL row if your function doesn't add it
-    total_co2 = None
-    try:
-        if emissions is not None and not emissions.empty:
-            if 'TOTAL' not in emissions.index and 'TOTAL CO2e' in emissions.columns:
-                emissions.loc['TOTAL'] = emissions.sum()
-            if 'TOTAL' in emissions.index and 'TOTAL CO2e' in emissions.columns:
-                total_co2 = float(emissions.loc['TOTAL', 'TOTAL CO2e'])
-            elif 'TOTAL CO2e' in emissions.columns:
-                total_co2 = float(emissions['TOTAL CO2e'].sum())
-    except Exception:
-        pass
+    f_internal = float(gas_meta.get('f_internal', 0.0))
+    f_internal_gas = float(gas_meta.get('f_internal_gas', 0.0))
+    ef_internal_electricity = float(gas_meta.get('ef_internal_electricity', 0.0))
     fyield = float(getattr(params, "finished_yield", 0.85))    
 
-    # ----------- Energy Cost Calculation -----------
-    try:
-        # Load energy prices
-        energy_prices_path = os.path.join(base, 'energy_prices.yml')
-        energy_prices = load_data_from_yaml(energy_prices_path) or {}
-
-        # Debug: Check what we are working with
-        print(f"🔍 Material prices loaded: {bool(energy_prices)}")
-        print(f"🔍 Material prices keys: {list(energy_prices.keys()) if energy_prices else 'None'}")
-
-        # Calculate total cost using core function
-        total_cost = analyze_energy_costs(energy_balance, energy_prices)
-        print(f"🔍 Total cost calculated: {total_cost}")
-        
-    except Exception as e:
-        print(f"❌ Error in cost calculation: {e}")
-        import traceback
-        traceback.print_exc()
-        total_cost = 0.0  # Default to 0 instead of None
-
-        # ----------- Material Cost Calculation -----------
-    try:
-        # Load energy prices
-        material_prices_path = os.path.join(base, 'material_prices.yml')
-        material_prices = load_data_from_yaml(material_prices_path) or {}
-
-        # Debug: Check what we are working with
-        print(f"🔍 Material prices loaded: {bool(material_prices)}")
-        print(f"🔍 Material prices keys: {list(material_prices.keys()) if material_prices else 'None'}")
-
-        # Calculate total cost using core function
-        material_cost = analyze_material_costs(balance_matrix, material_prices, external_rows=external_purchase_rows)
-        print(f"🔍 Material cost calculated: {material_cost}")
-        
-    except Exception as e:
-        print(f"❌ Error in cost calculation: {e}")
-        import traceback
-        traceback.print_exc()
-        material_cost = 0.0  # Default to 0 instead of None    
+    # Costs were computed inside core runner when price tables are present
+    total_cost = core_res.total_cost if core_res.total_cost is not None else 0.0
+    material_cost = core_res.material_cost if core_res.material_cost is not None else 0.0
 
     meta = {
         "route_preset": route_preset,
@@ -1298,7 +1121,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     }
 
     enable_lci = is_lci_enabled()
-    if enable_lci:
+    if enable_lci and lci_df is None:
         # Build final LCI with carrier splits
         lci_df = calculate_lci(
             prod_level=prod_levels,

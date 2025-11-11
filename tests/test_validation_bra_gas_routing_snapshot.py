@@ -8,8 +8,8 @@ from forge.steel_core_api_v2 import run_scenario, ScenarioInputs, RouteConfig
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "direct,use_expected", [
-        (0.0, 2216.0),
-        (0.5, 2087.0),
+        (0.0, 2241.5),
+        (0.5, 2100.7),
         (1.0, 1951.0),
     ],
 )

@@ -52,3 +52,4 @@ _preview_*.txt
 **/*.csv
 **/*.png
 **/*.log
+!datasets/steel/plants.csv

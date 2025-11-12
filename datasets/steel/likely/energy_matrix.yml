@@ -532,10 +532,10 @@ processes:
     Charcoal: 0
     Coke: 0
   "Basic Oxygen Furnace":
-    Electricity: 0.91
+    Electricity: 0.71
     FLF: 0
     RLF: 0
-    Process Gas (internal): 0.09
+    Process Gas (internal): 0.29
     Gas: 0
     Wood: 0
     Coal: 0

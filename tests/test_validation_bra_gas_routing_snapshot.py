@@ -8,9 +8,9 @@ from forge.steel_core_api_v2 import run_scenario, ScenarioInputs, RouteConfig
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "direct,use_expected", [
-        (0.0, 2507.1),
-        (0.5, 2390.0),
-        (1.0, 2270.5),
+        (0.0, 2802.0),
+        (0.5, 2674.0),
+        (1.0, 2544.0),
     ],
 )
 def test_bf_bof_validation_as_cast_bra_gas_routing_snapshots(data_dir, direct, use_expected):

@@ -88,6 +88,7 @@ process_roles:
     - gas_source
   Basic Oxygen Furnace:
     - primary
+    - gas_source
   Direct Reduction Iron:
     - primary
   Electric Arc Furnace:
@@ -108,7 +109,7 @@ costing:
     - 'Oxygen from market'
 
 gas:
-  process_gas_carrier: 'Process Gas'
+  process_gas_carrier: 'Process Gas (internal)'
   natural_gas_carrier: 'Gas'
   utility_process: 'Utility Plant'
   reference_stage_id: IP3

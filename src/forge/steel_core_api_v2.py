@@ -88,6 +88,116 @@ def _debug_print(*args, **kwargs) -> None:
         print(*args, **kwargs)
 
 
+def _coerce_float(value) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _infer_process_from_carrier(carrier: str) -> Optional[str]:
+    if not carrier:
+        return None
+    name = carrier.lower()
+    if "coke" in name:
+        return "Coke Production"
+    if "bof" in name or "basic oxygen" in name:
+        return "Basic Oxygen Furnace"
+    if "bf" in name or "blast furnace" in name:
+        return "Blast Furnace"
+    return None
+
+
+def _load_process_gas_table(base_path: str) -> Dict[str, Any]:
+    path = os.path.join(base_path, "process_gases.yml")
+    try:
+        data = load_data_from_yaml(path, unwrap_single_key=False)
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    if "process_gases" in data and isinstance(data["process_gases"], dict):
+        return data["process_gases"]
+    return data
+
+
+def _normalize_process_gas_entries(raw: Dict[str, Any], energy_content: Dict[str, float]) -> Tuple[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
+    normalized: Dict[str, Dict[str, Any]] = {}
+    specs: List[Dict[str, Any]] = []
+    if not isinstance(raw, dict):
+        return normalized, specs
+
+    for carrier, meta in raw.items():
+        if not isinstance(meta, dict):
+            continue
+        entry: Dict[str, Any] = {}
+        energy_mj_per_nm3 = _coerce_float(meta.get("energy_mj_per_nm3"))
+        energy_gj_per_ndam3 = _coerce_float(
+            meta.get("energy_gj_per_ndam3") or meta.get("energy_GJ_per_Ndam3") or meta.get("Energy Content")
+        )
+        if energy_mj_per_nm3 is None and energy_gj_per_ndam3 is not None:
+            ndam3_to_nm3 = _coerce_float(meta.get("ndam3_to_nm3")) or 1000.0
+            energy_mj_per_nm3 = (energy_gj_per_ndam3 * 1000.0) / max(1.0, ndam3_to_nm3)
+        density = _coerce_float(meta.get("density_kg_per_nm3") or meta.get("density_kg_per_Nm3") or meta.get("Density"))
+        entry["energy_mj_per_nm3"] = energy_mj_per_nm3
+        entry["density_kg_per_nm3"] = density
+
+        energy_mj_per_unit = None
+        if energy_mj_per_nm3 is not None and density and density > 0:
+            energy_mj_per_unit = energy_mj_per_nm3 / density
+        elif isinstance(energy_content.get(carrier), (int, float)):
+            try:
+                energy_mj_per_unit = float(energy_content[carrier])
+            except Exception:
+                energy_mj_per_unit = None
+
+        if energy_mj_per_unit is not None:
+            energy_content[carrier] = energy_mj_per_unit
+        entry["energy_mj_per_unit"] = energy_mj_per_unit
+
+        recovery = meta.get("recovery_fraction")
+        if recovery is None:
+            for key, val in meta.items():
+                if "recovery" in str(key).lower():
+                    recovery = val
+                    break
+        entry["recovery_fraction"] = _coerce_float(recovery)
+
+        source_process = meta.get("source_process") or meta.get("process") or meta.get("producer") or _infer_process_from_carrier(carrier)
+        entry["source_process"] = source_process
+        entry["outputs_in_MJ"] = bool(meta.get("outputs_in_MJ", False))
+
+        normalized[carrier] = entry
+        if source_process:
+            specs.append(
+                {
+                    "process": source_process,
+                    "carrier": carrier,
+                    "outputs_in_MJ": entry["outputs_in_MJ"],
+                    "energy_per_unit": entry["energy_mj_per_unit"],
+                }
+            )
+    return normalized, specs
+
+
+def _apply_process_gas_metadata(base_path: str, energy_content: Dict[str, float], params, gas_config: Dict[str, Any]) -> Dict[str, Any]:
+    raw = _load_process_gas_table(base_path)
+    normalized, specs = _normalize_process_gas_entries(raw, energy_content)
+    if not normalized:
+        return gas_config
+
+    if isinstance(params, object):
+        setattr(params, "process_gases", normalized)
+
+    updated = dict(gas_config or {})
+    updated["process_gases"] = normalized
+    if specs:
+        updated["process_gas_sources"] = specs
+    return updated
+
+
 # ==============================
 # Scenario transforms
 # ==============================
@@ -309,6 +419,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     energy_content = load_data_from_yaml(os.path.join(base, 'energy_content.yml'))
     e_efs          = load_data_from_yaml(os.path.join(base, 'emission_factors.yml'))
     params         = load_parameters      (os.path.join(base, 'parameters.yml'))
+    gas_config     = _apply_process_gas_metadata(base, energy_content, params, gas_config)
     mkt_cfg        = load_market_config   (os.path.join(base, 'mkt_config.yml'))
     elec_map       = load_electricity_intensity(os.path.join(base, 'electricity_intensity.yml')) or {}
 
@@ -507,6 +618,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "gas_coke_MJ": gas_meta.get('gas_coke_MJ', 0.0),
         "gas_bf_MJ": gas_meta.get('gas_bf_MJ', 0.0),
         "gas_sources_MJ": gas_meta.get('gas_sources_MJ', 0.0),
+        "gas_source_details": gas_meta.get('gas_source_details', {}),
+        "gas_credit_details": gas_meta.get('gas_credit_details', {}),
         "direct_use_gas_MJ": gas_meta.get('direct_use_gas_MJ', 0.0),
         "electricity_gas_MJ": gas_meta.get('electricity_gas_MJ', 0.0),
         "total_gas_consumption_plant": gas_meta.get('total_gas_consumption_plant', 0.0),

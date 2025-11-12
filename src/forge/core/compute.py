@@ -7,7 +7,7 @@ precedence; otherwise we delegate to `forge.steel_model_core`.
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 import pandas as pd
 import os
 from .models import Process
@@ -58,8 +58,34 @@ def calculate_internal_electricity(prod_level: Dict[str, float], recipes_dict: D
     if 'Utility Plant' in recipes_dict:
         util_eff = recipes_dict['Utility Plant'].outputs.get('Electricity', 0.0)
 
+    gas_meta = getattr(params, 'process_gases', {}) or {}
     internal_elec = 0.0
 
+    if gas_meta:
+        for carrier, meta in gas_meta.items():
+            try:
+                proc_name = str(meta.get('source_process') or '').strip()
+            except Exception:
+                proc_name = ''
+            if not proc_name or proc_name not in recipes_dict:
+                continue
+            runs = float(prod_level.get(proc_name, 0.0) or 0.0)
+            if runs <= 0:
+                continue
+            qty = float(recipes_dict[proc_name].outputs.get(carrier, 0.0) or 0.0)
+            if qty <= 0:
+                continue
+            try:
+                energy_per_unit = float(meta.get('energy_mj_per_unit', 0.0))
+            except (TypeError, ValueError):
+                energy_per_unit = 0.0
+            if energy_per_unit <= 0:
+                continue
+            energy_MJ = runs * qty * energy_per_unit
+            internal_elec += energy_MJ * util_eff
+        return internal_elec
+
+    # Legacy fallback (no explicit metadata): BF delta + Coke process gas
     # BF top-gas delta between adjusted and base intensities
     bf_runs = float(prod_level.get('Blast Furnace', 0.0))
     if bf_runs > 0 and hasattr(params, 'bf_base_intensity') and hasattr(params, 'bf_adj_intensity'):
@@ -164,19 +190,6 @@ def apply_gas_routing_and_credits(
             iterable = []
         return {str(r).lower() for r in iterable}
 
-    # Compute process gas volumes (legacy steel logic)
-    try:
-        gas_coke_MJ = prod_levels.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get(process_gas_carrier, 0.0)
-    except Exception:
-        gas_coke_MJ = 0.0
-    try:
-        bf_adj = float(getattr(params, 'bf_adj_intensity', 0.0))
-        bf_base = float(getattr(params, 'bf_base_intensity', 0.0))
-        gas_bf_MJ = (bf_adj - bf_base) * prod_levels.get('Blast Furnace', 0.0)
-    except Exception:
-        gas_bf_MJ = 0.0
-    total_gas_MJ = float(gas_coke_MJ + gas_bf_MJ)
-
     def _blend_EF(shares: Dict[str, float], efs: Dict[str, float]) -> float:
         fuels = [(c, s) for c, s in (shares or {}).items() if c != 'Electricity' and s > 0]
         if not fuels:
@@ -184,58 +197,150 @@ def apply_gas_routing_and_credits(
         denom = sum(s for _, s in fuels) or 1e-12
         return sum(s * float(efs.get(c, 0.0)) for c, s in fuels) / denom
 
+    def _collect_sources_from_specs(specs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        rows: List[Dict[str, Any]] = []
+        for spec in specs or []:
+            proc_name = str(spec.get('process') or '').strip()
+            if not proc_name:
+                continue
+            carrier_name = str(spec.get('carrier') or process_gas_carrier).strip()
+            proc = recipes_dict.get(proc_name)
+            if not proc:
+                continue
+            gas_output = float(proc.outputs.get(carrier_name, 0.0) or 0.0)
+            if gas_output <= 0:
+                continue
+            runs = float(prod_levels.get(proc_name, 0.0) or 0.0)
+            if runs <= 0:
+                continue
+            energy_per_unit = spec.get('energy_per_unit')
+            try:
+                energy_per_unit = float(energy_content.get(carrier_name, energy_per_unit))
+            except Exception:
+                try:
+                    energy_per_unit = float(energy_per_unit)
+                except Exception:
+                    energy_per_unit = None
+            if spec.get('outputs_in_MJ'):
+                contribution = runs * gas_output
+            else:
+                if energy_per_unit is None or energy_per_unit <= 0:
+                    continue
+                contribution = runs * gas_output * energy_per_unit
+            if contribution <= 1e-12:
+                continue
+            rows.append({'process': proc_name, 'carrier': carrier_name, 'mj': contribution})
+        return rows
+
     EF_coke_gas = _blend_EF(energy_shares.get('Coke Production', {}), e_efs)
     EF_bf_gas = _blend_EF(energy_shares.get('Blast Furnace', {}), e_efs)
-    EF_process_gas = EF_coke_gas if total_gas_MJ <= 1e-9 else (
-        (EF_coke_gas * (gas_coke_MJ / max(1e-12, total_gas_MJ))) + (EF_bf_gas * (gas_bf_MJ / max(1e-12, total_gas_MJ)))
-    )
+    EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
 
-    gas_source_names = gas_config.get('gas_sources')
-    if not gas_source_names:
-        gas_source_names = [
-            name for name in recipes_dict.keys()
-            if 'gas_source' in _roles_for(name)
-        ]
-    gas_source_names = list(dict.fromkeys(gas_source_names))
-
-    gas_sources_MJ = 0.0
-    ef_weighted = 0.0
-    weight_sum = 0.0
+    process_gas_specs = gas_config.get('process_gas_sources') or []
     gas_source_details: Dict[str, float] = {}
-    for src in gas_source_names:
-        proc = recipes_dict.get(src)
-        if not proc:
-            continue
-        gas_output = float(proc.outputs.get(process_gas_carrier, 0.0) or 0.0)
-        if gas_output <= 0:
-            continue
-        runs = float(prod_levels.get(src, 0.0) or 0.0)
-        contribution = runs * gas_output
-        if contribution <= 1e-12:
-            continue
-        gas_sources_MJ += contribution
-        gas_source_details[src] = contribution
-        shares = energy_shares.get(src, {})
-        ef_source = _blend_EF(shares, e_efs)
-        if ef_source <= 0:
-            ef_source = float(e_efs.get(process_gas_carrier, 0.0))
-        ef_weighted += ef_source * contribution
-        weight_sum += contribution
+    gas_credit_details: Dict[str, Dict[str, float]] = {}
+    gas_coke_MJ = 0.0
+    gas_bf_MJ = 0.0
+    gas_sources_MJ = 0.0
+    total_gas_MJ = 0.0
 
-    use_descriptor_sources = (
-        gas_sources_MJ > 0 and abs(gas_sources_MJ - total_gas_MJ) <= 1e-6
-    )
-    if use_descriptor_sources:
+    if process_gas_specs:
+        contributions = _collect_sources_from_specs(process_gas_specs)
+        for row in contributions:
+            proc_name = row['process']
+            gas_source_details[proc_name] = gas_source_details.get(proc_name, 0.0) + row['mj']
+            gas_credit_details.setdefault(proc_name, {})['mj'] = gas_source_details[proc_name]
+        gas_sources_MJ = sum(gas_source_details.values())
+        gas_coke_MJ = gas_source_details.get('Coke Production', 0.0)
+        gas_bf_MJ = gas_source_details.get('Blast Furnace', 0.0)
         total_gas_MJ = float(gas_sources_MJ)
-        if weight_sum > 0:
-            EF_process_gas = ef_weighted / weight_sum
+        if total_gas_MJ > 1e-9:
+            ef_weighted = 0.0
+            for row in contributions:
+                shares = energy_shares.get(row['process'], {})
+                ef_source = _blend_EF(shares, e_efs)
+                if ef_source <= 0:
+                    ef_source = float(e_efs.get(row['carrier'], e_efs.get(process_gas_carrier, 0.0)))
+                ef_weighted += ef_source * row['mj']
+            EF_process_gas = ef_weighted / total_gas_MJ if ef_weighted > 0 else float(e_efs.get(process_gas_carrier, 0.0))
         else:
             EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
-        gas_coke_MJ = float(gas_source_details.get('Coke Production', gas_coke_MJ))
-        gas_bf_MJ = float(gas_source_details.get('Blast Furnace', gas_bf_MJ))
     else:
-        if gas_sources_MJ <= 0 and total_gas_MJ <= 1e-9:
-            EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
+        # Legacy behavior (single carrier, inferred from intensity deltas)
+        try:
+            gas_coke_MJ = prod_levels.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get(process_gas_carrier, 0.0)
+        except Exception:
+            gas_coke_MJ = 0.0
+        try:
+            bf_adj = float(getattr(params, 'bf_adj_intensity', 0.0))
+            bf_base = float(getattr(params, 'bf_base_intensity', 0.0))
+            gas_bf_MJ = (bf_adj - bf_base) * prod_levels.get('Blast Furnace', 0.0)
+        except Exception:
+            gas_bf_MJ = 0.0
+        total_gas_MJ = float(gas_coke_MJ + gas_bf_MJ)
+        if gas_coke_MJ > 0:
+            gas_source_details.setdefault('Coke Production', gas_coke_MJ)
+            gas_credit_details.setdefault('Coke Production', {})['mj'] = gas_source_details['Coke Production']
+        if gas_bf_MJ > 0:
+            gas_source_details.setdefault('Blast Furnace', gas_bf_MJ)
+            gas_credit_details.setdefault('Blast Furnace', {})['mj'] = gas_source_details['Blast Furnace']
+
+        gas_source_names = gas_config.get('gas_sources')
+        if not gas_source_names:
+            gas_source_names = [
+                name for name in recipes_dict.keys()
+                if 'gas_source' in _roles_for(name)
+            ]
+        gas_source_names = list(dict.fromkeys(gas_source_names))
+
+        gas_sources_MJ = 0.0
+        ef_weighted = 0.0
+        weight_sum = 0.0
+        for src in gas_source_names:
+            proc = recipes_dict.get(src)
+            if not proc:
+                continue
+            gas_output = float(proc.outputs.get(process_gas_carrier, 0.0) or 0.0)
+            if gas_output <= 0:
+                continue
+            runs = float(prod_levels.get(src, 0.0) or 0.0)
+            contribution = runs * gas_output
+            if contribution <= 1e-12:
+                continue
+            gas_sources_MJ += contribution
+            gas_source_details[src] = contribution
+            gas_credit_details.setdefault(src, {})['mj'] = contribution
+            shares = energy_shares.get(src, {})
+            ef_source = _blend_EF(shares, e_efs)
+            if ef_source <= 0:
+                ef_source = float(e_efs.get(process_gas_carrier, 0.0))
+            ef_weighted += ef_source * contribution
+            weight_sum += contribution
+
+        use_descriptor_sources = (
+            gas_sources_MJ > 0 and abs(gas_sources_MJ - total_gas_MJ) <= 1e-6
+        )
+        if use_descriptor_sources:
+            total_gas_MJ = float(gas_sources_MJ)
+            if weight_sum > 0:
+                EF_process_gas = ef_weighted / weight_sum
+            else:
+                EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
+            gas_coke_MJ = float(gas_source_details.get('Coke Production', gas_coke_MJ))
+            gas_bf_MJ = float(gas_source_details.get('Blast Furnace', gas_bf_MJ))
+        else:
+            if gas_sources_MJ <= 0 and total_gas_MJ <= 1e-9:
+                EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
+            elif gas_sources_MJ <= 0 and total_gas_MJ > 1e-9:
+                numerator = 0.0
+                if gas_coke_MJ > 0:
+                    numerator += EF_coke_gas * gas_coke_MJ
+                if gas_bf_MJ > 0:
+                    numerator += EF_bf_gas * gas_bf_MJ
+                if numerator > 0:
+                    EF_process_gas = numerator / total_gas_MJ
+                else:
+                    EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
 
     try:
         util_eff = recipes_dict.get(utility_process_name, Process('',{},{})).outputs.get('Electricity', 0.0)
@@ -263,11 +368,6 @@ def apply_gas_routing_and_credits(
     if direct_use_fraction + electricity_fraction > 1.0:
         electricity_fraction = max(0.0, 1.0 - direct_use_fraction)
 
-    direct_use_gas_MJ = total_gas_MJ * direct_use_fraction
-    electricity_gas_MJ = total_gas_MJ * electricity_fraction
-
-    internal_elec = electricity_gas_MJ * util_eff
-
     total_gas_consumption_plant = 0.0
     if compute_inside_gas_reference_fn:
         try:
@@ -284,8 +384,29 @@ def apply_gas_routing_and_credits(
         except Exception:
             total_gas_consumption_plant = 0.0
 
+    direct_target = total_gas_consumption_plant * direct_use_fraction
+    if total_gas_MJ <= 0:
+        direct_use_gas_MJ = 0.0
+    else:
+        direct_use_gas_MJ = min(total_gas_MJ, direct_target)
+
+    remaining_gas = max(0.0, total_gas_MJ - direct_use_gas_MJ)
+    electricity_potential = total_gas_MJ * electricity_fraction
+    electricity_gas_MJ = min(remaining_gas, electricity_potential)
+
+    internal_elec = electricity_gas_MJ * util_eff
+
     f_internal_gas = (min(1.0, direct_use_gas_MJ / total_gas_consumption_plant)
                       if total_gas_consumption_plant > 1e-9 else 0.0)
+
+    if total_gas_MJ > 1e-9:
+        for proc_name, mj in gas_source_details.items():
+            share = mj / total_gas_MJ if total_gas_MJ > 0 else 0.0
+            detail = gas_credit_details.setdefault(proc_name, {})
+            detail['mj'] = mj
+            detail['share'] = share
+            detail['direct_use_MJ'] = share * direct_use_gas_MJ
+            detail['electricity_MJ'] = share * electricity_gas_MJ
 
     # Capture grid/baseline factors before any in-place updates
     ef_natural_gas_grid = float(e_efs.get(natural_gas_carrier, 0.0) or 0.0)
@@ -345,6 +466,7 @@ def apply_gas_routing_and_credits(
         'gas_bf_MJ': gas_bf_MJ,
         'gas_sources_MJ': gas_sources_MJ,
         'gas_source_details': gas_source_details,
+        'gas_credit_details': gas_credit_details,
         'direct_use_gas_MJ': direct_use_gas_MJ,
         'electricity_gas_MJ': electricity_gas_MJ,
         'total_gas_consumption_plant': total_gas_consumption_plant,

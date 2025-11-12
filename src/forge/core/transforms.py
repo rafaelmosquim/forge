@@ -82,11 +82,25 @@ def apply_recipe_overrides(
     return list(by_name.values())
 
 
+def _has_process_gas_metadata(params) -> bool:
+    try:
+        meta = getattr(params, "process_gases")
+    except AttributeError:
+        return False
+    return bool(meta)
+
+
 def adjust_blast_furnace_intensity(energy_int, energy_shares, params):
     """Scale BF intensity and store base/adjusted in params.
 
     Top-gas available = adjusted_intensity – base_intensity.
     """
+    if _has_process_gas_metadata(params):
+        base = float(energy_int.get('Blast Furnace', 0.0) or 0.0)
+        params.bf_base_intensity = base
+        params.bf_adj_intensity = base
+        return
+
     pg = getattr(params, 'process_gas', 0.0)
     if 'Blast Furnace' not in energy_int:
         return
@@ -106,6 +120,13 @@ def adjust_blast_furnace_intensity(energy_int, energy_shares, params):
 
 
 def adjust_process_gas_intensity(proc_name, param_key, energy_int, energy_shares, params):
+    if _has_process_gas_metadata(params):
+        base = float(energy_int.get(proc_name, 0.0) or 0.0)
+        safe = proc_name.replace(' ', '_').lower()
+        setattr(params, f"{safe}_base_intensity", base)
+        setattr(params, f"{safe}_adj_intensity", base)
+        return
+
     pg = getattr(params, param_key, 0.0)
     if proc_name not in energy_int or float(pg) <= 0:
         return

@@ -31,6 +31,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--country", default=None, help="Grid country code for electricity EF (e.g., BRA)")
     p.add_argument("--lci", action="store_true", help="Enable LCI and write CSVs to output dir")
     p.add_argument("--out", default="results/engine_demo", help="Output directory for CSVs")
+    p.add_argument("--show-gas-meta", action="store_true", help="Print process-gas emission factor diagnostics")
     args = p.parse_args(argv)
 
     if args.lci:
@@ -53,6 +54,36 @@ def main(argv: list[str] | None = None) -> int:
         print("Top emitters:")
         for proc, row in top.iterrows():
             print(f"  {proc:30s}  {float(row['TOTAL CO2e']):,.3f} t")
+
+    if args.show_gas_meta and out.meta:
+        gas_keys = [
+            "EF_process_gas",
+            "ef_gas_blended",
+            "EF_coke_gas",
+            "EF_bf_gas",
+            "total_process_gas_MJ",
+            "direct_use_gas_MJ",
+            "electricity_gas_MJ",
+            "gas_coke_MJ",
+            "gas_bf_MJ",
+            "f_internal_gas",
+        ]
+        print("Process gas diagnostics:")
+        for key in gas_keys:
+            if key in out.meta:
+                print(f"  {key:22s}: {out.meta.get(key)}")
+        details = out.meta.get("gas_source_details") or {}
+        if details:
+            print("  Source breakdown (MJ):")
+            for proc, mj in details.items():
+                print(f"    {proc:25s} {mj}")
+        credits = out.meta.get("gas_credit_details") or {}
+        if credits:
+            print("  Credit allocation (MJ):")
+            for proc, info in credits.items():
+                du = info.get("direct_use_MJ", 0.0)
+                elec = info.get("electricity_MJ", 0.0)
+                print(f"    {proc:25s} direct={du:.2f}  elec={elec:.2f}")
 
     # Optionally write CSVs
     out_dir = Path(args.out)

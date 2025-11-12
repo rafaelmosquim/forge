@@ -79,7 +79,8 @@ Run a single scenario through the refactored engine via the public API:
 ```bash
 PYTHONPATH=src python3 -m forge.cli.engine_cli \
   --data datasets/steel/likely --route BF-BOF --stage Finished \
-  --country BRA --demand 1000 --lci --out results/engine_demo
+  --country BRA --demand 1000 --lci --show-gas-meta \
+  --out results/engine_demo
 ```
 
 Equivalent Python usage:

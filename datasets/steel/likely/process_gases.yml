@@ -1,13 +1,17 @@
-Coke Process Gas:
-  Energy Content: 16.929 # MJ/m3
-  Density: 0.545 # kg/m3
-  cog_recovery: 0.15
-BF Process Gas:
-  Energy Content: 3.232 # MJ/m3
-  Density: 1.250 # kg/m3
-  bfg_recovery: 0.30
-BOF Process Gas:
-  Energy Content: 7.751 # MJ/m3
-  Density: 1.429 # kg/m3
-  bofg_recovery: 0.69
+process_gases:
+  Coke Process Gas:
+    source_process: "Coke Production"
+    energy_gj_per_ndam3: 16.929   # Input data from plant (GJ per normal dam³)
+    density_kg_per_nm3: 0.545     # kg per normal m³
+    recovery_fraction: 0.15
+  BF Process Gas:
+    source_process: "Blast Furnace"
+    energy_gj_per_ndam3: 3.232
+    density_kg_per_nm3: 1.250
+    recovery_fraction: 0.30
+  BOF Process Gas:
+    source_process: "Basic Oxygen Furnace"
+    energy_gj_per_ndam3: 7.751
+    density_kg_per_nm3: 1.429
+    recovery_fraction: 0.69
   

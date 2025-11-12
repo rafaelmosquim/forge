@@ -223,7 +223,7 @@
     Coal: 1.25 
   outputs:
     Coke: 1.0
-    Coke Process Gas: "cog_recovery * energy_int['Coke Production']/ energy_content['Coke Process Gas']" 
+    Coke Process Gas: "process_gases['Coke Process Gas']['recovery_fraction'] * energy_int['Coke Production'] / energy_content['Coke Process Gas']" 
 
 - process: Steam Production
   inputs: {}
@@ -347,7 +347,7 @@
       / energy_content['Coal']
   outputs:
     Pig Iron: 1.0
-    BF Process Gas: "bfg_recovery * energy_int['Blast Furnace']/ energy_content['BF Process Gas']" 
+    BF Process Gas: "process_gases['BF Process Gas']['recovery_fraction'] * energy_int['Blast Furnace'] / energy_content['BF Process Gas']" 
 
 - process: Direct Reduction Iron
   inputs:
@@ -395,7 +395,7 @@
     Scrap:      0.1
   outputs:
     Liquid Steel: 1.0
-    BOF Process Gas: "bofg_recovery * energy_int['Basic Oxygen Furnace']/ energy_content['BOF Process Gas']" 
+    BOF Process Gas: "process_gases['BOF Process Gas']['recovery_fraction'] * energy_int['Basic Oxygen Furnace'] / energy_content['BOF Process Gas']" 
 
 - process: Regular Steel
   inputs:  { Liquid Steel: 1.0 }

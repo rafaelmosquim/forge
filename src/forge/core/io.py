@@ -90,12 +90,15 @@ def load_recipes_from_yaml(filepath: str | Path, params, energy_int, energy_shar
         logger.warning("No recipes loaded from %s", filepath)
 
     # Context for evaluating expressions
+    process_gas_meta = getattr(params, "process_gases", None)
     context = {
         **(vars(params) if isinstance(params, SimpleNamespace) else getattr(params, "__dict__", {}) ),
         "energy_int": energy_int,
         "energy_shares": energy_shares,
         "energy_content": energy_content,
     }
+    if process_gas_meta is not None:
+        context.setdefault("process_gases", process_gas_meta)
 
     from .models import Process
     recipes = []

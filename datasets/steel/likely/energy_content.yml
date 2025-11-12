@@ -3,4 +3,7 @@ energy_content:
   Coke: 28.87  # MJ/kg
   Gas: 49.76   # MJ/kg (natural gas equivalent)
   Wood: 12.97  # MJ/kg
-  Charcoal: 28.40  # MJ/kg
+  Charcoal: 28.40 # MJ/kg
+  Coke Process Gas: 31.10  # MJ/kg
+  BF Process Gas: 2.58  # MJ/kg
+  BOF Process Gas: 5.42  # MJ/kg

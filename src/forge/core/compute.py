@@ -369,6 +369,9 @@ def apply_gas_routing_and_credits(
         electricity_fraction = max(0.0, 1.0 - direct_use_fraction)
 
     total_gas_consumption_plant = 0.0
+    carrier_list = [natural_gas_carrier]
+    if process_gas_carrier and process_gas_carrier != natural_gas_carrier:
+        carrier_list.append(process_gas_carrier)
     if compute_inside_gas_reference_fn:
         try:
             total_gas_consumption_plant = float(compute_inside_gas_reference_fn(
@@ -380,6 +383,7 @@ def apply_gas_routing_and_credits(
                 route_key=scenario.get('route_preset', None) or '',
                 demand_qty=float(scenario.get('demand_qty', 1000.0)),
                 stage_ref=scenario.get('stage_ref', 'IP3'),
+                gas_carriers=carrier_list,
             ))
         except Exception:
             total_gas_consumption_plant = 0.0
@@ -612,7 +616,7 @@ def compute_inside_gas_reference_for_share(
     demand_qty: float,
     stage_ref: str = "IP3",
     stage_lookup: Optional[Dict[str, str]] = None,
-    gas_carrier: str = "Gas",
+    gas_carriers: Optional[List[str]] = None,
     fallback_materials: Optional[Set[str]] = None,
 ) -> float:
     pre_mask = build_route_mask(route_key, recipes)
@@ -634,9 +638,11 @@ def compute_inside_gas_reference_for_share(
         return 0.0
     energy_balance_full = calculate_energy_balance(prod_levels_full, energy_int, energy_shares)
     total = 0.0
-    if gas_carrier in energy_balance_full.columns:
-        rows = [r for r in energy_balance_full.index if r not in ("TOTAL",)]
-        total = float(energy_balance_full.loc[rows, gas_carrier].clip(lower=0).sum())
+    carriers = gas_carriers or ["Gas"]
+    rows = [r for r in energy_balance_full.index if r not in ("TOTAL",)]
+    for carrier in carriers:
+        if carrier in energy_balance_full.columns:
+            total += float(energy_balance_full.loc[rows, carrier].clip(lower=0).sum())
     return total
 
 

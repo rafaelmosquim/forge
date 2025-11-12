@@ -139,7 +139,6 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
     gas_reference_fn = partial(
         compute_inside_gas_reference_for_share,
         stage_lookup=STAGE_MATS,
-        gas_carrier=(scn.gas_config.get("natural_gas_carrier") if isinstance(scn.gas_config, dict) else None) or "Gas",
         fallback_materials=scn.fallback_materials or set(),
     )
     eb_adj, e_efs, gas_meta = apply_gas_routing_and_credits(

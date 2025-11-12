@@ -198,6 +198,56 @@ def _apply_process_gas_metadata(base_path: str, energy_content: Dict[str, float]
     return updated
 
 
+def _build_energy_flow_summary(
+    process_names: List[str],
+    energy_balance: Optional[pd.DataFrame],
+    recipes: List[Any],
+    prod_levels: Dict[str, float],
+    energy_content: Dict[str, float],
+) -> Dict[str, Dict[str, Dict[str, float]]]:
+    summary: Dict[str, Dict[str, Dict[str, float]]] = {}
+    recipe_map = {r.name: r for r in (recipes or [])}
+    def _energy_for_carrier(carrier: str, qty: float) -> Optional[float]:
+        if carrier in energy_content:
+            return qty * float(energy_content[carrier])
+        if carrier.lower() == "electricity":
+            return qty  # already MJ
+        return None
+
+    for name in process_names:
+        inputs: Dict[str, float] = {}
+        outputs: Dict[str, float] = {}
+        if energy_balance is not None and name in energy_balance.index:
+            row = energy_balance.loc[name]
+            inputs = {
+                carrier: float(val)
+                for carrier, val in row.items()
+                if isinstance(val, (int, float)) and float(val) > 0
+            }
+        proc = recipe_map.get(name)
+        runs = float(prod_levels.get(name, 0.0) or 0.0)
+        if proc and runs > 0:
+            for in_name, qty in proc.inputs.items():
+                try:
+                    qty_val = float(qty)
+                except (TypeError, ValueError):
+                    continue
+                energy_val = _energy_for_carrier(in_name, qty_val * runs)
+                if energy_val is not None and (not inputs or in_name not in inputs):
+                    inputs[in_name] = energy_val
+
+            for out_name, qty in proc.outputs.items():
+                try:
+                    qty_val = float(qty)
+                except (TypeError, ValueError):
+                    continue
+                energy_val = _energy_for_carrier(out_name, qty_val * runs)
+                if energy_val is not None:
+                    outputs[out_name] = energy_val
+        summary[name] = {"inputs_MJ": inputs, "outputs_MJ": outputs}
+    return summary
+
+
 # ==============================
 # Scenario transforms
 # ==============================
@@ -639,6 +689,30 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "ef_electricity_grid": gas_meta.get('ef_electricity_grid', e_efs.get('Electricity', 0.0)),
         "ef_electricity_used": gas_meta.get('ef_electricity_used', f_internal * gas_meta.get('ef_internal_electricity', 0.0) + (1 - f_internal) * e_efs.get('Electricity', 0.0)),
     }
+
+    energy_flow_processes = [
+        "Coke Production",
+        "Blast Furnace",
+        "Basic Oxygen Furnace",
+        gas_config.get("utility_process") or "Utility Plant",
+    ]
+    energy_flow_summary = _build_energy_flow_summary(
+        energy_flow_processes,
+        energy_balance,
+        core_inputs.recipes,
+        prod_levels,
+        energy_content,
+    )
+    utility_name = gas_config.get("utility_process") or "Utility Plant"
+    if utility_name in energy_flow_summary:
+        util_entry = energy_flow_summary[utility_name]
+        elec_gas = float(gas_meta.get('electricity_gas_MJ', 0.0) or 0.0)
+        if elec_gas > 0:
+            carrier_name = process_gas_carrier or "Process Gas"
+            util_entry['inputs_MJ'].setdefault(carrier_name, elec_gas)
+            util_eff = float(gas_meta.get('util_eff', 0.0) or 0.0)
+            util_entry['outputs_MJ'].setdefault('Electricity', elec_gas * util_eff)
+    meta["energy_flow_summary"] = energy_flow_summary
 
     enable_lci = is_lci_enabled()
     if enable_lci and lci_df is None:

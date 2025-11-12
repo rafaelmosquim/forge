@@ -587,10 +587,11 @@ processes:
     Charcoal: 0
     Coke: 0
   "Hot Rolling":
-    Electricity: 0.2
+    Electricity: 0.37
     FLF: 0
     RLF: 0
-    Gas: 0.8
+    Gas: 0.29
+    Process Gas (internal): 0.34
     Wood: 0
     Coal: 0
     Charcoal: 0

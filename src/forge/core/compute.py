@@ -388,15 +388,10 @@ def apply_gas_routing_and_credits(
         except Exception:
             total_gas_consumption_plant = 0.0
 
-    direct_target = total_gas_consumption_plant * direct_use_fraction
-    if total_gas_MJ <= 0:
-        direct_use_gas_MJ = 0.0
-    else:
-        direct_use_gas_MJ = min(total_gas_MJ, direct_target)
-
+    direct_use_gas_MJ = max(0.0, min(total_gas_MJ, total_gas_MJ * direct_use_fraction))
     remaining_gas = max(0.0, total_gas_MJ - direct_use_gas_MJ)
     electricity_potential = total_gas_MJ * electricity_fraction
-    electricity_gas_MJ = min(remaining_gas, electricity_potential)
+    electricity_gas_MJ = max(0.0, min(remaining_gas, electricity_potential))
 
     internal_elec = electricity_gas_MJ * util_eff
 

@@ -177,6 +177,8 @@ def calculate_emissions(
             elec_ef_for_proc = ef_grid if is_outside else ef_elec_mix
             if proc_name in energy_df.index:
                 for carrier, cons in energy_df.loc[proc_name].items():
+                    if proc_name == "Coke Production" and carrier == "Coal":
+                        continue
                     if carrier == 'Electricity':
                         row['Energy Emissions'] += float(cons) * elec_ef_for_proc
                     else:

@@ -220,7 +220,7 @@
 - process: Coke Production
   inputs: 
     Nitrogen: 0.02
-    Coal: 1.25 
+    Coal: 1.1 
   outputs:
     Coke: 1.0
     Coke Process Gas: "process_gases['Coke Process Gas']['recovery_fraction'] * energy_int['Coke Production'] / energy_content['Coke Process Gas']" 

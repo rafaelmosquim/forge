@@ -196,10 +196,6 @@ def calculate_emissions(
     emissions_df = pd.DataFrame(rows).set_index('Process') / 1000.0  # kg -> t
     emissions_df['TOTAL CO2e'] = emissions_df['Energy Emissions'] + emissions_df['Direct Emissions']
 
-    # Optional: Zero Coke Production totals if following the convention
-    if 'Coke Production' in emissions_df.index:
-        emissions_df.loc['Coke Production', ['Energy Emissions', 'Direct Emissions', 'TOTAL CO2e']] = 0.0
-
     return emissions_df
 
 __all__ = [

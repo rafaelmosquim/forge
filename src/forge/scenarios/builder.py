@@ -112,7 +112,6 @@ def build_core_scenario(
     energy_prices: Optional[Dict[str, float]] = None,
     material_prices: Optional[Dict[str, float]] = None,
     outside_mill_procs: Optional[Set[str]] = None,
-    enable_lci: bool = False,
 ) -> ScenarioBuildResult:
     fallback_set = set(fallback_materials or set())
     is_validation = (str(stage_role or '').strip().lower() == 'validation')
@@ -183,7 +182,6 @@ def build_core_scenario(
         fallback_materials=fallback_set,
         allow_direct_onsite=None,
         outside_mill_procs=outside_mill_procs or set(),
-        enable_lci=enable_lci,
         energy_prices=energy_prices,
         material_prices=material_prices,
         external_purchase_rows=list(external_purchase_rows or []),
@@ -200,4 +198,3 @@ __all__ = [
     'build_core_scenario',
     'ScenarioBuildResult',
 ]
-

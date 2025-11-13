@@ -492,7 +492,6 @@ def apply_gas_routing_and_credits(
     return eb, e_efs, meta
 
 from .costs import analyze_energy_costs, analyze_material_costs
-from .lci import calculate_lci
 from .transforms import (
     apply_fuel_substitutions,
     apply_dict_overrides,
@@ -685,7 +684,6 @@ __all__ = [
     "derive_energy_shares",
     "analyze_energy_costs",
     "analyze_material_costs",
-    "calculate_lci",
     # transforms
     "apply_fuel_substitutions",
     "apply_dict_overrides",

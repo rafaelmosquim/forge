@@ -10,14 +10,14 @@ Submodules:
   - models: data structures (e.g., Process)
   - io: YAML/config loaders
   - routing: route helpers and constants (STAGE_MATS, build_route_mask, ...)
-  - compute: core computations, transforms, emissions/LCI
+  - compute: core computations, transforms, emissions
   - viz: plotting helpers (Sankey builders)
 
 Downstream code can start importing from `forge.core.*` immediately.
 """
 
 from . import models, io, routing, compute, viz  # baseline
-from . import costs, lci, transforms, engine  # additional subpackages
+from . import costs, transforms, engine  # additional subpackages
 
 __all__ = [
     "models",
@@ -26,7 +26,6 @@ __all__ = [
     "compute",
     "viz",
     "costs",
-    "lci",
     "transforms",
     "engine",
 ]

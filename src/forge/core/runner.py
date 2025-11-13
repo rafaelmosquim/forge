@@ -2,8 +2,8 @@
 
 This module provides a single entrypoint that accepts a fully-specified
 scenario (no UI heuristics, no file I/O), runs the core calculations
-(balance → energy → gas-routing/credits → emissions → optional LCI), and
-returns structured results.
+(balance → energy → gas-routing/credits → emissions), and returns structured
+results.
 
 The API layer is responsible for loading YAML, applying user overrides,
 resolving route picks/masks, and shaping a CoreScenario for execution.
@@ -28,7 +28,6 @@ from .compute import (
     expand_energy_tables_for_active,
     calculate_internal_electricity,
     apply_gas_routing_and_credits,
-    calculate_lci,
     compute_inside_gas_reference_for_share,
 )
 from .costs import analyze_energy_costs, analyze_material_costs
@@ -57,7 +56,6 @@ class CoreScenario:
       - fallback_materials: which materials are treated as external-only
       - allow_direct_onsite: chemistry whitelist to allow direct emissions onsite
       - outside_mill_procs: processes treated as outside the mill (grid power only)
-      - enable_lci: whether to compute LCI outputs (default False)
     """
     # Core data
     recipes: List[Process]
@@ -80,7 +78,6 @@ class CoreScenario:
     fallback_materials: Set[str] | None = None
     allow_direct_onsite: Set[str] | None = None
     outside_mill_procs: Set[str] | None = None
-    enable_lci: bool = False
     # Optional cost inputs
     energy_prices: Optional[Dict[str, float]] = None
     material_prices: Optional[Dict[str, float]] = None
@@ -95,7 +92,6 @@ class CoreResults:
     energy_balance: pd.DataFrame
     emissions: Optional[pd.DataFrame]
     total_co2e_kg: Optional[float]
-    lci: Optional[pd.DataFrame] = None
     meta: Dict[str, Any] = field(default_factory=dict)
     energy_efs_out: Dict[str, float] = field(default_factory=dict)
     total_cost: Optional[float] = None
@@ -124,7 +120,6 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
             energy_balance=pd.DataFrame(),
             emissions=None,
             total_co2e_kg=None,
-            lci=None,
             meta={"error": "Material balance failed"},
         )
 
@@ -213,29 +208,13 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
     except Exception:
         total_co2 = None
 
-    # 5) Optional LCI
-    lci_df = None
-    if scn.enable_lci:
-        try:
-            lci_df = calculate_lci(
-                prod_level=prod_levels,
-                recipes=scn.recipes,
-                energy_balance=eb_adj,
-                electricity_internal_fraction=float(gas_meta.get("f_internal", 0.0)),
-                gas_internal_fraction=float(gas_meta.get("f_internal_gas", 0.0)),
-                natural_gas_carrier=str(gas_meta.get("natural_gas_carrier", "Gas")),
-                process_gas_carrier=str(gas_meta.get("process_gas_carrier", "Process Gas")),
-            )
-        except Exception:
-            lci_df = None
-
     meta = {
         "route_preset": scn.route_preset,
         "stage_ref": scn.stage_ref,
         **gas_meta,
     }
 
-    # 6) Optional costs
+    # 5) Optional costs
     total_cost = None
     material_cost = None
     try:
@@ -258,7 +237,6 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
         energy_balance=eb_adj,
         emissions=emissions,
         total_co2e_kg=total_co2,
-        lci=lci_df,
         meta=meta,
         energy_efs_out=e_efs,
         total_cost=total_cost,

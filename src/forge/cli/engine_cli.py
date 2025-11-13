@@ -2,12 +2,11 @@
 
 Examples
   python -m forge.cli.engine_cli \
-    --data datasets/steel/likely --route BF-BOF --stage Finished --country BRA --demand 1000 --lci
+    --data datasets/steel/likely --route BF-BOF --stage Finished --country BRA --demand 1000
 """
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 import json
 import sys
@@ -22,6 +21,7 @@ if str(ROOT) not in sys.path:
 from forge.steel_core_api_v2 import RouteConfig, ScenarioInputs, run_scenario
 
 
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Run a single scenario via refactored engine and print a summary")
     p.add_argument("--data", required=True, help="Dataset directory (e.g., datasets/steel/likely)")
@@ -29,13 +29,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--stage", default="Finished", help="Stage key (e.g., Finished, IP3, Cast)")
     p.add_argument("--demand", type=float, default=1000.0, help="Demand quantity at stage (kg)")
     p.add_argument("--country", default=None, help="Grid country code for electricity EF (e.g., BRA)")
-    p.add_argument("--lci", action="store_true", help="Enable LCI and write CSVs to output dir")
     p.add_argument("--out", default="results/engine_demo", help="Output directory for CSVs")
     p.add_argument("--show-gas-meta", action="store_true", help="Print process-gas emission factor diagnostics")
     args = p.parse_args(argv)
-
-    if args.lci:
-        os.environ.setdefault("FORGE_ENABLE_LCI", "1")
 
     scn = ScenarioInputs(
         country_code=args.country,
@@ -93,8 +89,6 @@ def main(argv: list[str] | None = None) -> int:
         out.energy_balance.to_csv(out_dir / "energy_balance.csv")
     if out.emissions is not None and not out.emissions.empty:
         out.emissions.to_csv(out_dir / "emissions.csv")
-    if args.lci and out.lci is not None and not out.lci.empty:
-        out.lci.to_csv(out_dir / "lci.csv", index=False)
 
     # Write a lightweight manifest for reproducibility
     try:
@@ -108,7 +102,6 @@ def main(argv: list[str] | None = None) -> int:
         "stage": args.stage,
         "demand": args.demand,
         "country": args.country,
-        "enable_lci": bool(args.lci),
         "git_sha": sha,
     }
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")

@@ -34,9 +34,6 @@ import pandas as pd
 import streamlit as st
 import yaml
 
-# Ensure LCI flag defaults on when running via the app (can still be overridden externally)
-os.environ.setdefault("FORGE_ENABLE_LCI", "1")
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -47,7 +44,6 @@ from forge.steel_core_api_v2 import (
     RouteConfig,
     ScenarioInputs,
     run_scenario,
-    is_lci_enabled,
     write_run_log,  # for simple JSON logging
 )
 
@@ -1678,7 +1674,6 @@ if run_now:
         total            = getattr(out, "total_co2e_kg", None)
         total_cost       = getattr(out, "total_cost", None)
         material_cost    = getattr(out, "material_cost", None)
-        lci_df           = getattr(out, "lci", None)
 
         # Try to grab the material balance from out under common names
         balance_matrix = next(
@@ -1747,7 +1742,7 @@ if run_now:
 
             # Downloads
             df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")
-            d1, d2, d3, d4 = st.columns(4)
+            d1, d2, d3 = st.columns(3)
             d1.download_button("Production runs (CSV)", data=df_runs.to_csv().encode("utf-8"),
                                file_name="production_runs.csv", mime="text/csv")
             if isinstance(energy_balance, pd.DataFrame) and not energy_balance.empty:
@@ -1756,9 +1751,6 @@ if run_now:
             if isinstance(emissions, pd.DataFrame):
                 d3.download_button("Emissions (CSV)", data=emissions.to_csv().encode("utf-8"),
                                    file_name="emissions.csv", mime="text/csv")
-            if is_lci_enabled() and isinstance(lci_df, pd.DataFrame) and not lci_df.empty:
-                d4.download_button("LCI (CSV)", data=lci_df.to_csv(index=False).encode("utf-8"),
-                                   file_name="lci.csv", mime="text/csv")
 
             # Tables
             
@@ -1777,57 +1769,6 @@ if run_now:
             else:
                 st.info("No energy balance table for this run.")
             
-            if isinstance(lci_df, pd.DataFrame) and not lci_df.empty:
-                st.markdown("**Life Cycle Inventory (per unit of process output)**")
-                for process_name, df_proc in lci_df.groupby("Process"):
-                    st.markdown(f"##### {process_name}")
-                    for output_name, df_out in df_proc.groupby("Output"):
-                        st.caption(f"Reference output: {output_name}")
-                        inputs_section = df_out[df_out["Flow"] == "Input"]
-                        outputs_section = df_out[df_out["Flow"] == "Output"]
-                        # Also show emissions rows (totals and credits)
-                        emissions_section = df_out[(df_out["Flow"].astype(str) == "Emissions") | (df_out["Category"].astype(str) == "Emissions")]
-
-                        rows = []
-                        for _, row in inputs_section.iterrows():
-                            rows.append({
-                                "Section": "Input",
-                                "Name": row["Input"],
-                                "Category": row["Category"],
-                                "ValueUnit": row.get("ValueUnit", ""),
-                                "Amount": float(row["Amount"]),
-                                "Unit": row["Unit"],
-                            })
-                        for _, row in outputs_section.iterrows():
-                            rows.append({
-                                "Section": "Output",
-                                "Name": row["Input"],
-                                "Category": row["Category"],
-                                "ValueUnit": row.get("ValueUnit", ""),
-                                "Amount": float(row["Amount"]),
-                                "Unit": row["Unit"],
-                            })
-
-                        # Append emissions at the end, if present
-                        for _, row in emissions_section.iterrows():
-                            rows.append({
-                                "Section": "Emissions",
-                                "Name": row.get("Input", "Emissions"),
-                                "Category": row.get("Category", "Emissions"),
-                                "ValueUnit": row.get("ValueUnit", ""),
-                                "Amount": float(row.get("Amount", 0.0) or 0.0),
-                                "Unit": row.get("Unit", ""),
-                            })
-
-                        if rows:
-                            display_df = pd.DataFrame(rows)
-                            display_df["Amount"] = display_df["Amount"].round(6)
-                            st.table(display_df)
-                        else:
-                            st.info("No flows recorded for this output.")
-            else:
-                st.info("No life cycle inventory table for this run.")
-                
     except Exception as e:
         st.error("Run crashed. Traceback below:")
         st.exception(e)

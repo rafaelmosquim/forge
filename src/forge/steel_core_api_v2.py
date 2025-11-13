@@ -33,13 +33,11 @@ from forge.core.io import (
 from forge.core.models import Process, OUTSIDE_MILL_PROCS
 from forge.core.routing import STAGE_MATS
 from forge.core.compute import (
-    calculate_lci,
     compute_inside_elec_reference_for_share,
 )
 from forge.core.runner import run_core_scenario
 from forge.scenarios.builder import build_core_scenario
 from forge.scenarios.transforms import apply_dri_mix, apply_charcoal_expansion
-from forge.reporting.lci_aug import augment_lci_and_debug
 from forge.core.transforms import (
     apply_fuel_substitutions,
     apply_dict_overrides,
@@ -68,15 +66,6 @@ def _env_flag_truthy(var_name: str) -> bool:
     except Exception:
         return False
     return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def is_lci_enabled() -> bool:
-    """
-    Global feature flag for LCI calculations.
-    LCI outputs are experimental and disabled by default; enable by setting
-    FORGE_ENABLE_LCI=1 (or any truthy value accepted by `_env_flag_truthy`).
-    """
-    return _env_flag_truthy("FORGE_ENABLE_LCI")
 
 
 def _is_debug_io_enabled() -> bool:
@@ -312,7 +301,6 @@ class RunOutputs:
         emissions: DataFrame of CO2e emissions by process (kg)
         total_co2e_kg: Total CO2e emissions for the scenario (kg)
         balance_matrix: DataFrame of material balances
-        lci: DataFrame with material and energy inputs per process
         meta: Dictionary of metadata about the run
     """    
     production_routes: Dict[str, int]
@@ -322,8 +310,7 @@ class RunOutputs:
     total_co2e_kg: Optional[float]
     total_cost: Optional[float] = None
     material_cost: Optional[float] = None
-    balance_matrix: Optional[pd.DataFrame] = None   # ← add this line
-    lci: Optional[pd.DataFrame] = None
+    balance_matrix: Optional[pd.DataFrame] = None
     meta: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -589,7 +576,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         energy_prices=energy_prices,
         material_prices=material_prices,
         outside_mill_procs=set(OUTSIDE_MILL_PROCS or []),
-        enable_lci=is_lci_enabled(),
     )
     core_inputs = build_result.core
     prefer_internal_map = build_result.prefer_internal_map
@@ -602,7 +588,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     energy_balance = core_res.energy_balance
     emissions = core_res.emissions
     total_co2 = core_res.total_co2e_kg
-    lci_df = core_res.lci
     gas_meta = core_res.meta
     e_efs = core_res.energy_efs_out
 
@@ -714,38 +699,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
             util_entry['outputs_MJ'].setdefault('Electricity', elec_gas * util_eff)
     meta["energy_flow_summary"] = energy_flow_summary
 
-    enable_lci = is_lci_enabled()
-    if enable_lci and lci_df is None:
-        # Build final LCI with carrier splits
-        lci_df = calculate_lci(
-            prod_level=prod_levels,
-            recipes=core_inputs.recipes,
-            energy_balance=energy_balance,
-            electricity_internal_fraction=f_internal,
-            gas_internal_fraction=f_internal_gas,
-            natural_gas_carrier=gas_meta.get('natural_gas_carrier', natural_gas_carrier),
-            process_gas_carrier=gas_meta.get('process_gas_carrier', process_gas_carrier),
-        )
-        # Augment LCI and print EF debug
-        lci_df = augment_lci_and_debug(
-            lci_df=lci_df,
-            prod_levels=prod_levels,
-            recipes=core_inputs.recipes,
-            energy_balance=energy_balance,
-            energy_shares=energy_shares,
-            energy_content=energy_content,
-            params=params,
-            gas_meta=gas_meta,
-            e_efs=e_efs,
-            meta=meta,
-            base_path=base,
-            natural_gas_carrier=gas_meta.get('natural_gas_carrier', natural_gas_carrier),
-            process_gas_carrier=gas_meta.get('process_gas_carrier', process_gas_carrier),
-            f_internal=f_internal,
-        )
-    else:
-        lci_df = None
-
     return RunOutputs(
         production_routes=core_res.production_routes,
         prod_levels=prod_levels,
@@ -755,7 +708,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         total_cost=total_cost,
         material_cost=material_cost,
         balance_matrix=balance_matrix,
-        lci=lci_df,
         meta=meta,
     )
 def _resolve_stage_role(descriptor, stage_key: str, provided_role: Optional[str]) -> str:

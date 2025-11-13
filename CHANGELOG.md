@@ -3,7 +3,7 @@
 ## Unreleased
 - Core refactor: no `steel_model_core` dependency
   - Introduced `forge.core.engine` (engine trio): `calculate_balance_matrix`, `calculate_energy_balance`, `calculate_emissions`.
-  - Split helpers into `forge.core.compute` (gas routing, intensity adjustments, reference helpers), `forge.core.io`, `forge.core.models`, `forge.core.routing`, `forge.core.transforms`, `forge.core.costs`, `forge.core.lci`, and `forge.core.viz`.
+  - Split helpers into `forge.core.compute` (gas routing, intensity adjustments, reference helpers), `forge.core.io`, `forge.core.models`, `forge.core.routing`, `forge.core.transforms`, `forge.core.costs`, and `forge.core.viz`.
   - Moved descriptor code to `forge.descriptor.{sector_descriptor,scenario_resolver}`; app and API updated.
   - Streamlit app now imports exclusively from refactored core modules.
 
@@ -27,7 +27,7 @@
   - Added coverage collection and artifact upload; nightly numeric workflow.
   - Added mypy type check (non‑blocking) for core/descriptor.
   - Pre‑commit with ruff (fix/format), YAML checks, mypy, and pytest smoke.
-  - Tests updated to refactored API/core; added new light tests for transforms, LCI, viz, descriptor, gas routing, engine imports, and batch CLI.
+  - Tests updated to refactored API/core; added new light tests for transforms, viz, descriptor, gas routing, engine imports, and batch CLI.
 
 - Descriptor‑driven behavior
   - Validation (as‑cast) clamps auxiliaries to market; other stages respect user picks.

@@ -30,11 +30,6 @@ https://doi.org/10.5281/zenodo.17145189
 - 1-D sensitivity sweeps + Monte Carlo with pinned seeds
 - Streamlit UI for picks (AND/OR recipe graph) and charts
 
-## Optional LCI outputs
-- Life-cycle inventory (LCI) post-processing is experimental and **off by default**.
-- Set `FORGE_ENABLE_LCI=1` (or `true/yes/on`) before running the CLI/API/UI to enable LCI tables.
-- When the flag is unset, LCI calculations are skipped and the API returns `lci=None`.
-
 ## Data bundles
 - Datasets now live under `datasets/<sector>/<variant>/` (e.g., `datasets/steel/likely`, `datasets/aluminum/baseline`).
 - The Streamlit app opens with a sector gate so you can select *Steel* or *Aluminum* before choosing a dataset variant.
@@ -79,7 +74,7 @@ Run a single scenario through the refactored engine via the public API:
 ```bash
 PYTHONPATH=src python3 -m forge.cli.engine_cli \
   --data datasets/steel/likely --route BF-BOF --stage Finished \
-  --country BRA --demand 1000 --lci --show-gas-meta \
+  --country BRA --demand 1000 --show-gas-meta \
   --out results/engine_demo
 ```
 

@@ -35,7 +35,7 @@ parallel:
 	$(PY) scripts/run_profiles.py finished paper --parallel
 
 engine-smoke:
-	$(PY) -m forge.cli.engine_cli --data datasets/steel/likely --route BF-BOF --stage Finished --country BRA --demand 1000 --lci --out results/engine_demo
+	$(PY) -m forge.cli.engine_cli --data datasets/steel/likely --route BF-BOF --stage Finished --country BRA --demand 1000 --out results/engine_demo
 
 # --- Monte Carlo examples (edit or copy as needed) ---
 mc-as-cast:

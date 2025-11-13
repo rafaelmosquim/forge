@@ -1,5 +1,4 @@
 import os
-import math
 import pytest
 import pandas as pd
 
@@ -7,21 +6,17 @@ from forge.steel_core_api_v2 import (
     run_scenario,
     ScenarioInputs,
     RouteConfig,
-    is_lci_enabled,
 )
 from forge.core.io import load_data_from_yaml
 
 
 @pytest.mark.integration
-def test_blast_furnace_emissions_use_base_while_lci_uses_adjusted():
+def test_blast_furnace_energy_emissions_use_base_intensity():
     data_dir = os.path.join(os.path.dirname(__file__), '..', 'datasets', 'steel', 'likely')
     data_dir = os.path.abspath(data_dir)
 
     # Ensure paths exist
     assert os.path.isdir(data_dir), f"Missing dataset directory: {data_dir}"
-
-    if not is_lci_enabled():
-        pytest.skip("LCI feature disabled; set FORGE_ENABLE_LCI=1 to run LCI-focused tests.")
 
     # Scenario that triggers BF adjusted intensity (via process_gas > 0)
     scn = ScenarioInputs(
@@ -42,7 +37,6 @@ def test_blast_furnace_emissions_use_base_while_lci_uses_adjusted():
 
     # Basic guards
     assert out.energy_balance is not None and not out.energy_balance.empty
-    assert out.lci is not None and not out.lci.empty
     assert out.emissions is not None and not out.emissions.empty
 
     # If BF not active (unlikely for BF-BOF), skip
@@ -50,24 +44,8 @@ def test_blast_furnace_emissions_use_base_while_lci_uses_adjusted():
     if bf_runs <= 1e-9:
         pytest.skip('Blast Furnace not active in this scenario')
 
-    # 1) LCI uses ADJUSTED energy balance: sum of BF energy inputs per kg
-    lci_bf_energy = out.lci[
-        (out.lci['Process'] == 'Blast Furnace')
-        & (out.lci['Flow'] == 'Input')
-        & (out.lci['Category'] == 'Energy')
-    ]
-    lci_energy_per_kg = float(lci_bf_energy['Amount'].sum())
-
     eb_bf_row = out.energy_balance.loc['Blast Furnace']
-    # exclude TOTAL column if present in columns
-    eb_bf_total_mj = float(eb_bf_row.drop(labels=['TOTAL'], errors='ignore').sum())
-    # per-kg (Pig Iron per run is 1.0), so divide by runs
-    expected_lci_per_kg = eb_bf_total_mj / bf_runs
-
-    assert math.isclose(lci_energy_per_kg, expected_lci_per_kg, rel_tol=1e-6, abs_tol=1e-6), \
-        f"LCI energy per kg should match adjusted energy balance (got {lci_energy_per_kg} vs {expected_lci_per_kg})"
-
-    # 2) Emissions for BF Energy Emissions use BASE intensity on non-electric carriers
+    # Emissions for BF Energy Emissions use BASE intensity on non-electric carriers
     # Load inputs to compute expected BF energy emissions
     energy_shares = load_data_from_yaml(os.path.join(data_dir, 'energy_matrix.yml')) or {}
     efs_yaml = load_data_from_yaml(os.path.join(data_dir, 'emission_factors.yml')) or {}

@@ -716,19 +716,6 @@ def _log_payload(plan: RunPlan, route_cfg: RouteConfig, result_summary: Dict[str
     return payload
 
 
-def _write_lci_csv(df: Optional[pd.DataFrame], out_dir: Path, name: str) -> Optional[Path]:
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return None
-    out_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
-    path = out_dir / f"{safe_name}.csv"
-    try:
-        df.to_csv(path, index=False)
-        return path
-    except Exception:
-        return None
-
-
 def _compute_blend_result(
     blend: BlendPlan,
     record_map: Dict[str, RunRecord],
@@ -750,40 +737,6 @@ def _compute_blend_result(
         if accumulator is None:
             return addition
         return accumulator.add(addition, fill_value=0.0)
-
-    def _weight_lci(df: Optional[pd.DataFrame], weight: float) -> Optional[pd.DataFrame]:
-        if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-            return None
-        lci = df.copy()
-        if 'Amount' not in lci.columns:
-            return None
-        try:
-            lci['Amount'] = pd.to_numeric(lci['Amount'], errors='coerce').fillna(0.0) * float(weight)
-        except Exception:
-            return None
-        return lci
-
-    def _accumulate_lci(acc: Optional[pd.DataFrame], add: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
-        if add is None:
-            return acc
-        if acc is None:
-            acc = add
-        else:
-            acc = pd.concat([acc, add], ignore_index=True)
-        # Group by non-numeric identity columns and sum Amount
-        keys = [
-            c for c in ['Process', 'Output', 'Flow', 'Input', 'Category', 'ValueUnit', 'Unit']
-            if c in acc.columns
-        ]
-        if not keys or 'Amount' not in acc.columns:
-            return acc
-        grouped = (
-            acc.groupby(keys, dropna=False, as_index=False)['Amount']
-               .sum()
-        )
-        # Reorder columns for consistency
-        cols = keys + ['Amount']
-        return grouped.loc[:, cols]
 
     components_payload = []
     weighted_routes: defaultdict[str, float] = defaultdict(float)
@@ -807,7 +760,6 @@ def _compute_blend_result(
     energy_balance: Optional[pd.DataFrame] = None
     emissions_df: Optional[pd.DataFrame] = None
     balance_df: Optional[pd.DataFrame] = None
-    lci_df: Optional[pd.DataFrame] = None
 
     route_set = set()
     for component in blend.components:
@@ -841,9 +793,6 @@ def _compute_blend_result(
         contribution = _weight_numeric_frame(record.result.balance_matrix, weight)
         balance_df = _accumulate_numeric(balance_df, contribution)
 
-        contribution_lci = _weight_lci(record.result.lci, weight)
-        lci_df = _accumulate_lci(lci_df, contribution_lci)
-
         for proc, flag in record.result.production_routes.items():
             try:
                 weighted_routes[proc] += weight * float(flag)
@@ -875,7 +824,6 @@ def _compute_blend_result(
         total_cost=total_cost if cost_valid else None,
         material_cost=material_cost if material_cost_valid else None,
         balance_matrix=balance_df,
-        lci=lci_df,
         meta={
             "blend": {
                 "name": blend.name,
@@ -905,8 +853,6 @@ def _run_blends(
     blends: List[BlendPlan],
     records: List[RunRecord],
     log_dir_default: Optional[Path] = None,
-    write_lci: bool = False,
-    lci_dir: Optional[Path] = None,
 ) -> List[Dict[str, Any]]:
     if not blends:
         return []
@@ -931,11 +877,6 @@ def _run_blends(
                 print(f"  ↳ blend log written to {path_written}")
             except Exception as exc:
                 print(f"  ! failed to write blend log in {log_dir}: {exc}", file=sys.stderr)
-        if write_lci:
-            out_dir = lci_dir if lci_dir is not None else Path("results/lci").resolve()
-            path_written = _write_lci_csv(getattr(result, 'lci', None), out_dir, blend.name)
-            if path_written:
-                print(f"  ↳ blend LCI written to {path_written}")
     return summaries
 
 
@@ -944,8 +885,6 @@ def run_batch(
     show_meta: bool = False,
     log_dir_default: Optional[Path] = None,
     fail_fast: bool = False,
-    write_lci: bool = False,
-    lci_dir: Optional[Path] = None,
 ) -> Tuple[List[Dict[str, Any]], int, List[RunRecord]]:
     summaries: List[Dict[str, Any]] = []
     failures = 0
@@ -975,12 +914,6 @@ def run_batch(
                     print(f"  ↳ log written to {path_written}")
                 except Exception as exc:
                     print(f"  ! failed to write log in {log_dir}: {exc}", file=sys.stderr)
-            # Optionally write LCI CSV per run
-            if write_lci:
-                out_dir = lci_dir if lci_dir is not None else Path("results/lci").resolve()
-                path_written = _write_lci_csv(getattr(result, 'lci', None), out_dir, plan.name)
-                if path_written:
-                    print(f"  ↳ LCI written to {path_written}")
             records.append(RunRecord(plan=plan, route_cfg=route_cfg, result=result, summary=summary))
         except Exception as exc:
             failures += 1
@@ -1018,9 +951,6 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--name", type=str, help="Friendly name for a single run.")
     run_parser.add_argument("--countries", nargs="+", help="List of country codes to cycle through (overrides --country-code).")
     run_parser.add_argument("--fail-fast", action="store_true", help="Abort on first failure.")
-    run_parser.add_argument("--enable-lci", action="store_true", help="Enable LCI outputs (sets FORGE_ENABLE_LCI=1).")
-    run_parser.add_argument("--write-lci", action="store_true", help="Write LCI CSV for each run and blend.")
-    run_parser.add_argument("--lci-dir", type=str, default="results/lci", help="Directory for LCI CSV outputs (with --write-lci).")
     return parser
 
 
@@ -1030,10 +960,6 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     if args.command != "run":
         parser.print_help()
         return 1
-    # Optionally enable LCI calculations explicitly for CLI runs
-    if getattr(args, "enable_lci", False):
-        import os as _os
-        _os.environ["FORGE_ENABLE_LCI"] = "1"
     cli_defaults = {}
     if args.data_dir:
         cli_defaults["data_dir"] = args.data_dir
@@ -1096,8 +1022,6 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             show_meta=args.show_meta,
             log_dir_default=log_dir_default,
             fail_fast=args.fail_fast,
-            write_lci=bool(getattr(args, 'write_lci', False)),
-            lci_dir=_resolve_path(args.lci_dir, Path.cwd()) if getattr(args, 'lci_dir', None) else None,
         )
     except Exception as exc:
         print(f"Execution aborted: {exc}", file=sys.stderr)
@@ -1109,8 +1033,6 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
                 blend_plans,
                 records,
                 log_dir_default=log_dir_default,
-                write_lci=bool(getattr(args, 'write_lci', False)),
-                lci_dir=_resolve_path(args.lci_dir, Path.cwd()) if getattr(args, 'lci_dir', None) else None,
             )
         except Exception as exc:
             print(f"Blend calculation failed: {exc}", file=sys.stderr)

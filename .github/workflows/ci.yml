@@ -39,7 +39,6 @@ jobs:
         env:
           PYTHONPATH: src
           # Ensure heavy/optional paths stay off in CI
-          FORGE_ENABLE_LCI: '0'
           FORGE_ENABLE_NUMERIC_TESTS: '0'
           FORGE_DEBUG_IO: '0'
         run: |

@@ -159,7 +159,15 @@ def apply_gas_routing_and_credits(
         return {str(r).lower() for r in iterable}
 
     def _blend_EF(shares: Dict[str, float], efs: Dict[str, float]) -> float:
-        fuels = [(c, s) for c, s in (shares or {}).items() if c != 'Electricity' and s > 0]
+        # Exclude Electricity and the process-gas carrier from the EF blend.
+        # The EF for process gas should reflect the primary thermal inputs
+        # (e.g., Coal, Coke, NG, Charcoal), not recycled process gas itself.
+        pg_name = process_gas_carrier if 'process_gas_carrier' in locals() else 'Process Gas'
+        fuels = [
+            (c, s)
+            for c, s in (shares or {}).items()
+            if c not in {'Electricity', pg_name} and s > 0
+        ]
         if not fuels:
             return 0.0
         denom = sum(s for _, s in fuels) or 1e-12

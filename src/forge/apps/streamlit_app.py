@@ -45,6 +45,7 @@ from forge.steel_core_api_v2 import (
     ScenarioInputs,
     run_scenario,
     write_run_log,  # for simple JSON logging
+    _apply_process_gas_metadata,
 )
 
 from forge.core.models import Process
@@ -429,6 +430,14 @@ def _load_for_picks(
     energy_content = load_data_from_yaml(os.path.join(base, 'energy_content.yml'))
     e_efs          = load_data_from_yaml(os.path.join(base, 'emission_factors.yml'))
     params         = load_parameters      (os.path.join(base, 'parameters.yml'))
+    descriptor_gas = getattr(descriptor, "gas", None) if descriptor is not None else None
+    gas_config = {
+        "process_gas_carrier": getattr(descriptor_gas, "process_gas_carrier", None) or "Process Gas",
+        "natural_gas_carrier": getattr(descriptor_gas, "natural_gas_carrier", None) or "Gas",
+        "utility_process": getattr(descriptor_gas, "utility_process", None),
+        "default_direct_use_fraction": getattr(descriptor_gas, "default_direct_use_fraction", None),
+    }
+    gas_config = _apply_process_gas_metadata(base, energy_content, params, gas_config)
 
     # Initial recipes
     recipes = load_recipes_from_yaml(
@@ -1770,7 +1779,10 @@ if run_now:
                 st.info("No per-process emissions table for this run.")
 
             if isinstance(energy_balance, pd.DataFrame) and not energy_balance.empty:
-                st.dataframe(energy_balance)
+                eb_display = energy_balance.loc[:, (energy_balance != 0).any(axis=0)]
+                if eb_display.empty:
+                    eb_display = energy_balance
+                st.dataframe(eb_display)
             else:
                 st.info("No energy balance table for this run.")
             

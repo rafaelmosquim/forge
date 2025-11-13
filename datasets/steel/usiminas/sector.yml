@@ -7,7 +7,7 @@ stage_menu:
     label: 'Validation (as cast)'
     description: 'Reference chain up to continuous casting.'
   - key: crude
-    stage_id: Cast
+    stage_id: CastCrude
     label: 'Crude steel'
     description: 'As-cast steel after continuous casting.'
   - key: finished
@@ -25,6 +25,8 @@ stages:
   Raw:
     material: 'Raw Products (types)'
   Cast:
+    material: 'Cast Steel (IP1)'
+  CastCrude:
     material: 'Cast Steel (IP1)'
   Liquid:
     material: 'Liquid Steel'

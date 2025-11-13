@@ -37,6 +37,11 @@
   - Added provenance manifest to Engine CLI outputs.
   - Removed unused legacy CLI wrapper.
   - Introduced `FORGE_ENABLE_COSTS` feature flag (default off) so cost calculations stay hidden while code paths remain available.
+  - Removed LCI feature surface (no LCI compute/exports in API/UI/CLI).
+  - Eliminated base/adjusted intensity hacks and BF base-intensity emission rewrites; emissions now run on the same adjusted balance.
+  - Process‑gas EF blending excludes Electricity and process‑gas carriers (attribution only to primary fuels).
+  - Streamlit: headline EF metrics now show with/without Coke Production; Energy Balance view hides zero‑only columns.
+  - Datasets: cleaned energy matrices (removed FLF/RLF columns); renamed Crude Steel `stage_id` to `CastCrude` to disambiguate CLI stage_key.
 
 ## v1.0.2 — 2025-10-06
 - JOSS submission snapshot.

@@ -17,11 +17,16 @@ Status legend: [x] done • [ ] pending
 - [x] Remove legacy core imports in the app.
 - [ ] Split `streamlit_app.py` into smaller UI components (sector gate, scenario, charts) for testability.
 - [ ] Add type annotations + mypy coverage for descriptor and routing helpers.
+- [x] Load process‑gas metadata in the app before recipe evaluation.
+- [x] Remove LCI code paths entirely.
+- [x] Remove adjusted‑intensity (base/adjust) hacks and BF emissions rewrite.
+- [x] Exclude process gas carrier from EF blending when computing process‑gas EFs.
 
 ## Documentation Accuracy
 - [x] Update README with Make targets and Engine CLI quickstart (refactored API usage).
 - [ ] Document descriptor architecture (stage menu, route presets) for contributors.
 - [ ] Update `CONTRIBUTING.md` with lint/test steps and expected outputs for validation runs.
+- [x] Note new env flag `FORGE_ENABLE_COSTS` (costs disabled by default for reviewers).
 
 ## CI / Automation
 - [x] Emit coverage and upload artifact.

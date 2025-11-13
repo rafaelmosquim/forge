@@ -20,8 +20,14 @@ Status legend: [x] done • [ ] pending
 - [ ] Offer downloadable CSV/Parquet outputs for balance matrices, energy tables, and emissions without leaving the UI.
 - [ ] Embed provenance metadata (git SHA, dataset hash) in the UI results card for citation.
 - [ ] Add comparison mode to plot multiple route runs side-by-side (e.g., BF-BOF vs DRI-EAF).
+- [x] Show EF metrics with/without Coke Production for quick sensitivity (two headline metrics).
+- [x] Hide zero-only columns in the Energy Balance table to slim the view.
 
 ## Performance & Reliability
 - [ ] Cache parsed YAML/descriptor data per dataset to reduce app reload time.
 - [ ] Add in-app diagnostics panel surfacing run_scenario errors with actionable tips.
 - [ ] Implement headless smoke-test for Streamlit endpoints to catch regressions.
+- [x] Ensure `process_gases.yml` is applied before recipe evaluation in the app (fixes missing `process_gases` errors).
+
+## Stage Unambiguity
+- [x] Rename Crude Steel `stage_id` to `CastCrude` (was `Cast`) to disambiguate CLI usage while keeping functionality identical to Validation (as‑cast stop).

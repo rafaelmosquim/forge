@@ -8,6 +8,8 @@
   - Any consumer (even BF/Coke auxiliaries) draws from the generic carrier, keeping the graph acyclic without intensity hacks.
 - Long-term fix: eliminate the base/adjusted intensity swap and always use the real (adjusted) intensity, then apply explicit credits after emissions (similar to how electricity credit works). This would make energy/emission accounting transparent and remove the need for dual intensity definitions.
 
-## Next Steps
-- Model the recovered gas manifold explicitly (sources → router → generic sinks) so BF/Coke can consume internal gas without circular dependencies.
-- Update `apply_gas_routing_and_credits` / emissions flow to subtract credits explicitly instead of rebuilding the energy balance with "base" intensities.
+## Status / Next Steps
+- [x] Model recovered gas manifold explicitly (sources → router → generic sinks) so BF/Coke can consume internal gas without circular dependencies (implemented in `apply_gas_routing_and_credits`).
+- [x] Remove base/adjusted intensity swap; use real intensities and handle credits explicitly (no BF/Coke base-intensity rewrites; credit routing lives in `apply_gas_routing_and_credits`).
+- [x] Compute process‑gas EF from primary fuels only (exclude Electricity and the process‑gas carrier from EF blending).
+- [ ] Optional: add a fossil‑only toggle for process‑gas EF (exclude biogenic carriers like Charcoal when desired).

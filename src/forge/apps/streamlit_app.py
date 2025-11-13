@@ -1733,16 +1733,31 @@ if run_now:
             finished_for_metric = stage_is_finished or str(stage_key) in ("Finished", "Finished steel")
             per_t_finished = raw_per_t if not finished_for_metric else (raw_per_t / max(fyield, 1e-9))
 
-            # 4) Display
+            # 4) Display — report with vs without Coke Production emissions
+            # Compute an EF that excludes Coke Production (reporting nicety)
+            raw_per_t_incl_coke = raw_per_t
+            raw_per_t_excl_coke = raw_per_t_incl_coke
+            try:
+                if isinstance(emissions, pd.DataFrame) and not emissions.empty:
+                    if 'TOTAL CO2e' in emissions.columns and 'Coke Production' in emissions.index:
+                        coke_total_kg = float(emissions.loc['Coke Production', 'TOTAL CO2e'])
+                        total_no_coke_kg = max(0.0, float(total_kg) - coke_total_kg)
+                        raw_per_t_excl_coke = total_no_coke_kg / (demand_kg / 1000.0)
+            except Exception:
+                pass
+
             c1, c2 = st.columns(2)
             with c1:
-                st.metric("EF (raw)", f"{raw_per_t:,.0f} kg CO₂e / t at {stage_key}",
-                        help="No yield applied (equivalent to yield = 1.00).")
+                st.metric(
+                    "EF (incl. Coke Production)",
+                    f"{raw_per_t_incl_coke:,.0f} kg CO₂e / t",
+                    help="Includes emissions from Coke Production."
+                )
             with c2:
                 st.metric(
-                    "EF (per t finished)",
-                    f"{per_t_finished:,.0f} kg CO₂e / t finished",
-                    help=f"Raw EF adjusted by yield when the selected stage is finished (yield = {fyield:.2f}).",
+                    "EF (excl. Coke Production)",
+                    f"{raw_per_t_excl_coke:,.0f} kg CO₂e / t",
+                    help="Subtracts Coke Production from total before dividing by demand."
                 )
             if total_cost is not None or material_cost is not None:
                 cost_cols = st.columns(2)

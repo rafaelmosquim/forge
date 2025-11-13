@@ -98,6 +98,14 @@ APP_DIR = Path(__file__).parent
 ASSETS  = APP_DIR / "assets"
 MAP_PNG = ASSETS / "process_map.png"
 
+
+def _costs_enabled() -> bool:
+    try:
+        raw = os.environ.get("FORGE_ENABLE_COSTS", "")
+    except Exception:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
 SECTOR_CONFIG = {
     "Steel": {
         "datasets": {
@@ -1666,8 +1674,9 @@ if run_now:
         energy_balance   = getattr(out, "energy_balance", None)
         emissions        = getattr(out, "emissions", None)
         total            = getattr(out, "total_co2e_kg", None)
-        total_cost       = getattr(out, "total_cost", None)
-        material_cost    = getattr(out, "material_cost", None)
+        costs_enabled = _costs_enabled()
+        total_cost       = float(getattr(out, "total_cost", 0.0)) if costs_enabled and getattr(out, "total_cost", None) is not None else None
+        material_cost    = float(getattr(out, "material_cost", 0.0)) if costs_enabled and getattr(out, "material_cost", None) is not None else None
 
         # Try to grab the material balance from out under common names
         balance_matrix = next(
@@ -1710,15 +1719,13 @@ if run_now:
             total_kg   = float(getattr(out, "total_co2e_kg", 0.0) or 0.0)
             demand_kg  = float(demand_qty) if float(demand_qty) > 0 else 1000.0  # guard
             raw_per_t  = total_kg / (demand_kg / 1000.0)  # kg CO2e per tonne at current stage
-            total_cost = float(getattr(out, "total_cost", 0.0) or 0.0)
-            material_cost = float(getattr(out, "material_cost", 0.0) or 0.0)
 
             # 3) EF per ton FINISHED (apply yield ONLY if current stage is not Finished)
             finished_for_metric = stage_is_finished or str(stage_key) in ("Finished", "Finished steel")
             per_t_finished = raw_per_t if not finished_for_metric else (raw_per_t / max(fyield, 1e-9))
 
             # 4) Display
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2 = st.columns(2)
             with c1:
                 st.metric("EF (raw)", f"{raw_per_t:,.0f} kg CO₂e / t at {stage_key}",
                         help="No yield applied (equivalent to yield = 1.00).")
@@ -1728,11 +1735,15 @@ if run_now:
                     f"{per_t_finished:,.0f} kg CO₂e / t finished",
                     help=f"Raw EF adjusted by yield when the selected stage is finished (yield = {fyield:.2f}).",
                 )
-            with c3:
-                st.metric("Total Energy Cost", f"${total_cost:,.2f}")
-
-            with c4:
-                st.metric("Material Energy Cost", f"${material_cost:,.2f}")
+            if total_cost is not None or material_cost is not None:
+                cost_cols = st.columns(2)
+                if total_cost is not None:
+                    with cost_cols[0]:
+                        st.metric("Total Energy Cost", f"${total_cost:,.2f}")
+                if material_cost is not None:
+                    target_col = cost_cols[1] if total_cost is not None else cost_cols[0]
+                    with target_col:
+                        st.metric("Material Energy Cost", f"${material_cost:,.2f}")
 
             # Downloads
             df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")

@@ -72,6 +72,11 @@ def _is_debug_io_enabled() -> bool:
     return _env_flag_truthy("FORGE_DEBUG_IO")
 
 
+def is_cost_enabled() -> bool:
+    """Global feature flag for cost calculations (off by default)."""
+    return _env_flag_truthy("FORGE_ENABLE_COSTS")
+
+
 def _debug_print(*args, **kwargs) -> None:
     if _is_debug_io_enabled():
         print(*args, **kwargs)
@@ -619,9 +624,12 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     ef_internal_electricity = float(gas_meta.get('ef_internal_electricity', 0.0))
     fyield = float(getattr(params, "finished_yield", 0.85))    
 
-    # Costs were computed inside core runner when price tables are present
-    total_cost = core_res.total_cost if core_res.total_cost is not None else 0.0
-    material_cost = core_res.material_cost if core_res.material_cost is not None else 0.0
+    if is_cost_enabled():
+        total_cost = core_res.total_cost
+        material_cost = core_res.material_cost
+    else:
+        total_cost = None
+        material_cost = None
 
     meta = {
         "route_preset": route_preset,

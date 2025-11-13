@@ -37,6 +37,7 @@ import copy
 import csv
 import json
 import math
+import os
 import sys
 from collections import defaultdict
 from dataclasses import asdict, dataclass
@@ -96,6 +97,18 @@ def _coerce_jsonish(value: str) -> Any:
         return int(text)
     except ValueError:
         return text
+
+
+def _env_flag_truthy(var_name: str) -> bool:
+    try:
+        raw = os.environ.get(var_name, "")
+    except Exception:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _costs_enabled() -> bool:
+    return _env_flag_truthy("FORGE_ENABLE_COSTS")
 
 
 def _deep_merge(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
@@ -753,8 +766,9 @@ def _compute_blend_result(
         raise ValueError(f"Blend '{blend.name}' has non-positive total share ({total_share}).")
     demand_qty = 0.0
     total_co2e = 0.0
-    total_cost = 0.0
-    material_cost = 0.0
+    costs_enabled = _costs_enabled()
+    total_cost = 0.0 if costs_enabled else None
+    material_cost = 0.0 if costs_enabled else None
     cost_valid = True
     material_cost_valid = True
     energy_balance: Optional[pd.DataFrame] = None
@@ -773,16 +787,17 @@ def _compute_blend_result(
         demand_qty += weight * float(record.route_cfg.demand_qty)
         if record.route_cfg.route_preset:
             route_set.add(record.route_cfg.route_preset)
-        comp_cost = getattr(record.result, "total_cost", None)
-        if comp_cost is None:
-            cost_valid = False
-        else:
-            total_cost += weight * float(comp_cost)
-        comp_material_cost = getattr(record.result, "material_cost", None)
-        if comp_material_cost is None:
-            material_cost_valid = False
-        else:
-            material_cost += weight * float(comp_material_cost)
+        if costs_enabled:
+            comp_cost = getattr(record.result, "total_cost", None)
+            if comp_cost is None:
+                cost_valid = False
+            else:
+                total_cost += weight * float(comp_cost)
+            comp_material_cost = getattr(record.result, "material_cost", None)
+            if comp_material_cost is None:
+                material_cost_valid = False
+            else:
+                material_cost += weight * float(comp_material_cost)
 
         contribution = _weight_numeric_frame(record.result.energy_balance, weight)
         energy_balance = _accumulate_numeric(energy_balance, contribution)
@@ -821,8 +836,8 @@ def _compute_blend_result(
         energy_balance=energy_balance if energy_balance is not None else pd.DataFrame(),
         emissions=emissions_df,
         total_co2e_kg=total_co2e,
-        total_cost=total_cost if cost_valid else None,
-        material_cost=material_cost if material_cost_valid else None,
+        total_cost=total_cost if (costs_enabled and cost_valid) else None,
+        material_cost=material_cost if (costs_enabled and material_cost_valid) else None,
         balance_matrix=balance_df,
         meta={
             "blend": {

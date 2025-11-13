@@ -67,6 +67,12 @@ make parallel       # run both in parallel
 make engine-smoke   # single refactored engine run (BF-BOF, Finished, 1000 kg)
 ```
 
+## Cost calculations (temporary off)
+
+Cost outputs are disabled for reviewers by default. Set `FORGE_ENABLE_COSTS=1`
+before running the CLI/API/UI if you need the energy/material cost tables; leave
+it unset to keep the UI and summaries clean while the estimates are under review.
+
 ## Engine CLI (refactored core)
 
 Run a single scenario through the refactored engine via the public API:

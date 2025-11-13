@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Iterable
 from functools import partial
 import inspect
+import os
 
 import pandas as pd
 
@@ -31,6 +32,18 @@ from .compute import (
     compute_inside_gas_reference_for_share,
 )
 from .costs import analyze_energy_costs, analyze_material_costs
+
+
+def _env_flag_truthy(var_name: str) -> bool:
+    try:
+        raw = os.environ.get(var_name, "")
+    except Exception:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _costs_enabled() -> bool:
+    return _env_flag_truthy("FORGE_ENABLE_COSTS")
 
 
 @dataclass
@@ -202,18 +215,19 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
     # 5) Optional costs
     total_cost = None
     material_cost = None
-    try:
-        if scn.energy_prices:
-            total_cost = analyze_energy_costs(eb_adj, scn.energy_prices)
-    except Exception:
-        total_cost = None
-    try:
-        if scn.material_prices:
-            material_cost = analyze_material_costs(
-                balance_matrix, scn.material_prices, external_rows=scn.external_purchase_rows
-            )
-    except Exception:
-        material_cost = None
+    if _costs_enabled():
+        try:
+            if scn.energy_prices:
+                total_cost = analyze_energy_costs(eb_adj, scn.energy_prices)
+        except Exception:
+            total_cost = None
+        try:
+            if scn.material_prices:
+                material_cost = analyze_material_costs(
+                    balance_matrix, scn.material_prices, external_rows=scn.external_purchase_rows
+                )
+        except Exception:
+            material_cost = None
 
     return CoreResults(
         production_routes=scn.production_routes,

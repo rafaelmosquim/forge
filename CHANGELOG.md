@@ -36,6 +36,7 @@
 - Miscellaneous
   - Added provenance manifest to Engine CLI outputs.
   - Removed unused legacy CLI wrapper.
+  - Introduced `FORGE_ENABLE_COSTS` feature flag (default off) so cost calculations stay hidden while code paths remain available.
 
 ## v1.0.2 — 2025-10-06
 - JOSS submission snapshot.

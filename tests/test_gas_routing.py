@@ -20,9 +20,19 @@ def test_apply_gas_routing_updates_efs_and_meta():
     energy_int = {'Blast Furnace': 10.0}
     energy_content = {}
     e_efs = {'Coal': 10.0, 'Gas': 100.0}
-    params = types.SimpleNamespace(bf_base_intensity=10.0, bf_adj_intensity=12.0)
+    params = types.SimpleNamespace()
     eb = pd.DataFrame({'TOTAL': [0.0]}, index=['TOTAL'])
-    scenario = {'gas_routing': {'direct_use_fraction': 0.5}}
+    scenario = {
+        'gas_config': {
+            'process_gas_carrier': 'Process Gas',
+            'natural_gas_carrier': 'Gas',
+            'utility_process': 'Utility Plant',
+            'process_gas_sources': [
+                {'process': 'Coke Production', 'carrier': 'Process Gas', 'outputs_in_MJ': True},
+            ],
+        },
+        'gas_routing': {'direct_use_fraction': 0.5},
+    }
 
     eb2, efs2, meta = apply_gas_routing_and_credits(
         energy_balance=eb,
@@ -46,4 +56,3 @@ def test_apply_gas_routing_updates_efs_and_meta():
         'ef_gas_blended', 'EF_process_gas', 'util_eff',
     ):
         assert k in meta
-

@@ -157,22 +157,7 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
         compute_inside_gas_reference_fn=gas_reference_fn,
     )
 
-    # Build a variant of energy balance for emissions: use BF base intensity
     eb_for_emissions = eb_adj.copy()
-    try:
-        if "Blast Furnace" in eb_for_emissions.index:
-            bf_runs = float(prod_levels.get("Blast Furnace", 0.0))
-            bf_base = float(getattr(scn.params, "bf_base_intensity", scn.energy_int.get("Blast Furnace", 0.0)))
-            bf_sh = scn.energy_shares.get("Blast Furnace", {}) or {}
-            for carrier in eb_for_emissions.columns:
-                if carrier == "Electricity":
-                    continue
-                share = float(bf_sh.get(carrier, 0.0))
-                eb_for_emissions.loc["Blast Furnace", carrier] = bf_runs * bf_base * share
-            if "TOTAL" in eb_for_emissions.index:
-                eb_for_emissions.loc["TOTAL"] = eb_for_emissions.drop(index="TOTAL").sum()
-    except Exception:
-        eb_for_emissions = eb_adj
 
     # 4) Emissions (robust signature)
     emissions = _robust_call_calculate_emissions(

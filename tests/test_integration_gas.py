@@ -44,7 +44,18 @@ def test_apply_gas_routing_and_credits_basic():
 
     params = SimpleNamespace()
     # Route all process gas to direct use so blended Gas EF should equal process-gas EF
-    scenario = {'gas_routing': {'direct_use_fraction': 1.0, 'electricity_fraction': 0.0}, 'inside_elec_ref': 0.0}
+    scenario = {
+        'gas_config': {
+            'process_gas_carrier': 'Process Gas',
+            'natural_gas_carrier': 'Gas',
+            'utility_process': 'Utility Plant',
+            'process_gas_sources': [
+                {'process': 'Coke Production', 'carrier': 'Process Gas', 'outputs_in_MJ': True},
+            ],
+        },
+        'gas_routing': {'direct_use_fraction': 1.0, 'electricity_fraction': 0.0},
+        'inside_elec_ref': 0.0,
+    }
 
     eb_new, e_efs_new, meta = apply_gas_routing_and_credits(
         energy_balance=energy_balance,

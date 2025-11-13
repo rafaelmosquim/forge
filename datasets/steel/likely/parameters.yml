@@ -14,11 +14,8 @@ blend:
   pellet: 0.10
   lump: 0.10
 
-# Blast Furnace gas config
-process_gas: 0.275
 process_gas_coke: 0.085  # your coke-oven value
 
 # Yield for finished steel stage
 finished_yield: 0.85
-
 

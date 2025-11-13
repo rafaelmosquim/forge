@@ -39,7 +39,6 @@ def load_parameters(filepath: str):
             params_dict = yaml.safe_load(f) or {}
             params = json.loads(json.dumps(params_dict), object_hook=lambda d: SimpleNamespace(**d))
             logger.debug("Loaded parameters YAML from %s", filepath)
-            logger.debug("process_gas: %s", getattr(params, "process_gas", "NOT FOUND"))
             return params
     except FileNotFoundError:
         logger.error("Parameters file not found: %s", filepath)

@@ -1,35 +1,10 @@
 import types
 
 from forge.core.transforms import (
-    adjust_blast_furnace_intensity,
-    adjust_process_gas_intensity,
     apply_dict_overrides,
     apply_recipe_overrides,
     apply_fuel_substitutions,
 )
-
-
-def _ns(**kw):
-    return types.SimpleNamespace(**kw)
-
-
-def test_adjust_bf_and_process_gas():
-    energy_int = {'Blast Furnace': 10.0, 'Coke Production': 5.0}
-    energy_shares = {
-        'Blast Furnace': {'Gas': 0.1, 'Coal': 0.2, 'Electricity': 0.7},
-        'Coke Production': {'Gas': 0.3, 'Electricity': 0.7},
-    }
-    params = _ns(process_gas=0.5, process_gas_coke=0.4)
-
-    adjust_blast_furnace_intensity(energy_int, energy_shares, params)
-    assert params.bf_base_intensity == 10.0
-    assert params.bf_adj_intensity > 10.0
-    assert energy_int['Blast Furnace'] == params.bf_adj_intensity
-
-    adjust_process_gas_intensity('Coke Production', 'process_gas_coke', energy_int, energy_shares, params)
-    assert getattr(params, 'coke_production_base_intensity', None) == 5.0
-    assert getattr(params, 'coke_production_adj_intensity', None) is not None
-    assert energy_int['Coke Production'] == params.coke_production_adj_intensity
 
 
 def test_apply_dict_and_recipe_overrides():
@@ -44,7 +19,7 @@ def test_apply_dict_and_recipe_overrides():
             'outputs': {'B': 'inputs["A"] + 1'},
         }
     }
-    params = _ns()
+    params = types.SimpleNamespace()
     energy_int, energy_shares, energy_content = {}, {}, {}
 
     new_recipes = apply_recipe_overrides(recipes, overrides, params, energy_int, energy_shares, energy_content)
@@ -76,4 +51,3 @@ def test_apply_fuel_substitutions_moves_shares_and_recipe_io():
     assert energy_shares['P']['Charcoal'] == 0.3
     r = recipes[0]
     assert 'Coal' not in r.inputs and r.inputs['Charcoal'] == 1.0
-

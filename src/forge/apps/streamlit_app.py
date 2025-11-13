@@ -59,8 +59,6 @@ from forge.core.transforms import (
     apply_fuel_substitutions,
     apply_dict_overrides,
     apply_recipe_overrides,
-    adjust_blast_furnace_intensity,
-    adjust_process_gas_intensity,
 )
 from forge.core.viz import (
     make_mass_sankey,
@@ -462,10 +460,6 @@ def _load_for_picks(
     if _param_patch is None:
         _param_patch = scenario.get('parameters', {})
     _recursive_ns_update(params, _param_patch)
-
-    # Intensity adjustments that affect connectivity/modes
-    adjust_blast_furnace_intensity(energy_int, energy_shares, params)
-    adjust_process_gas_intensity('Coke Production', 'process_gas_coke', energy_int, energy_shares, params)
 
     # Re-load recipes to re-evaluate expressions with new params
     recipes = load_recipes_from_yaml(

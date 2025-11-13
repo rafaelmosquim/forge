@@ -5,11 +5,8 @@ entire legacy module.
 """
 from __future__ import annotations
 
-import logging
 from types import SimpleNamespace
 from typing import Dict, Iterable, Optional
-
-logger = logging.getLogger(__name__)
 
 
 def apply_fuel_substitutions(
@@ -82,73 +79,10 @@ def apply_recipe_overrides(
     return list(by_name.values())
 
 
-def _has_process_gas_metadata(params) -> bool:
-    try:
-        meta = getattr(params, "process_gases")
-    except AttributeError:
-        return False
-    return bool(meta)
-
-
-def adjust_blast_furnace_intensity(energy_int, energy_shares, params):
-    """Scale BF intensity and store base/adjusted in params.
-
-    Top-gas available = adjusted_intensity – base_intensity.
-    """
-    if _has_process_gas_metadata(params):
-        base = float(energy_int.get('Blast Furnace', 0.0) or 0.0)
-        params.bf_base_intensity = base
-        params.bf_adj_intensity = base
-        return
-
-    pg = getattr(params, 'process_gas', 0.0)
-    if 'Blast Furnace' not in energy_int:
-        return
-
-    base = float(energy_int['Blast Furnace'])
-    params.bf_base_intensity = base
-
-    shares = energy_shares.get('Blast Furnace', {}) or {}
-    carriers = ['Gas', 'Coal', 'Coke', 'Charcoal']
-    S = sum(float(shares.get(c, 0.0) or 0.0) for c in carriers)
-    denom = max(1e-9, 1 - float(pg) * S)
-
-    adj = base / denom
-    energy_int['Blast Furnace'] = adj
-    params.bf_adj_intensity = adj
-    logger.info("Adjusted BF intensity: %0.2f -> %0.2f MJ/t steel (recovering %0.1f%% of carriers)", base, adj, float(pg)*100)
-
-
-def adjust_process_gas_intensity(proc_name, param_key, energy_int, energy_shares, params):
-    if _has_process_gas_metadata(params):
-        base = float(energy_int.get(proc_name, 0.0) or 0.0)
-        safe = proc_name.replace(' ', '_').lower()
-        setattr(params, f"{safe}_base_intensity", base)
-        setattr(params, f"{safe}_adj_intensity", base)
-        return
-
-    pg = getattr(params, param_key, 0.0)
-    if proc_name not in energy_int or float(pg) <= 0:
-        return
-    base = float(energy_int[proc_name])
-    safe = proc_name.replace(' ', '_').lower()
-    setattr(params, f"{safe}_base_intensity", base)
-
-    shares = energy_shares.get(proc_name, {}) or {}
-    S = sum(float(shares.get(c, 0.0) or 0.0) for c in ['Gas', 'Coal', 'Coke', 'Charcoal'])
-    denom = max(1e-9, 1 - float(pg) * S)
-    adj = base / denom
-    energy_int[proc_name] = adj
-    setattr(params, f"{safe}_adj_intensity", adj)
-    logger.info("Adjusted %s: %0.2f -> %0.2f MJ/run", proc_name, base, adj)
-
-
 __all__ = [
     'apply_fuel_substitutions',
     'apply_dict_overrides',
     'apply_recipe_overrides',
-    'adjust_blast_furnace_intensity',
-    'adjust_process_gas_intensity',
     'apply_energy_int_efficiency_scaling',
     'apply_energy_int_floor',
 ]

@@ -529,13 +529,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         _param_patch = scenario.get('parameters', {})
     _recursive_ns_update(params, _param_patch)
 
-    # Intensity adjustments (from refactored core)
-    from forge.core.compute import (
-        adjust_blast_furnace_intensity, adjust_process_gas_intensity
-    )
-    adjust_blast_furnace_intensity(energy_int, energy_shares, params)
-    adjust_process_gas_intensity('Coke Production', 'process_gas_coke', energy_int, energy_shares, params)
-
     # Re-load recipes to re-evaluate expressions with updated params; then recipe overrides
     recipes = load_recipes_from_yaml(
         os.path.join(base, 'recipes.yml'),

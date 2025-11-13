@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Set
 import pandas as pd
-import os
 from .models import Process
 from .routing import STAGE_MATS, build_route_mask
 from .engine import calculate_balance_matrix, calculate_energy_balance
@@ -17,18 +16,6 @@ from .engine import calculate_balance_matrix, calculate_energy_balance
 # -----------------------
 # Local implementations
 # -----------------------
-
-def _env_flag_truthy(var_name: str) -> bool:
-    try:
-        raw = os.environ.get(var_name, "")
-    except Exception:
-        return False
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _debug_print(*args, **kwargs) -> None:
-    if _env_flag_truthy("FORGE_DEBUG_IO"):
-        print(*args, **kwargs)
 
 
 def expand_energy_tables_for_active(active_names, energy_shares, energy_int):
@@ -83,25 +70,6 @@ def calculate_internal_electricity(prod_level: Dict[str, float], recipes_dict: D
                 continue
             energy_MJ = runs * qty * energy_per_unit
             internal_elec += energy_MJ * util_eff
-        return internal_elec
-
-    # Legacy fallback (no explicit metadata): BF delta + Coke process gas
-    # BF top-gas delta between adjusted and base intensities
-    bf_runs = float(prod_level.get('Blast Furnace', 0.0))
-    if bf_runs > 0 and hasattr(params, 'bf_base_intensity') and hasattr(params, 'bf_adj_intensity'):
-        bf_delta = params.bf_adj_intensity - params.bf_base_intensity
-        gf = bf_runs * bf_delta
-        _debug_print(f"DBG gas BF: runs={bf_runs:.3f}, delta={bf_delta:.2f} MJ/run → {gf:.1f} MJ")
-        internal_elec += gf * util_eff
-
-    # Coke-oven gas
-    cp_runs = float(prod_level.get('Coke Production', 0.0))
-    if 'Coke Production' in recipes_dict:
-        gas_per_run_cp = recipes_dict['Coke Production'].outputs.get('Process Gas', 0.0)
-        if cp_runs > 0 and gas_per_run_cp > 0:
-            gf_cp = cp_runs * gas_per_run_cp
-            _debug_print(f"DBG gas Coke: runs={cp_runs:.3f}, gas_per_run={gas_per_run_cp:.2f} MJ/run → {gf_cp:.1f} MJ")
-            internal_elec += gf_cp * util_eff
 
     return internal_elec
 
@@ -265,83 +233,6 @@ def apply_gas_routing_and_credits(
             EF_process_gas = ef_weighted / total_gas_MJ if ef_weighted > 0 else float(e_efs.get(process_gas_carrier, 0.0))
         else:
             EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
-    else:
-        # Legacy behavior (single carrier, inferred from intensity deltas)
-        try:
-            gas_coke_MJ = prod_levels.get('Coke Production', 0.0) * recipes_dict.get('Coke Production', Process('',{},{})).outputs.get(process_gas_carrier, 0.0)
-        except Exception:
-            gas_coke_MJ = 0.0
-        try:
-            bf_adj = float(getattr(params, 'bf_adj_intensity', 0.0))
-            bf_base = float(getattr(params, 'bf_base_intensity', 0.0))
-            gas_bf_MJ = (bf_adj - bf_base) * prod_levels.get('Blast Furnace', 0.0)
-        except Exception:
-            gas_bf_MJ = 0.0
-        total_gas_MJ = float(gas_coke_MJ + gas_bf_MJ)
-        if gas_coke_MJ > 0:
-            gas_source_details.setdefault('Coke Production', gas_coke_MJ)
-            gas_credit_details.setdefault('Coke Production', {})['mj'] = gas_source_details['Coke Production']
-        if gas_bf_MJ > 0:
-            gas_source_details.setdefault('Blast Furnace', gas_bf_MJ)
-            gas_credit_details.setdefault('Blast Furnace', {})['mj'] = gas_source_details['Blast Furnace']
-
-        gas_source_names = gas_config.get('gas_sources')
-        if not gas_source_names:
-            gas_source_names = [
-                name for name in recipes_dict.keys()
-                if 'gas_source' in _roles_for(name)
-            ]
-        gas_source_names = list(dict.fromkeys(gas_source_names))
-
-        gas_sources_MJ = 0.0
-        ef_weighted = 0.0
-        weight_sum = 0.0
-        for src in gas_source_names:
-            proc = recipes_dict.get(src)
-            if not proc:
-                continue
-            gas_output = float(proc.outputs.get(process_gas_carrier, 0.0) or 0.0)
-            if gas_output <= 0:
-                continue
-            runs = float(prod_levels.get(src, 0.0) or 0.0)
-            contribution = runs * gas_output
-            if contribution <= 1e-12:
-                continue
-            gas_sources_MJ += contribution
-            gas_source_details[src] = contribution
-            gas_credit_details.setdefault(src, {})['mj'] = contribution
-            shares = energy_shares.get(src, {})
-            ef_source = _blend_EF(shares, e_efs)
-            if ef_source <= 0:
-                ef_source = float(e_efs.get(process_gas_carrier, 0.0))
-            ef_weighted += ef_source * contribution
-            weight_sum += contribution
-
-        use_descriptor_sources = (
-            gas_sources_MJ > 0 and abs(gas_sources_MJ - total_gas_MJ) <= 1e-6
-        )
-        if use_descriptor_sources:
-            total_gas_MJ = float(gas_sources_MJ)
-            if weight_sum > 0:
-                EF_process_gas = ef_weighted / weight_sum
-            else:
-                EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
-            gas_coke_MJ = float(gas_source_details.get('Coke Production', gas_coke_MJ))
-            gas_bf_MJ = float(gas_source_details.get('Blast Furnace', gas_bf_MJ))
-        else:
-            if gas_sources_MJ <= 0 and total_gas_MJ <= 1e-9:
-                EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
-            elif gas_sources_MJ <= 0 and total_gas_MJ > 1e-9:
-                numerator = 0.0
-                if gas_coke_MJ > 0:
-                    numerator += EF_coke_gas * gas_coke_MJ
-                if gas_bf_MJ > 0:
-                    numerator += EF_bf_gas * gas_bf_MJ
-                if numerator > 0:
-                    EF_process_gas = numerator / total_gas_MJ
-                else:
-                    EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
-
     try:
         util_eff = recipes_dict.get(utility_process_name, Process('',{},{})).outputs.get('Electricity', 0.0)
     except Exception:
@@ -496,8 +387,6 @@ from .transforms import (
     apply_fuel_substitutions,
     apply_dict_overrides,
     apply_recipe_overrides,
-    adjust_blast_furnace_intensity,
-    adjust_process_gas_intensity,
 )
 
 # Transforms/overrides (gas routing implemented locally)
@@ -688,8 +577,6 @@ __all__ = [
     "apply_fuel_substitutions",
     "apply_dict_overrides",
     "apply_recipe_overrides",
-    "adjust_blast_furnace_intensity",
-    "adjust_process_gas_intensity",
     "apply_gas_routing_and_credits",
     # refs
     "compute_inside_elec_reference_for_share",

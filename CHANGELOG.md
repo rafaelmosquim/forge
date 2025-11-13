@@ -42,6 +42,7 @@
   - Process‑gas EF blending excludes Electricity and process‑gas carriers (attribution only to primary fuels).
   - Streamlit: headline EF metrics now show with/without Coke Production; Energy Balance view hides zero‑only columns.
   - Datasets: cleaned energy matrices (removed FLF/RLF columns); renamed Crude Steel `stage_id` to `CastCrude` to disambiguate CLI stage_key.
+  - Reproducibility: `make reproduce-validation` runs Likely/BRA Validation (as‑cast) via Engine CLI and writes artifacts; `run_scenario` meta now includes an environment fingerprint (`meta['env']`).
 
 ## v1.0.2 — 2025-10-06
 - JOSS submission snapshot.

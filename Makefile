@@ -17,6 +17,7 @@ help:
 	@echo "  docker-finished - run 'finished' profile inside Docker"
 	@echo "  docker-paper    - run 'paper' profile inside Docker"
 	@echo "  engine-smoke    - quick engine CLI run (BF-BOF, Finished, 1000 kg)"
+	@echo "  reproduce-validation - Likely/BRA Validation (as-cast) reproducible run"
 
 list:
 	$(PY) scripts/run_profiles.py --list
@@ -36,6 +37,16 @@ parallel:
 
 engine-smoke:
 	$(PY) -m forge.cli.engine_cli --data datasets/steel/likely --route BF-BOF --stage Finished --country BRA --demand 1000 --out results/engine_demo
+
+# Reproducible Validation (Likely dataset, Brazil, Validation as-cast)
+reproduce-validation:
+	PYTHONPATH=src $(PY) -m forge.cli.engine_cli \
+	  --data datasets/steel/likely \
+	  --route BF-BOF \
+	  --stage Cast \
+	  --country BRA \
+	  --demand 1000 \
+	  --out results/reproduce_validation
 
 # --- Monte Carlo examples (edit or copy as needed) ---
 mc-as-cast:

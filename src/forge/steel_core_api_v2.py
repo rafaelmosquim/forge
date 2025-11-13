@@ -21,6 +21,9 @@ from datetime import datetime
 from functools import partial
 
 import pandas as pd
+import sys
+import platform
+import subprocess as _sp
 
 # Core functions & models from your existing engine
 from forge.core.io import (
@@ -80,6 +83,45 @@ def is_cost_enabled() -> bool:
 def _debug_print(*args, **kwargs) -> None:
     if _is_debug_io_enabled():
         print(*args, **kwargs)
+
+
+def _env_fingerprint() -> Dict[str, Any]:
+    """Collect lightweight execution environment metadata for provenance."""
+    info: Dict[str, Any] = {
+        "python_version": sys.version.split()[0],
+        "python_impl": platform.python_implementation(),
+        "platform": platform.platform(),
+    }
+    try:
+        import numpy as _np
+        info["numpy_version"] = getattr(_np, "__version__", None)
+        # Try to capture BLAS/OpenBLAS/LAPACK vendor hints
+        try:
+            cfg = _np.__config__  # type: ignore[attr-defined]
+            names = [
+                "blas_opt_info",
+                "openblas_info",
+                "lapack_opt_info",
+            ]
+            for n in names:
+                d = getattr(cfg, "get_info", lambda *_: {})(n)  # type: ignore[misc]
+                if d:
+                    info.setdefault("blas_info", {})[n] = {k: v for k, v in d.items() if isinstance(v, (str, int, float, list))}
+        except Exception:
+            pass
+    except Exception:
+        pass
+    try:
+        import pandas as _pd
+        info["pandas_version"] = getattr(_pd, "__version__", None)
+    except Exception:
+        pass
+    try:
+        sha = _sp.check_output(["git", "rev-parse", "HEAD"], stderr=_sp.DEVNULL).decode().strip()
+        info["git_sha"] = sha
+    except Exception:
+        pass
+    return info
 
 
 def _coerce_float(value) -> Optional[float]:
@@ -675,6 +717,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "ef_electricity_grid": gas_meta.get('ef_electricity_grid', e_efs.get('Electricity', 0.0)),
         "ef_electricity_used": gas_meta.get('ef_electricity_used', f_internal * gas_meta.get('ef_internal_electricity', 0.0) + (1 - f_internal) * e_efs.get('Electricity', 0.0)),
     }
+    # Attach environment fingerprint for reproducibility
+    meta["env"] = _env_fingerprint()
 
     energy_flow_processes = [
         "Coke Production",

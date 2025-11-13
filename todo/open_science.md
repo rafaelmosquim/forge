@@ -4,9 +4,13 @@ Comprehensive backlog to keep FORGE aligned with transparency, reproducibility, 
 
 ## 1. Reproducible Execution & Environments
 - [ ] Publish resolver-locked dependencies (`requirements-lock.txt`, optional Conda/UV lock) plus documentation describing the relationship to `pyproject.toml` / `requirements.txt`.
+  - How: after creating a venv and `pip install -r requirements.txt`, run `python -m pip freeze > requirements-lock.txt` (or use `pip-tools`/`uv` if preferred). Commit the lock file alongside `requirements.txt`.
 - [x] Ship a container image (Dockerfile present); Make targets wrap it. [ ] Exercise in CI (smoke-testing release artifacts).
-- [ ] Add a `make reproduce-validation` (or `python -m forge.reproduce`) command that seeds randomness, runs the Likely/BRA validation scenario, and records provenance (git SHA, dataset hash, CLI args).
-- [ ] Capture hardware/software fingerprints (OS, Python version, BLAS vendor) in `steel_core_api_v2.run_scenario` metadata and surface them inside exported logs.
+- [x] Add a `make reproduce-validation` command that runs the Likely/BRA Validation (as‑cast) scenario and writes manifest/artifacts under `results/reproduce_validation`.
+  - Command: `make reproduce-validation`
+  - Under the hood: calls `forge.cli.engine_cli` with `--data datasets/steel/likely --route BF-BOF --stage Cast --country BRA --demand 1000`.
+- [x] Capture hardware/software fingerprints (OS, Python version, BLAS vendor, git SHA) in `steel_core_api_v2.run_scenario` metadata (`meta['env']`).
+  - Included keys: `python_version`, `python_impl`, `platform`, `numpy_version`, `pandas_version`, `blas_info` (best-effort), `git_sha`.
 
 ## 2. Transparent & FAIR Data Management
 - [ ] Provide `meta.yml` files inside each `datasets/<sector>/<variant>/` describing source, license, QA date, owner, and processing steps; surface this metadata in the Streamlit sidebar.

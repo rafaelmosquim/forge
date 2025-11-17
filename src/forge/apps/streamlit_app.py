@@ -1541,6 +1541,14 @@ if not IS_PAPER:
                 pci_th = max(0.0, 1.0 - coke_frac_th)  # remaining thermal is PCI
                 pci_char_frac = (char0 / max(1e-9, (coal0 + char0))) if (coal0 + char0) > 0 else 0.0
 
+                # Reset BF fuel sliders when scenario/data switch so YAML defaults (e.g., charcoal)
+                # don't get overwritten by stale Streamlit widget state.
+                scenario_token = f"{DATA_ROOT}::{scenario_name or '(no scenario)'}::{route}"
+                if st.session_state.get("_bf_slider_token") != scenario_token:
+                    st.session_state["_bf_slider_token"] = scenario_token
+                    st.session_state["static_bf_coke"] = float(coke_frac_th)
+                    st.session_state["static_bf_charfrac"] = float(pci_char_frac)
+
                 # UI
                 coke_share_th = st.slider(
                     "Coke share (of BF thermal input)",

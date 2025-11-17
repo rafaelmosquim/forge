@@ -3,7 +3,7 @@
 Comprehensive backlog to keep FORGE aligned with transparency, reproducibility, and FAIR data principles.
 
 ## 1. Reproducible Execution & Environments
-- [ ] Publish resolver-locked dependencies (`requirements-lock.txt`, optional Conda/UV lock) plus documentation describing the relationship to `pyproject.toml` / `requirements.txt`.
+- [x] Publish resolver-locked dependencies (`requirements-lock.txt`, optional Conda/UV lock) plus documentation describing the relationship to `pyproject.toml` / `requirements.txt`.
   - How: after creating a venv and `pip install -r requirements.txt`, run `python -m pip freeze > requirements-lock.txt` (or use `pip-tools`/`uv` if preferred). Commit the lock file alongside `requirements.txt`.
 - [x] Ship a container image (Dockerfile present); Make targets wrap it. [ ] Exercise in CI (smoke-testing release artifacts).
 - [x] Add a `make reproduce-validation` command that runs the Likely/BRA Validation (as‑cast) scenario and writes manifest/artifacts under `results/reproduce_validation`.

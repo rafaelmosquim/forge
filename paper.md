@@ -34,18 +34,17 @@ steelmaking pathways (BF-BOF, DRI-EAF, EAF-scrap) and products (Pig Iron, Cast S
 
 # Statement of Need
 
-The steel industry accounts for approximately 7-9% of global CO₂ emissions [@worldsteel2023]. 
-Decarbonization requires tools that can model complex production routes and their 
-environmental impacts. FORGE addresses this need by providing:
+The steel industry accounts for approximately 7-9% of global CO₂ emissions [@worldsteel2023]. Academic works usually fall into three main categories: Life Cycle Analysis of a single plant, top-down, black box calculations using total sectorial energy consumption and carrier share, or bottom-up analysies using proprietary data. These approaches have major shortcomings which FORGE addresses by providing:
 
-- Transparent, YAML-driven configuration
+- Transparent, YAML-driven process configuration
+- End-to-end integration between processes and total energy and emission balances
 - Multiple route modeling with scenario locking  
 - Interactive sensitivity analysis
 - Monte Carlo uncertainty quantification
 - Streamlit-based user interface
 
 Unlike commercial LCA software, FORGE is open-source and specifically designed for 
-steel production analysis, making it accessible for researchers and policymakers.
+steel production analysis, making it accessible for researchers and policymakers. Its extensive customization allows researchers to easily tailor processes to their realities. The software can also be used as a simulation tool for industry or researchers alike. 
 
 # Features
 

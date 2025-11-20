@@ -1,88 +1,109 @@
-"""Core engine trio kept together here.
-
-Exports the main compute functions while we gradually refactor internals.
-Currently implements balance matrix and energy balance locally, and delegates
-emissions to the legacy monolith to preserve behavior.
+"""
+This is the core computation engine for the Forge modeling framework. Main function is 'calculate_balance_matrix', which walks upstream from a specified final demand to determine production levels across a network of recipes. It is set for error if multiple producers exist for a material without clear selection, to avoid guessing. 
+The function is complex because recipes are configured once, for all possible steel production processes, to avoid duplication and drift (ie. one recipe for BF-BOF, another for DRI-EAF). The route must be constructed elsewhere and fed into engine, which is kept a pure calculation machine by design. The specific production scenario is set by enabling/disabling certain routes, via 'production_routes' dict.
+Additional functions compute energy balances and emissions based on production levels and various intensity and emission factors configured externally via YAML files.
 """
 from __future__ import annotations
 
+from matplotlib.pylab import mat
 import pandas as pd
 from collections import defaultdict, deque
 from typing import Dict
 
 def calculate_balance_matrix(recipes, final_demand, production_routes):
     """
-    Solve production levels by walking upstream from 'final_demand' material.
-    production_routes: dict {process_name: 0/1}; missing key means allowed (1).
-    Exactly one producer per material must be enabled, or we treat as external.
+    This function is the heart of the system. If solves material balances to give production levels
+    for all processes needed to satisfy a given final demand, based on available recipes and
+    enabled production routes.
     """
-    all_m, producers = set(), defaultdict(list)
+    
+    """
+    First step is to scan recipes to build a mapping of materials and their possible producers 
+    (ie Pig Iron may be produced by the Blast Furnace or Direct Reduction, per recipes).
+    """
+
+    all_materials, producers = set(), defaultdict(list)
     recipes_dict = {r.name: r for r in recipes}
     for r in recipes:
-        all_m |= set(r.inputs) | set(r.outputs)
-        for m in r.outputs:
-            producers[m].append(r)
+        all_materials |= set(r.inputs) | set(r.outputs) # gather all possible materials
+        for m in r.outputs: 
+            producers[m].append(r) 
+            # map material to possible producers 
+            # (still allow more than one at this point)
+
+    """
+    Some materials are not produced internally, by design they have no output in recipes (ie. iron ore). These will remain as external requirements in the final balance.
+    """        
 
     demand = list(final_demand.keys())[0]
     if demand not in producers:
         # demand may be a market-only material; still build external requirement row
         required: Dict[str, float] = defaultdict(float, final_demand)
-        mats = sorted(all_m | {demand})
+        mats = sorted(all_materials | {demand})
         df = pd.DataFrame(
             [[required.get(m, 0) for m in mats], [-final_demand.get(m, 0) for m in mats]],
             index=['External Inputs', 'Final Demand'], columns=mats,
         )
         return df.loc[:, (df.abs() > 1e-9).any()], defaultdict(float)
+    
+    """
+    Now we need to walk upstream from final demand, which is set by the user (ie cast steel, finished product).
+    To avoid infinite loops we set a queue and seen set. Required and prod_level dicts track material requirements and production levels per process.
+    """
 
-    required: Dict[str, float] = defaultdict(float, final_demand)
-    prod_level: Dict[str, float] = defaultdict(float)
-    queue = deque([demand])
-    seen = {demand}
+    required = defaultdict(float, final_demand) # the walk starts with final demand set by user (ie pig iron, 1000 kg) - generic so we can change final demand on the fly without duplication
+    prod_level = defaultdict(float) # production levels per process (recipe name)
+    queue = deque([demand]) # puts final demand at the start of the queue. the rest is built upstream from recipes. user must ensure recipes i/o are consistent, code can't check that.
+    seen = {demand} # to avoid infinite loops
+
+    # Now that we set the table we can start walking upstream
+
 
     while queue:
-        mat = queue.popleft(); seen.remove(mat)
-        amt = required[mat]
-        if amt <= 1e-9:
+        material = queue.popleft(); seen.remove(material) # pop material from queue and mark as unseen
+        amount_required = required[material] # amount required for this material
+        if amount_required <= 1e-9:
             continue
 
-        cand_all = producers.get(mat, [])
-        cand = [p for p in cand_all if (production_routes.get(p.name, 1.0) > 0.0)]
+        all_recipes = producers.get(material, []) # possible recipes for this material
+        enabled_recipes = [recipe for recipe in all_recipes if (production_routes.get(recipe.name, 1.0) > 0.0)] # filter recipes by enabled routes
 
-        if not cand:
+        if not enabled_recipes:
             # No enabled internal producer → external purchase; leave as requirement
             continue
 
-        if len(cand) > 1:
-            names = [p.name for p in cand]
-            raise ValueError(f"Ambiguous producers for '{mat}': {names}. Pick exactly one.")
+        if len(enabled_recipes) > 1:
+            names = [p.name for p in enabled_recipes]
+            raise ValueError(f"Ambiguous producers for '{material}': {names}. Pick exactly one.")
+            # multiple enabled producers leads to error so code can't guess. recipes can and have multiple producers per material, but user must pick one via production_routes.
 
-        p = cand[0]
-        out_amt = float(p.outputs.get(mat, 0.0))
-        if out_amt <= 0:
+        selected_recipe = enabled_recipes[0]
+        output_per_run = float(selected_recipe.outputs.get(material, 0.0))
+        if output_per_run <= 0:
             continue
 
-        runs = amt / out_amt
-        prod_level[p.name] += runs
+        production_runs_needed = amount_required / output_per_run
+        prod_level[selected_recipe.name] += production_runs_needed
 
-        for im, ia in p.inputs.items():
-            required[im] += runs * float(ia)
-            if im in producers and im not in seen:
-                queue.append(im); seen.add(im)
+        for input_material, input_amount in selected_recipe.inputs.items():
+            required[input_material] += production_runs_needed * float(input_amount)
+            if input_material in producers and input_material not in seen:
+                queue.append(input_material); seen.add(input_material)
 
-        required[mat] = 0.0
+        required[material] = 0.0 # loop stops when no material is left on the queue
 
     # Prepare matrix (process net flows + external + final demand)
-    ext = {m: amt for m, amt in required.items() if amt > 1e-9 and m not in producers}
-    mats = sorted(all_m | set(required.keys()))
+    external_purchases = {m: amt for m, amt in required.items() if amt > 1e-9 and m not in producers}
+    mats = sorted(all_materials | set(required.keys()))
     data, rows = [], []
 
-    for nm, lvl in prod_level.items():
-        if lvl > 1e-9:
-            rec = recipes_dict[nm]
-            row = [(rec.outputs.get(m, 0.0) - rec.inputs.get(m, 0.0)) * lvl for m in mats]
-            data.append(row); rows.append(nm)
+    for process_name, production_volume in prod_level.items():
+        if production_volume > 1e-9:
+            rec = recipes_dict[process_name]
+            row = [(rec.outputs.get(m, 0.0) - rec.inputs.get(m, 0.0)) * production_volume for m in mats]
+            data.append(row); rows.append(process_name)
 
-    data.append([ext.get(m, 0.0) for m in mats]); rows.append('External Inputs')
+    data.append([external_purchases.get(m, 0.0) for m in mats]); rows.append('External Inputs')
     data.append([-final_demand.get(m, 0.0) for m in mats]); rows.append('Final Demand')
 
     df = pd.DataFrame(data, index=rows, columns=mats)

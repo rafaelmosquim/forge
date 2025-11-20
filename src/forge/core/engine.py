@@ -112,18 +112,20 @@ def calculate_balance_matrix(recipes, final_demand, production_routes):
 
 def calculate_energy_balance(prod_level, energy_int, energy_shares):
     """Build energy balance (MJ) from production levels, per-run intensity, and carrier shares."""
-    es = pd.DataFrame.from_dict(energy_shares, orient='index').fillna(0.0)
-    ei = pd.Series(energy_int).fillna(0.0)
+    energy_shares = pd.DataFrame.from_dict(energy_shares, orient='index').fillna(0.0) 
+    # reads per carrier shares from dict (from energy_shares YAML)
+    energy_intensity = pd.Series(energy_int).fillna(0.0)
+    # reads per process energy intensity from dict (from energy_int YAML)
 
-    per_run = es.multiply(ei, axis='index')  # MJ per run by carrier
-    runs = pd.Series(prod_level)
-    common = per_run.index.intersection(runs.index)
-    data = per_run.loc[common].multiply(runs, axis=0)
+    per_run = energy_shares.multiply(energy_intensity, axis='index') # MJ per run by carrier
+    runs = pd.Series(prod_level) # as energy intensity is per process run, we need to multiply by runs, so we need runs first
+    common = per_run.index.intersection(runs.index) # only processes with both energy intensity and production levels
+    data = per_run.loc[common].multiply(runs, axis=0) # now we multiply MJ/run by runs to get total MJ per process
 
-    all_carriers = sorted(es.columns.union(pd.Index(['Electricity'])))
-    bal = pd.DataFrame(data, index=common, columns=all_carriers).fillna(0.0)
-    bal.loc['TOTAL'] = bal.sum()
-    return bal
+    all_carriers = sorted(energy_shares.columns.union(pd.Index(['Electricity']))) # ensure Electricity is included even if zero (but why?)
+    bal = pd.DataFrame(data, index=common, columns=all_carriers).fillna(0.0) # this simply creates the energy balance DataFrame
+    bal.loc['TOTAL'] = bal.sum() # and this adds a total row summing total per carrier enrgy consumption
+    return bal # bal will be read anywhere as the energy balance; do not refactor here
 
 
 def calculate_emissions(
@@ -132,7 +134,7 @@ def calculate_emissions(
     energy_df,
     energy_efs,
     process_efs,
-    internal_elec,  # kept for signature compatibility (not used here)
+    internal_elec,  # kept for signature compatibility (not used here because we changed logic)
     final_demand,
     total_gas_MJ,
     EF_process_gas,
@@ -142,22 +144,19 @@ def calculate_emissions(
     allow_direct_onsite: set | None = None,
 ):
     """
-    Enforce mutual exclusivity per process row:
-    - Onsite production  → Energy Emissions only (Direct=0), unless whitelisted chemistry.
-    - Market/outside     → Direct Emissions only (Energy=0).
-
-    Electricity EF for onsite rows uses the plant-wide blend:
-        ef_elec_mix = f_internal * ef_int + (1 - f_internal) * EF_grid
-    Electricity for outside-mill rows is grid-only.
-    Returns a DataFrame indexed by process with columns:
-        [Energy Emissions, Direct Emissions, TOTAL CO2e] in tonnes.
+    This should be a simple emission calculator but needed some tailoring for steel processes. Aluminum will probably need similar treatment.
+    First we separate purchases from onsite production. This is set via 'mkt_cfg' (or helper?) because we need some flexibility (i.e. Nitrogen can be purchased or produced onsite). As we have some processes that occur downstream of a typical mill, we need to identify those as well. Electricity/gas there is from grid/mkt, not blended.
+    Second aspect is that both electricity and process gas need special handling. Both emission factors are blends between outside purchase and internal production, based on internal_fraction_plant. We calculate this elsewhere and explain there. 
+    Finally, some internal process can have direct emissions, so we need to whitelist those via 'allow_direct_onsite' set.
+    When all these aspects are considered, we can build the emissions DataFrame, which is simply a matter of iterating over processes and calculating energy and direct emissions accordingly.
+    This function may benefit from some refactoring later, but for now it works as intended.
     """
     # Helpers
     def _is_market_process(name: str) -> bool:
         n = name.lower()
-        return (" from market" in n) or (" purchase" in n)
+        return (" from market" in n) or (" purchase" in n) #maybe mkt_cfg is not even used anymore? check this later
 
-    # Determine outside-mill processes
+    # Determine outside-mill processes - self explanatory; we set a plant boundary constant
     if outside_mill_procs is not None:
         outside_set = set(outside_mill_procs)
     else:
@@ -199,7 +198,7 @@ def calculate_emissions(
             if proc_name in energy_df.index:
                 for carrier, cons in energy_df.loc[proc_name].items():
                     if proc_name == "Coke Production" and carrier == "Coal":
-                        continue
+                        continue # we treat coal as feedstock, not energy, for coke production
                     if carrier == 'Electricity':
                         row['Energy Emissions'] += float(cons) * elec_ef_for_proc
                     else:
@@ -217,7 +216,7 @@ def calculate_emissions(
         return None
 
     emissions_df = pd.DataFrame(rows).set_index('Process') / 1000.0  # kg -> t
-    emissions_df['TOTAL CO2e'] = emissions_df['Energy Emissions'] + emissions_df['Direct Emissions']
+    emissions_df['TOTAL CO2e'] = emissions_df['Energy Emissions'] + emissions_df['Direct Emissions'] # separate accounting for energy and direct emissions for clarity; but total emissions always sum both
 
     return emissions_df
 

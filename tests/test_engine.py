@@ -1,11 +1,8 @@
-import pandas as pd
 import pytest
 
-from forge.core.engine import (
-    calculate_balance_matrix,
-    calculate_energy_balance,
-    calculate_emissions,
-)
+# will test here the balance matrix logic only
+
+from forge.core.engine import calculate_balance_matrix
 from forge.core.models import Process
 
 # we will test here if balance matrix walks upstream from final demand
@@ -25,7 +22,7 @@ def test_balance_matrix_walks_upstream_and_tracks_runs():
         Process(
             "Iron Ore From Market",
             inputs={},
-            outputs={"Iron Ore: 1.0"}.
+            outputs={"Iron Ore": 1.0},
         ),
     ]
 
@@ -44,5 +41,64 @@ def test_balance_matrix_walks_upstream_and_tracks_runs():
     assert df.loc["Basic Oxygen Furnace", "Steel"] == pytest.approx(100.0)
     assert df.loc["Blast Furnace", "Iron Ore"] == pytest.approx(-110.0)
     assert df.loc["Blast Furnace", "Coke"] == pytest.approx(-1000.0)
+    assert df.loc["Blast Furnace", "Sinter"] == pytest.approx(-100.0)
+    assert df.loc["Basic Oxygen Furnace", "Pig Iron"] == pytest.approx(-100.0)
+    assert df.loc["Basic Oxygen Furnace", "Electricity"] == pytest.approx(-100.0)
     
+    # Intermediate product is fully balanced internally
+    assert df["Pig Iron"].sum() == pytest.approx(0.0)
+
+# test with multiple producers should fail by design; core model accepts only one production route per process which should be resolved elsewhere.
+def test_balance_matrix_with_multiple_routes():
+    recipes = [
+        Process(
+            "Basic Oxygen Furnace",
+            inputs={"Pig Iron": 1.0, "Electricity": 1.0},
+            outputs={"Steel": 1.0},
+        ),
+        Process(
+            "Blast Furnace",
+            inputs={"Iron Ore": 1.1, "Coke": 10.0, "Sinter": 1.0},
+            outputs={"Pig Iron": 1.0},
+        ),
+        Process(
+            "Direct Reduction Iron",
+            inputs={"Iron Ore": 1.1, "Natural Gas": 5.0, "Sinter": 1.0},
+            outputs={"Pig Iron": 1.0},
+        ),
+        Process(
+            "Iron Ore From Market",
+            inputs={},
+            outputs={"Iron Ore": 1.0},
+        ),
+    ]
+    with pytest.raises(ValueError, match="Ambiguous producers for 'Pig Iron'"):
+        calculate_balance_matrix(
+            recipes=recipes,
+            final_demand={"Steel": 100},
+            production_routes={"Basic Oxygen Furnace": 1.0, "Blast Furnace": 1.0,
+                               "Direct Reduction Iron": 1.0},
+        )
+
+# def test_external_producers():
+#     recipes = [
+#         Process(
+#             "Blast Furnace",
+#             inputs={"Iron Ore": 1.1, "Coke": 10.0, "Sinter": 1.0},
+#             outputs={"Pig Iron": 1.0},
+#         ),
+#         Process(
+#             "Iron Ore From Market",
+#             inputs={},
+#             outputs={"Iron Ore": 1.0},
+#         ),
+#     ]
+#     df, prod_level = calculate_balance_matrix(
+#         recipes=recipes,
+#         final_demand={"Pig Iron": 100.0},
+#         production_routes={"Blast Furnace":1.0, "Iron Ore From Market":1.0}    
+#     )        
+
+#     assert prod_level["Blast Furnace"] == pytest.approx(100.0)
+#     assert df.loc["External Inputs", "Iron Ore"] == pytest.approx(110.0)
 

@@ -12,9 +12,7 @@ from typing import Dict
 
 def calculate_balance_matrix(recipes, final_demand, production_routes):
     """
-    This function is the heart of the system. If solves material balances to give production levels
-    for all processes needed to satisfy a given final demand, based on available recipes and
-    enabled production routes.
+    This function is the heart of the system. If solves material balances to give production levelsf or all processes needed to satisfy a given final demand, based on available recipes and enabled production routes.
     """
     
     """

@@ -387,7 +387,7 @@ def write_run_log(log_dir: str, payload: Dict[str, Any]) -> str:
         json.dump(payload, f, indent=2, ensure_ascii=False)
     return fpath
 
-## NOTE: Canonical gas reference is provided by forge.core.compute.compute_inside_gas_reference_for_share
+## NOTE: Canonical gas reference is provided by forge.core.gas.compute_inside_gas_reference_for_share
 # ==============================
 # Main API
 # ==============================

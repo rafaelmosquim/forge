@@ -1,7 +1,7 @@
 import types
 import pandas as pd
 
-from forge.core.compute import apply_gas_routing_and_credits
+from forge.core.gas import apply_gas_routing_and_credits
 from forge.core.models import Process
 
 

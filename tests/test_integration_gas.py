@@ -10,7 +10,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from forge.core.models import Process
-from forge.core.compute import apply_gas_routing_and_credits
+from forge.core.gas import apply_gas_routing_and_credits
 from forge.core.engine import calculate_energy_balance
 
 

@@ -27,6 +27,9 @@ from .engine import (
 )
 from .compute import (
     expand_energy_tables_for_active,
+    compute_inside_elec_reference_for_share,
+)
+from .gas import (
     calculate_internal_electricity,
     apply_gas_routing_and_credits,
     compute_inside_gas_reference_for_share,
@@ -149,6 +152,11 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
         stage_lookup=STAGE_MATS,
         fallback_materials=scn.fallback_materials or set(),
     )
+    elec_reference_fn = partial(
+        compute_inside_elec_reference_for_share,
+        stage_lookup=STAGE_MATS,
+        fallback_materials=scn.fallback_materials or set(),
+    )
     eb_adj, e_efs, gas_meta = apply_gas_routing_and_credits(
         energy_balance=energy_balance,
         recipes=scn.recipes,
@@ -167,6 +175,7 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
             "fallback_materials": list(scn.fallback_materials or []),
         },
         compute_inside_gas_reference_fn=gas_reference_fn,
+        compute_inside_elec_reference_fn=elec_reference_fn,
     )
 
     eb_for_emissions = eb_adj.copy()

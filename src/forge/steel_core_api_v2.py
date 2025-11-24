@@ -35,10 +35,8 @@ from forge.core.io import (
 )
 from forge.core.models import Process, OUTSIDE_MILL_PROCS
 from forge.core.routing import STAGE_MATS
-from forge.core.compute import (
-    compute_inside_elec_reference_for_share,
-)
 from forge.core.runner import run_core_scenario
+from forge.core.gas import compute_inside_energy_reference_for_share
 from forge.scenarios.builder import build_core_scenario
 from forge.scenarios.transforms import apply_dri_mix, apply_charcoal_expansion
 from forge.core.transforms import (
@@ -387,7 +385,7 @@ def write_run_log(log_dir: str, payload: Dict[str, Any]) -> str:
         json.dump(payload, f, indent=2, ensure_ascii=False)
     return fpath
 
-## NOTE: Canonical gas reference is provided by forge.core.gas.compute_inside_gas_reference_for_share
+## NOTE: Canonical gas/electricity reference is provided by forge.core.gas.compute_inside_energy_reference_for_share
 # ==============================
 # Main API
 # ==============================
@@ -613,20 +611,28 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         pass
 
     # ensure we have plant-level inside_elec_ref and fixed internal ef values
-    try:
-        elec_ref_stage = reference_stage_for_electricity(descriptor)
-        inside_elec_ref = compute_inside_elec_reference_for_share(
-            recipes=recipes,
-            energy_int=energy_int,
-            energy_shares=energy_shares,
-            energy_content=energy_content,
-            params=params,
-            route_key=route_preset,
-            demand_qty=demand_qty,
-            stage_ref=elec_ref_stage,
-        )
-    except Exception:
-        inside_elec_ref = 0.0
+    inside_elec_ref = float(gas_meta.get('inside_elec_ref', 0.0))
+    if inside_elec_ref <= 0.0:
+        try:
+            elec_ref_stage = reference_stage_for_electricity(descriptor)
+            ref_totals = compute_inside_energy_reference_for_share(
+                recipes=recipes,
+                energy_int=energy_int,
+                energy_shares=energy_shares,
+                energy_content=energy_content,
+                params=params,
+                route_key=route_preset,
+                demand_qty=demand_qty,
+                stage_ref=elec_ref_stage,
+                gas_carriers=[
+                    gas_config.get("natural_gas_carrier") or "Gas",
+                    gas_config.get("process_gas_carrier") or "Process Gas",
+                ],
+                fallback_materials=fallback_materials,
+            )
+            inside_elec_ref = float(ref_totals.get('electricity_total', 0.0))
+        except Exception:
+            inside_elec_ref = 0.0
 
     # Pull internal electricity diagnostics from gas_meta if available
     f_internal = float(gas_meta.get('f_internal', 0.0))

@@ -67,7 +67,7 @@ def test_apply_gas_routing_and_credits_basic():
         energy_content=energy_content,
         e_efs=e_efs,
         scenario=scenario,
-        compute_inside_gas_reference_fn=lambda *a, **k: 5.0,
+        compute_inside_reference_fn=lambda *a, **k: {'gas_total': 5.0, 'electricity_total': 0.0},
     )
 
     # With all process gas routed to electricity and util eff 0.2, internal elec should be > 0

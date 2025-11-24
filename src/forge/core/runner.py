@@ -27,12 +27,11 @@ from .engine import (
 )
 from .compute import (
     expand_energy_tables_for_active,
-    compute_inside_elec_reference_for_share,
 )
 from .gas import (
     calculate_internal_electricity,
     apply_gas_routing_and_credits,
-    compute_inside_gas_reference_for_share,
+    compute_inside_energy_reference_for_share,
 )
 from .costs import analyze_energy_costs, analyze_material_costs
 
@@ -147,13 +146,8 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
     energy_balance = calculate_energy_balance(prod_levels, scn.energy_int, scn.energy_shares)
 
     # 3) Gas routing + credit, EF blending
-    gas_reference_fn = partial(
-        compute_inside_gas_reference_for_share,
-        stage_lookup=STAGE_MATS,
-        fallback_materials=scn.fallback_materials or set(),
-    )
-    elec_reference_fn = partial(
-        compute_inside_elec_reference_for_share,
+    reference_fn = partial(
+        compute_inside_energy_reference_for_share,
         stage_lookup=STAGE_MATS,
         fallback_materials=scn.fallback_materials or set(),
     )
@@ -174,8 +168,7 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
             "gas_config": scn.gas_config,
             "fallback_materials": list(scn.fallback_materials or []),
         },
-        compute_inside_gas_reference_fn=gas_reference_fn,
-        compute_inside_elec_reference_fn=elec_reference_fn,
+        compute_inside_reference_fn=reference_fn,
     )
 
     eb_for_emissions = eb_adj.copy()

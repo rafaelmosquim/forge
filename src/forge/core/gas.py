@@ -1,4 +1,7 @@
-"""Gas routing, credits, and internal electricity helpers."""
+"""
+Gas routing warrants a dedicated module.
+Gas logic is as follows: Blast Furnace, Coke Oven and Basic Oxygen Furnace can recover gas. This gas is first routed to a main gas router, which splits the gas between direct use in processes and electricity generation in the Utility Plant (user can set this split in UI. default is 50/50). The electricity generated and the process gas used as gas are credited back to the system, reducing the net electricity and gas consumption.
+"""
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Set
@@ -71,8 +74,7 @@ def apply_gas_routing_and_credits(
     energy_content: dict,
     e_efs: dict,
     scenario: dict,
-    compute_inside_gas_reference_fn=None,
-    compute_inside_elec_reference_fn=None,
+    compute_inside_reference_fn=None,
 ):
     """Gas routing, EF blending and electricity credits."""
     recipes_dict = {r.name: r for r in recipes}
@@ -204,13 +206,14 @@ def apply_gas_routing_and_credits(
     if direct_use_fraction + electricity_fraction > 1.0:
         electricity_fraction = max(0.0, 1.0 - direct_use_fraction)
 
+    ref_totals = {}
     total_gas_consumption_plant = 0.0
     carrier_list = [natural_gas_carrier]
     if process_gas_carrier and process_gas_carrier != natural_gas_carrier:
         carrier_list.append(process_gas_carrier)
-    if compute_inside_gas_reference_fn:
+    if compute_inside_reference_fn:
         try:
-            total_gas_consumption_plant = float(compute_inside_gas_reference_fn(
+            ref_totals = compute_inside_reference_fn(
                 recipes=recipes,
                 energy_int=energy_int,
                 energy_shares=energy_shares,
@@ -220,9 +223,14 @@ def apply_gas_routing_and_credits(
                 demand_qty=float(scenario.get('demand_qty', 1000.0)),
                 stage_ref=scenario.get('stage_ref', 'IP3'),
                 gas_carriers=carrier_list,
-            ))
+            ) or {}
         except Exception:
-            total_gas_consumption_plant = 0.0
+            ref_totals = {}
+
+    try:
+        total_gas_consumption_plant = float(ref_totals.get('gas_total', 0.0))
+    except Exception:
+        total_gas_consumption_plant = 0.0
 
     direct_use_gas_MJ = max(0.0, min(total_gas_MJ, total_gas_MJ * direct_use_fraction))
     remaining_gas = max(0.0, total_gas_MJ - direct_use_gas_MJ)
@@ -254,18 +262,9 @@ def apply_gas_routing_and_credits(
     e_efs[process_gas_carrier] = EF_process_gas
 
     inside_elec_ref = float(scenario.get('inside_elec_ref', 0.0))
-    if inside_elec_ref <= 0.0 and compute_inside_elec_reference_fn:
+    if inside_elec_ref <= 0.0:
         try:
-            inside_elec_ref = compute_inside_elec_reference_fn(
-                recipes=recipes,
-                energy_int=energy_int,
-                energy_shares=energy_shares,
-                energy_content=energy_content,
-                params=params,
-                route_key=scenario.get('route_preset', None) or '',
-                demand_qty=float(scenario.get('demand_qty', 1000.0)),
-                stage_ref=scenario.get('stage_ref', 'IP3'),
-            )
+            inside_elec_ref = float(ref_totals.get('electricity_total', 0.0))
         except Exception:
             inside_elec_ref = 0.0
 
@@ -306,6 +305,7 @@ def apply_gas_routing_and_credits(
         'electricity_fraction': electricity_fraction,
         'f_internal': f_internal,
         'ef_internal_electricity': ef_internal_electricity,
+        'inside_elec_ref': inside_elec_ref,
         'process_gas_carrier': process_gas_carrier,
         'natural_gas_carrier': natural_gas_carrier,
         'utility_process': utility_process_name,
@@ -317,6 +317,50 @@ def apply_gas_routing_and_credits(
     }
 
     return eb, e_efs, meta
+
+
+def compute_inside_energy_reference_for_share(
+    recipes: List[Process],
+    energy_int: Dict[str, float],
+    energy_shares: Dict[str, Dict[str, float]],
+    energy_content: Dict[str, float],
+    params,
+    route_key: str,
+    demand_qty: float,
+    stage_ref: str = "IP3",
+    stage_lookup: Optional[Dict[str, str]] = None,
+    gas_carriers: Optional[List[str]] = None,
+    fallback_materials: Optional[Set[str]] = None,
+) -> Dict[str, float]:
+    """Single reference plant run that returns both gas and electricity totals."""
+    pre_mask = build_route_mask(route_key, recipes)
+    stage_map = stage_lookup or STAGE_MATS
+    if stage_ref not in stage_map:
+        raise KeyError(f"Stage '{stage_ref}' not found while computing gas/electricity reference.")
+    demand_mat = stage_map[stage_ref]
+    production_routes_full = _build_routes_from_picks(
+        recipes, demand_mat, picks_by_material={}, pre_mask=pre_mask, fallback_materials=fallback_materials
+    )
+    final_demand_full = {demand_mat: float(demand_qty)}
+    import copy as _copy
+    recipes_full = _copy.deepcopy(recipes)
+    _ensure_fallback_processes(recipes_full, production_routes_full, fallback_materials)
+    balance_matrix_full, prod_levels_full = calculate_balance_matrix(
+        recipes_full, final_demand_full, production_routes_full
+    )
+    if balance_matrix_full is None:
+        return {"gas_total": 0.0, "electricity_total": 0.0}
+    energy_balance_full = calculate_energy_balance(prod_levels_full, energy_int, energy_shares)
+    rows = [r for r in energy_balance_full.index if r not in ("TOTAL",)]
+    carriers = gas_carriers or ["Gas"]
+    gas_total = 0.0
+    for carrier in carriers:
+        if carrier in energy_balance_full.columns:
+            gas_total += float(energy_balance_full.loc[rows, carrier].clip(lower=0).sum())
+    elec_total = 0.0
+    if 'Electricity' in energy_balance_full.columns:
+        elec_total = float(energy_balance_full.loc[rows, 'Electricity'].clip(lower=0).sum())
+    return {"gas_total": gas_total, "electricity_total": elec_total}
 
 
 def compute_inside_gas_reference_for_share(
@@ -332,36 +376,29 @@ def compute_inside_gas_reference_for_share(
     gas_carriers: Optional[List[str]] = None,
     fallback_materials: Optional[Set[str]] = None,
 ) -> float:
-    pre_mask = build_route_mask(route_key, recipes)
-    stage_map = stage_lookup or STAGE_MATS
-    if stage_ref not in stage_map:
-        raise KeyError(f"Stage '{stage_ref}' not found while computing gas reference.")
-    demand_mat = stage_map[stage_ref]
-    production_routes_full = _build_routes_from_picks(
-        recipes, demand_mat, picks_by_material={}, pre_mask=pre_mask, fallback_materials=fallback_materials
+    refs = compute_inside_energy_reference_for_share(
+        recipes=recipes,
+        energy_int=energy_int,
+        energy_shares=energy_shares,
+        energy_content=energy_content,
+        params=params,
+        route_key=route_key,
+        demand_qty=demand_qty,
+        stage_ref=stage_ref,
+        stage_lookup=stage_lookup,
+        gas_carriers=gas_carriers,
+        fallback_materials=fallback_materials,
     )
-    final_demand_full = {demand_mat: float(demand_qty)}
-    import copy as _copy
-    recipes_full = _copy.deepcopy(recipes)
-    _ensure_fallback_processes(recipes_full, production_routes_full, fallback_materials)
-    balance_matrix_full, prod_levels_full = calculate_balance_matrix(
-        recipes_full, final_demand_full, production_routes_full
-    )
-    if balance_matrix_full is None:
+    try:
+        return float(refs.get("gas_total", 0.0))
+    except Exception:
         return 0.0
-    energy_balance_full = calculate_energy_balance(prod_levels_full, energy_int, energy_shares)
-    total = 0.0
-    carriers = gas_carriers or ["Gas"]
-    rows = [r for r in energy_balance_full.index if r not in ("TOTAL",)]
-    for carrier in carriers:
-        if carrier in energy_balance_full.columns:
-            total += float(energy_balance_full.loc[rows, carrier].clip(lower=0).sum())
-    return total
 
 
 __all__ = [
     "calculate_internal_electricity",
     "adjust_energy_balance",
     "apply_gas_routing_and_credits",
+    "compute_inside_energy_reference_for_share",
     "compute_inside_gas_reference_for_share",
 ]

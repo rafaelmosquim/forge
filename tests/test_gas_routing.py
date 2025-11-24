@@ -44,7 +44,7 @@ def test_apply_gas_routing_updates_efs_and_meta():
         energy_content=energy_content,
         e_efs=e_efs,
         scenario=scenario,
-        compute_inside_gas_reference_fn=None,
+        compute_inside_reference_fn=None,
     )
 
     # EFs should contain updated Gas and Process Gas

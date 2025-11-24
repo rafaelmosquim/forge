@@ -162,42 +162,6 @@ def _ensure_fallback_processes(
         production_routes.setdefault(proc_name, 1)
 
 
-def compute_inside_elec_reference_for_share(
-    recipes: List[Process],
-    energy_int: Dict[str, float],
-    energy_shares: Dict[str, Dict[str, float]],
-    energy_content: Dict[str, float],
-    params,
-    route_key: str,
-    demand_qty: float,
-    stage_ref: str = "IP3",
-    stage_lookup: Optional[Dict[str, str]] = None,
-    fallback_materials: Optional[Set[str]] = None,
-) -> float:
-    pre_mask = build_route_mask(route_key, recipes)
-    stage_map = stage_lookup or STAGE_MATS
-    if stage_ref not in stage_map:
-        raise KeyError(f"Stage '{stage_ref}' not found while computing electricity reference.")
-    demand_mat = stage_map[stage_ref]
-    production_routes_full = _build_routes_from_picks(
-        recipes, demand_mat, picks_by_material={}, pre_mask=pre_mask, fallback_materials=fallback_materials
-    )
-    final_demand_full = {demand_mat: float(demand_qty)}
-    import copy as _copy
-    recipes_full = _copy.deepcopy(recipes)
-    _ensure_fallback_processes(recipes_full, production_routes_full, fallback_materials)
-    balance_matrix_full, prod_levels_full = calculate_balance_matrix(
-        recipes_full, final_demand_full, production_routes_full
-    )
-    if balance_matrix_full is None:
-        return 0.0
-    energy_balance_full = calculate_energy_balance(prod_levels_full, energy_int, energy_shares)
-    total = 0.0
-    if 'Electricity' in energy_balance_full.columns:
-        rows = [r for r in energy_balance_full.index if r not in ("TOTAL",)]
-        total = float(energy_balance_full.loc[rows, 'Electricity'].clip(lower=0).sum())
-    return total
-
 __all__ = [
     # calcs
     "expand_energy_tables_for_active",
@@ -208,6 +172,4 @@ __all__ = [
     "apply_fuel_substitutions",
     "apply_dict_overrides",
     "apply_recipe_overrides",
-    # refs
-    "compute_inside_elec_reference_for_share",
 ]

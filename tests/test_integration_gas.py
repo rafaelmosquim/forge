@@ -67,7 +67,6 @@ def test_apply_gas_routing_and_credits_basic():
         energy_content=energy_content,
         e_efs=e_efs,
         scenario=scenario,
-        credit_on=True,
         compute_inside_gas_reference_fn=lambda *a, **k: 5.0,
     )
 

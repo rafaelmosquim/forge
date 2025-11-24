@@ -362,35 +362,6 @@ class RunOutputs:
 
 
 # ==============================
-# Helpers
-# ==============================
-
-def _credit_enabled(scn: dict | None) -> bool:
-    """
-    Returns True if recovered process-gas → electricity credit should be applied.
-    Recognized flags in scenario:
-      - process_gas_credit: true/false
-      - bf_gas_credit: true/false
-      - credits: { process_gas: true/false }
-    Default True (enabled) unless explicitly disabled.
-    """
-    if not isinstance(scn, dict):
-        return True
-    for k in ("process_gas_credit", "bf_gas_credit"):
-        if k in scn:
-            v = scn[k]
-            if isinstance(v, str):
-                return v.strip().lower() not in {"false", "0", "no", "off"}
-            return bool(v)
-    credits = scn.get("credits")
-    if isinstance(credits, dict) and "process_gas" in credits:
-        v = credits["process_gas"]
-        if isinstance(v, str):
-            return v.strip().lower() not in {"false", "0", "no", "off"}
-        return bool(v)
-    return True
-
-
 ## Emissions call robustness handled by core.runner
 
 
@@ -429,7 +400,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
       3) Lock route preset; build route mask; enforce EAF feed
       4) Build production route from UI picks (or deterministically)
       5) Solve balances
-      6) Apply/disable internal-electricity credit per scenario
+      6) Apply internal-electricity credit from process gas
       7) Compute emissions (robust to signature)
     """
     # Optional debug dump of scenario payload
@@ -451,9 +422,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     country_code: Optional[str] = scn.country_code or None
 
     scenario.setdefault('gas_routing', {})
-
-    # Flag for BF process-gas → electricity credit
-    credit_on: bool = _credit_enabled(scenario)
 
     # ---------- Load base data ----------
     base = os.path.join(data_dir, "")
@@ -682,7 +650,6 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "demand_qty": demand_qty,
         "demand_material": demand_mat,
         "country_code": country_code,
-        "process_gas_credit_enabled": bool(credit_on),
         "inside_elec_ref": inside_elec_ref,
         "f_internal": f_internal,
         "ef_internal_electricity": ef_internal_electricity,

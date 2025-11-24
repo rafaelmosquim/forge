@@ -19,13 +19,10 @@ from .engine import calculate_balance_matrix, calculate_energy_balance
 
 
 def expand_energy_tables_for_active(active_names, energy_shares, energy_int):
-    """Let variant names like 'Continuous Casting (R)' reuse base rows.
-
-    Mutates energy_shares/energy_int in-place by copying entries for each
-    active process variant from its base name (text before " (").
-    """
+    """Copy base energy rows to variant names like 'Continuous Casting (R)'."""
     def base(n: str) -> str:
         return n.split(" (")[0]
+    # removes any suffix like " (R)" to let model continue working
 
     for n in list(active_names or []):
         b = base(n)
@@ -36,7 +33,7 @@ def expand_energy_tables_for_active(active_names, energy_shares, energy_int):
 
 
 def calculate_internal_electricity(prod_level: Dict[str, float], recipes_dict: Dict[str, Process], params) -> float:
-    """Compute internal electricity from recovered gases (BF delta + Coke gas).
+    """Compute internal electricity from recovered gases (BF, BOF and Coke).
 
     Utility Plant efficiency is taken as the Electricity output per MJ gas
     from the 'Utility Plant' recipe.
@@ -45,10 +42,18 @@ def calculate_internal_electricity(prod_level: Dict[str, float], recipes_dict: D
     if 'Utility Plant' in recipes_dict:
         util_eff = recipes_dict['Utility Plant'].outputs.get('Electricity', 0.0)
 
+    #process_gases was probably treated elsewhere
     gas_meta = getattr(params, 'process_gases', {}) or {}
     internal_elec = 0.0
 
-    if gas_meta:
+    # loop over gas_meta to find procese gas producers we set on 'process_gases.yml'
+    # see which processes are active from prod_level, get production runs
+    # qty of gas output from recipes_dict
+    # energy per unit from gas_meta
+    # then we set internal electricity with efficiency set on recipe (34%)
+    
+
+    if gas_meta: # if gas_meta is empty, skip loop
         for carrier, meta in gas_meta.items():
             try:
                 proc_name = str(meta.get('source_process') or '').strip()
@@ -75,11 +80,9 @@ def calculate_internal_electricity(prod_level: Dict[str, float], recipes_dict: D
 
 
 def adjust_energy_balance(energy_df, internal_elec):
-    """Apply internal electricity credit to energy balance DataFrame.
-
-    - Subtract internal_elec from TOTAL's Electricity
-    - Add/overwrite a 'Utility Plant' row with negative Electricity equal to
-      the internal_elec (export from recovered gases)
+    """
+    Energy balance calculates total electricity demand, but we need to account for internal electricity generation.
+    It is set as negative demand from 'Utility Plant' and subtracted from 'TOTAL' electricity demand.
     """
     df = energy_df.copy()
     if 'Electricity' not in df.columns:
@@ -91,10 +94,9 @@ def adjust_energy_balance(energy_df, internal_elec):
         except Exception:
             df.loc['TOTAL'] = 0.0
     df.loc['TOTAL', 'Electricity'] = float(df.loc['TOTAL'].get('Electricity', 0.0)) - float(internal_elec)
-    df.loc['Utility Plant'] = 0.0
+    df.loc['Utility Plant'] = 0.0 # for now utility has now energy usage, just energy in/out set by efficiency
     df.loc['Utility Plant', 'Electricity'] = -float(internal_elec)
     return df
-
 
 def derive_energy_shares(recipes: List[Process], energy_content: Dict[str, float]):
     """Derive energy carrier shares per process from recipe inputs.
@@ -129,7 +131,6 @@ def apply_gas_routing_and_credits(
     energy_content: dict,
     e_efs: dict,
     scenario: dict,
-    credit_on: bool,
     compute_inside_gas_reference_fn=None,
 ):
     """Gas routing, EF blending and electricity credits.
@@ -338,25 +339,17 @@ def apply_gas_routing_and_credits(
     ef_electricity_used = (f_internal * ef_internal_electricity) + ((1.0 - f_internal) * ef_electricity_grid)
 
     eb = energy_balance.copy()
-    if credit_on:
-        eb = adjust_energy_balance(eb, internal_elec)
-        if direct_use_gas_MJ > 0 and total_gas_consumption_plant > 1e-9:
-            for process_name in eb.index:
-                if natural_gas_carrier in eb.columns:
-                    current_gas = eb.loc[process_name, natural_gas_carrier]
-                    if current_gas > 0:
-                        reduction = current_gas * f_internal_gas
-                        eb.loc[process_name, natural_gas_carrier] = current_gas - reduction
-                        if process_gas_carrier not in eb.columns:
-                            eb[process_gas_carrier] = 0.0
-                        eb.loc[process_name, process_gas_carrier] += reduction
-    else:
-        internal_elec = 0.0
-        total_gas_MJ = 0.0
-        direct_use_gas_MJ = 0.0
-        electricity_gas_MJ = 0.0
-        gas_sources_MJ = 0.0
-        EF_process_gas = 0.0
+    eb = adjust_energy_balance(eb, internal_elec)
+    if direct_use_gas_MJ > 0 and total_gas_consumption_plant > 1e-9:
+        for process_name in eb.index:
+            if natural_gas_carrier in eb.columns:
+                current_gas = eb.loc[process_name, natural_gas_carrier]
+                if current_gas > 0:
+                    reduction = current_gas * f_internal_gas
+                    eb.loc[process_name, natural_gas_carrier] = current_gas - reduction
+                    if process_gas_carrier not in eb.columns:
+                        eb[process_gas_carrier] = 0.0
+                    eb.loc[process_name, process_gas_carrier] += reduction
 
     meta = {
         'total_process_gas_MJ': total_gas_MJ,

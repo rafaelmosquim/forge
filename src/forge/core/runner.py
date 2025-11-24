@@ -166,7 +166,6 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
             "gas_config": scn.gas_config,
             "fallback_materials": list(scn.fallback_materials or []),
         },
-        credit_on=True,
         compute_inside_gas_reference_fn=gas_reference_fn,
     )
 

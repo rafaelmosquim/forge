@@ -44,7 +44,6 @@ def test_apply_gas_routing_updates_efs_and_meta():
         energy_content=energy_content,
         e_efs=e_efs,
         scenario=scenario,
-        credit_on=True,
         compute_inside_gas_reference_fn=None,
     )
 

@@ -1,4 +1,10 @@
-# Placeholder direct process emissions for aluminum dataset
-Alumina Refining (Bayer): 1.2
-Aluminum Smelting (Electrolysis): 3.0
-Casting & Finishing: 0.2
+processes:
+  "Bauxite Mining": 237.1 
+  "Pitch Production": 531.2 
+  "Coke Production": 822.1 
+  "Caustic Soda Production": 1278 
+  "Anode Production (Prebaked)": 538.5 
+  "Anode Production (Paste)": 653.6 
+  "Cryolite Production (HF)": 2177.6 
+  "Aluminum Fluoride Production": 1291.5 
+  "Scrap Melting and Processing": 820.78

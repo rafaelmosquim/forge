@@ -60,6 +60,7 @@ routes:
     aliases: ['dri', 'dri-eaf', 'dri eaf']
     disable:
       - 'Blast Furnace'
+      - 'Basic Oxygen Furnace'
     enable:
       - 'Direct Reduction Iron'
       - 'Electric Arc Furnace'

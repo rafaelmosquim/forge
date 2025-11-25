@@ -319,7 +319,7 @@ processes:
     FLF: 0
     RLF: 0
     Gas: 0
-    Wood: 0.955
+    Wood: 0.995
     Coal: 0
     Charcoal: 0
     Coke: 0
@@ -342,7 +342,7 @@ processes:
     Charcoal: 0
     Coke: 0
   "Steam Production":
-    Electricity: 0.01
+    Electricity: 0.00
     FLF: 0
     RLF: 0
     Gas: 1
@@ -513,7 +513,7 @@ processes:
     Charcoal: 0
     Coke: 0
   "Electric Arc Furnace":
-    Electricity: 0.77
+    Electricity: 0.76
     FLF: 0
     RLF: 0
     Gas: 0.24

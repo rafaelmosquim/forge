@@ -1,39 +1,127 @@
 - process: Bauxite Mining
-  inputs:
-    Diesel: 0.5
-    Electricity: 0.1
-  outputs:
-    Bauxite Ore: 1.0
+  inputs: {}
+  outputs: 
+    Bauxite: 1.0
 
-- process: Alumina Refining (Bayer)
+- process: Scrap Purchase
+  inputs: {}
+  outputs: 
+    Scrap: 1.0
+
+- process: Pitch Production
+  inputs: {}
+  outputs:
+    Pitch: 1.0
+
+- process: Coke Production
+  inputs: {}
+  outputs:
+    Coke: 1.0    
+
+- process: Caustic Soda Production
+  inputs: {}
+  outputs:
+    NaOH: 1.0
+
+- process: Anode Production (Prebaked)
   inputs:
-    Bauxite Ore: 2.0
-    Caustic Soda: 0.2
-    Electricity: 5.0
+    Coke: 0.6750
+    Pitch: 0.1460
+  outputs:
+    Carbon Anode Prebaked: 1.0    
+
+- process: Anode Production (Paste)
+  inputs:
+    Coke: 0.7017
+    Pitch: 0.3059
+  outputs:
+    Carbon Anode Paste: 1.0    
+
+- process: Cryolite Production (HF)
+  inputs:
+    Alumina: 0.2480 
+    HF: 0.5840
+    NaOH: 0.0702 # accounting for NaOH recovered in Precipitation 
+  outputs: 
+    Cryolite: 1.0    
+
+- process: Aluminum Fluoride Production
+  inputs:
+    HF: 0.7143 
+    Alumina: 0.6071 
+  outputs:
+    AlF3: 1.0
+
+- process: Bauxite Processing
+  inputs:
+    Bauxite: 1.2345 # materia losses
+  outputs:
+    Alumina Trihydrate: 1.0
+
+- process: Digestion
+  inputs:
+    Alumina Trihydrate: 0.8415
+    NaOH: 0.3853
+  outputs:
+    NaAlO2: 1.0
+
+- process: Precipitation
+  inputs:
+    NaAlO2: 1.5128 
+  outputs:
+    AlOH3: 1.0
+
+
+- process: Calcination  
+  inputs:
+    AlOH3: 1.53
   outputs:
     Alumina: 1.0
-    Red Mud: 1.0
-    Process Gas: 0.5
 
-- process: Aluminum Smelting (Electrolysis)
+- process: Electrolysis (prebaked)
   inputs:
-    Alumina: 1.0
-    Electricity: 50.0
-    Carbon Anode: 0.05
+    Coke: 0.0036
+    Pitch: 0.0019
+    Alumina: 1.8970
+    Cryolite: 0.0016
+    Carbon Anode Prebaked: 0.4750
+    AlF3: 0.0210 
   outputs:
-    Aluminum Ingot: 1.0
-    CO2: 1.5
+    Primary Liquid Aluminum (prebaked): 1.0
 
-- process: Casting & Finishing
+- process: Electrolysis (Soderberg)
   inputs:
-    Aluminum Ingot: 1.0
-    Electricity: 1.0
+    Coke: 0.0036
+    Pitch: 0.0019
+    Alumina: 2.1050
+    Cryolite: 0.0016
+    Carbon Anode Paste: 0.5150
+    AlF3: 0.0207
   outputs:
-    Finished Aluminum: 1.0
-    Finished Products: 1.0
+    Primary Liquid Aluminum (Soderberg): 1.0
 
-- process: Utility Plant
+- process: Primary Aluminum
   inputs:
-    Process Gas: 1.0
+    Primary Liquid Aluminum (prebaked): 0.674
+    Primary Liquid Aluminum (Soderberg): 0.326
   outputs:
-    Electricity: 0.2
+    Primary Aluminum: 1.0  
+
+- process: Scrap Melting and Processing
+  inputs:
+    Scrap: 1.0
+  outputs:
+    Recycled Aluminum: 1.0 
+
+- process: Primary Ingot Melting
+  inputs:
+    Primary Aluminum: 1.0
+  outputs:
+    Primary Ingot Aluminum: 1.0      
+
+- process: Remelt Blending
+  inputs:
+    Primary Ingot Aluminum: 0.582
+    Recycled Aluminum: 0.418
+  outputs:
+    Remelt Blend: 1.0       

@@ -1,5 +1,20 @@
-Bauxite Mining: 10.0
-Alumina Refining (Bayer): 50.0
-Aluminum Smelting (Electrolysis): 250.0
-Casting & Finishing: 5.0
-Utility Plant: 0.0
+Bauxite Mining: 0.09
+Scrap Purchase: 0
+Pitch Production: 61.52
+Coke Production: 0.76
+Caustic Soda Production: 0.97
+Anode Production (Prebaked): 2.19
+Anode Production (Paste): 0.63
+Cryolite Production (HF): 3.66
+Cryolite Production (H2SiF6): 3.31
+Aluminum Fluoride Production: 3.66
+Bauxite Processing: 0.53
+Digestion: 1.79
+Precipitation: 0.0
+Calcination: 2.85
+Electrolysis (prebaked): 56.70
+Electrolysis (Soderberg): 61.02
+Scrap Melting and Processing: 5.80
+Primary Ingot Melting: 0.80
+Remelt Blending: ~
+

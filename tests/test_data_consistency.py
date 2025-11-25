@@ -121,3 +121,38 @@ def test_recipes_nonnegative_and_have_output(data_dir, yload):
                 if num is None:
                     continue  # skip symbolic or complex expressions
                 assert num >= -1e-12, f"{proc}: {where} '{k}' has negative value {num}"
+
+
+@pytest.mark.integration
+def test_all_energy_matrices_sum_to_one(repo_root):
+    """All energy_matrix.yml rows (steel/aluminum variants) should sum to 1 ±0.01."""
+    tol = 0.01
+    matrices = list(repo_root.glob("datasets/**/energy_matrix.yml"))
+    assert matrices, "No energy_matrix.yml files found under datasets/"
+
+    for path in matrices:
+        raw = yaml.safe_load(path.read_text()) or {}
+        mat = raw.get("processes") if isinstance(raw, dict) else None
+        if mat is None:
+            mat = raw if isinstance(raw, dict) else {}
+        assert isinstance(mat, dict), f"{path}: expected mapping of processes"
+
+        for proc, shares in mat.items():
+            if not isinstance(shares, dict) or not shares:
+                continue
+            nums = []
+            for _, v in shares.items():
+                val = norm_num(v)
+                if val is not None:
+                    nums.append(val)
+            if not nums:
+                continue  # skip processes with no numeric shares
+            s = sum(nums)
+            assert math.isfinite(s), f"{path} :: {proc}: non-finite share sum"
+            # Allow either fully zero (some processes intentionally have no energy carriers)
+            # or a normalized sum of 1 ± tol.
+            if abs(s) <= tol:
+                continue
+            assert abs(s - 1.0) <= tol, (
+                f"{path} :: {proc}: shares sum to {s:.6f}, expected 0 or 1±{tol}"
+            )

@@ -1,3 +1,15 @@
 route_preset: Primary
 stage_key: Primary
 demand_qty: 1000  # or whatever you need
+
+allow_direct_onsite:
+  - Bauxite Mining
+  - Pitch Production
+  - Coke Production
+  - Caustic Soda Production
+  - Anode Production (Prebaked)
+  - Anode Production (Paste)
+  - Cryolite Production (HF)
+  - Aluminum Fluoride Production
+  - Scrap Melting and Processing
+  # add any others you want to count as process emissions

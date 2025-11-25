@@ -3,6 +3,7 @@ import pathlib
 import pandas as pd
 import types
 from types import SimpleNamespace
+import pytest
 
 # Ensure src directory is on sys.path so package imports resolve during tests
 SRC_DIR = pathlib.Path(__file__).resolve().parents[1] / "src"
@@ -12,6 +13,7 @@ if str(SRC_DIR) not in sys.path:
 from forge.core.models import Process
 from forge.core.gas import apply_gas_routing_and_credits
 from forge.core.engine import calculate_energy_balance
+from forge.steel_core_api_v2 import run_scenario, ScenarioInputs, RouteConfig
 
 
 def make_minimal_recipes():
@@ -77,3 +79,56 @@ def test_apply_gas_routing_and_credits_basic():
     assert e_efs_new.get('Gas', None) == 10.0
     assert 'total_process_gas_MJ' in meta
     assert meta['total_process_gas_MJ'] == 5.0
+
+
+@pytest.mark.integration
+def test_bf_bof_process_gas_sources_include_bf_bof_chain(data_dir):
+    """BF-BOF route should recover process gas from coke, BF, and BOF."""
+    scn = ScenarioInputs(
+        country_code=None,
+        scenario={},
+        route=RouteConfig(
+            route_preset="BF-BOF",
+            stage_key="Finished",
+            demand_qty=1000.0,
+        ),
+    )
+
+    out = run_scenario(str(data_dir), scn)
+    assert out.meta is not None
+    sources = out.meta.get("gas_source_details") or {}
+
+    for proc in ("Coke Production", "Blast Furnace", "Basic Oxygen Furnace"):
+        recovered = float(sources.get(proc, 0.0))
+        assert recovered > 0.0, f"Expected recovered process gas from {proc}"
+
+
+@pytest.mark.integration
+def test_bf_bof_real_process_gas_efs_in_hundreds_range(data_dir, yload):
+    """Use real dataset to check that process-gas EFs are in a reasonable range."""
+    # Run a full BF-BOF scenario on the Likely dataset
+    scn = ScenarioInputs(
+        country_code=None,
+        scenario={"gas_routing": {"direct_use_fraction": 1.0}},
+        route=RouteConfig(
+            route_preset="BF-BOF",
+            stage_key="Finished",
+            demand_qty=1000.0,
+        ),
+    )
+    out = run_scenario(str(data_dir), scn)
+    meta = out.meta or {}
+
+    ef_coke = float(meta.get("EF_coke_gas", 0.0))
+    ef_bf = float(meta.get("EF_bf_gas", 0.0))
+    ef_process = float(meta.get("EF_process_gas", 0.0))
+    ef_gas_blended = float(meta.get("ef_gas_blended", 0.0))
+
+    for name, val in [
+        ("EF_coke_gas", ef_coke),
+        ("EF_bf_gas", ef_bf),
+        ("EF_process_gas", ef_process),
+        ("ef_gas_blended", ef_gas_blended),
+    ]:
+        assert val > 0.0, f"{name} should be positive"
+        assert 100.0 <= val <= 200.0, f"{name} out of expected range: {val}"

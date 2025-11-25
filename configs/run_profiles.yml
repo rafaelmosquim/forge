@@ -19,3 +19,12 @@ profiles:
       FORGE_OUTPUT_LABEL: paper
     cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
 
+  reviewer:
+    desc: "Light reviewer run (simple picks, cached EFs)"
+    env:
+      FORGE_PAPER_PRODUCT_CONFIG: simple        # avoids portfolio blending
+      FORGE_PAPER_CACHE_DIR: results/cache_reviewer
+      FORGE_OUTPUT_LABEL: reviewer
+      FORGE_PAPER_CACHE: 1                      # optional; default on
+    cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
+

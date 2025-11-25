@@ -1,7 +1,7 @@
 emission_factors:
   Electricity: 38.50
-  FLF: 94.12
-  RLF: 23.58
+  #FLF: 94.12
+  #RLF: 23.58
   Gas: 72.73
   Biomethane: 5.55
   Green hydrogen: 21.47
@@ -10,3 +10,10 @@ emission_factors:
   Coal: 111.95
   Charcoal: 20.43
   Coke: 107.51
+  Coke Process Gas: 44.40 
+  BF Furnace Gas: 260.00
+  BOF Process Gas: 182.00
+
+  # Process gas values from IPCCC hapter 2: Stationary Combustion
+  # 2006 IPCC Guidelines for National Greenhouse Gas Inventories
+  # https://www.ipcc-nggip.iges.or.jp/public/2006gl/pdf/2_Volume2/V2_2_Ch2_Stationary_Combustion.pdf

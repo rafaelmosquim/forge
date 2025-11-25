@@ -13,11 +13,19 @@ from .routing import STAGE_MATS, build_route_mask
 from .compute import _build_routes_from_picks, _ensure_fallback_processes
 
 
+
+
 def calculate_internal_electricity(prod_level: Dict[str, float], recipes_dict: Dict[str, Process], params) -> float:
     """Compute internal electricity from recovered gases (BF, BOF and Coke)."""
     util_eff = 0.0
     if 'Utility Plant' in recipes_dict:
         util_eff = recipes_dict['Utility Plant'].outputs.get('Electricity', 0.0)
+
+
+    # process_gases.yml set parameters for all processes that can recover gas, ie, BF, BOF, Coke Ovens. 
+    # Each process has a gas carrier (e.g., Process Gas) and an energy content (MJ/unit).
+    # we loop through these processes to compute the total internal electricity generated, which we must credit later. 
+    # Credit is simply the amount of energy that is not bought from the grid because it is generated internally.
 
     gas_meta = getattr(params, 'process_gases', {}) or {}
     internal_elec = 0.0
@@ -47,6 +55,7 @@ def calculate_internal_electricity(prod_level: Dict[str, float], recipes_dict: D
 
     return internal_elec
 
+# here we apply the internal electricity credit to the energy balance dataframe
 
 def adjust_energy_balance(energy_df, internal_elec):
     """Subtract internal electricity from TOTAL and add the Utility Plant export."""
@@ -79,6 +88,7 @@ def apply_gas_routing_and_credits(
     """Gas routing, EF blending and electricity credits."""
     recipes_dict = {r.name: r for r in recipes}
 
+    # scenario refers to gas only logic, built in the runner
     gas_config = scenario.get('gas_config', {}) or {}
     process_roles = scenario.get('process_roles', {}) or {}
     fallback_materials = set(scenario.get('fallback_materials', []))

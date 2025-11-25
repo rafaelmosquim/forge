@@ -1,8 +1,3 @@
-description: Simple aluminum scenario for testing
-grid_country: USA
-recipe_file: recipes.yml
-energy_int_file: energy_int.yml
-energy_matrix_file: energy_matrix.yml
-emission_factors:
-  Electricity: 100.0
-  Diesel: 73.0
+route_preset: Primary
+stage_key: Primary
+demand_qty: 1000  # or whatever you need

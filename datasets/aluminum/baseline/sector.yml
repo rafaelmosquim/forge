@@ -1,33 +1,55 @@
 sector_key: aluminum
 sector_name: Aluminum
 
-stage_menu:
-  - key: finished
-    stage_id: Finished
-    label: "Finished aluminum"
-    description: "Finished aluminum products."
+stage_menu: 
+  - key: primary
+    stage_id: primary
+    label: "Primary Aluminum"
+    description: "Primary aluminum production from bauxite ore and scrap."
+  - key: remelt
+    stage_id: remelt
+    label: "Remelt Aluminum"
+    description: "Remelting of aluminum scrap to produce secondary aluminum."
 
 stages:
-  Finished:
-    material: "Finished Products"
+  primary:
+    material: "Primary Aluminum"
+  remelt:
+    material: "Remelt Blend"
 
 routes:
   - id: Primary
-    label: "Primary aluminum"
-    aliases: ["primary", "aluminum"]
+    label: "Primary Aluminum"
+    aliases: ["Primary", "Aluminum"]
+    enable:
+      - Bauxite Mining
+      - Scrap Purchase
+      - Pitch Production
+      - Coke Production
+      - Caustic Soda Production
+      - Anode Production (Prebaked)
+      - Anode Production (Paste)
+      - Cryolite Production (HF)
+      - Cryolite Production (H2SiF6)
+      - Aluminum Fluoride Production
+      - Bauxite Processing
+      - Digestion
+      - Precipitation
+      - Calcination
+      - Electrolysis (prebaked)
+      - Electrolysis (Soderberg)
+      - Scrap Melting and Processing
+      - Primary Ingot Melting
+      - Remelt Blending
+      - Primary Aluminum    
 
 process_roles:
-  Bauxite Mining:
-    - upstream
-  Alumina Refining (Bayer):
-    - conversion
-    - gas_source
-  Aluminum Smelting (Electrolysis):
-    - primary
-  Casting & Finishing:
-    - downstream
-  Utility Plant:
-    - utility
+  Bauxite Mining: [upstream]
+  Cryolite Production (HF): [conversion]
+  Aluminum Fluoride Production: [conversion]
+  Electrolysis (prebaked): [primary]
+  Electrolysis (Soderberg): [primary]
+  Primary Aluminum: [downstream]
 
 costing:
   external_purchase_rows:

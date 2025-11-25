@@ -1,3 +1,6 @@
+# emission factors are in gCO2e/MJ
+# values are for combustion and lifecycle where applicable
+
 emission_factors:
   Electricity: 38.50
   #FLF: 94.12
@@ -10,8 +13,8 @@ emission_factors:
   Coal: 111.95
   Charcoal: 20.43
   Coke: 107.51
-  Coke Process Gas: 44.40 
-  BF Furnace Gas: 260.00
+  Coke Process Gas: 44.40 # these are not used for now
+  BF Furnace Gas: 260.00 # these are not used for now
   BOF Process Gas: 182.00
 
   # Process gas values from IPCCC hapter 2: Stationary Combustion

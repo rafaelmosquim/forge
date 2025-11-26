@@ -11,7 +11,7 @@ Status legend: [x] done • [ ] pending
 - [x] Ensure app calls refactored API/core (no legacy imports).
 
 ## Scenario & Route UX
-- [ ] Replace the current per-material radio forest with a structured “recipe graph” view showing AND/OR nodes and current picks.
+- [x] Render downstream picks per descriptor stage (including aluminum) instead of hard-coded steel buckets.
 - [ ] Provide preset buttons for canonical scenarios (Validation, Baseline, Low/High) that pre-populate picks and route masks.
 - [ ] Expose descriptor-fed tooltips explaining why certain processes are disabled for a given route preset.
 - [ ] Allow exporting/importing pick bundles directly from the UI to stay in sync with batch workflows.
@@ -20,6 +20,9 @@ Status legend: [x] done • [ ] pending
 - [ ] Offer downloadable CSV/Parquet outputs for balance matrices, energy tables, and emissions without leaving the UI.
 - [ ] Embed provenance metadata (git SHA, dataset hash) in the UI results card for citation.
 - [ ] Add comparison mode to plot multiple route runs side-by-side (e.g., BF-BOF vs DRI-EAF).
+- [x] Keep downstream controls sector-aware (steel vs aluminum) and avoid leaking steel-only UI into aluminum.
+- [x] Show EF metrics with/without Coke Production for quick sensitivity (two headline metrics).
+- [x] Hide zero-only columns in the Energy Balance table to slim the view.
 
 ## Performance & Reliability
 - [ ] Cache parsed YAML/descriptor data per dataset to reduce app reload time.

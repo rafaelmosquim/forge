@@ -941,17 +941,7 @@ with tab_main:
         # Descriptor-driven mapping first
         try:
             if mat_name in descriptor_stage_map:
-                sid = descriptor_stage_map[mat_name]
-                if not sid:
-                    return sid
-                sid_lower = str(sid).lower()
-                if sid_lower in {"ip1", "ip2", "ip3", "ip4"}:
-                    return sid_upper if (sid_upper := str(sid).upper()) else sid
-                if sid_lower == "finished":
-                    return "Finished"
-                if sid_lower == "remelt":
-                    return "Remelt"
-                return str(sid)
+                return descriptor_stage_map[mat_name]
         except Exception:
             pass
         # Aluminum: explicit downstream buckets so UI columns stay ordered
@@ -965,7 +955,7 @@ with tab_main:
                 return "Aluminum Basic"
             if "manufactured aluminum" in name:
                 return "Aluminum Manufactured"
-            if "finished aluminum" in name or "finished" in name:
+            if "finished aluminum" in name:
                 return "Aluminum Finished"
             return "Aluminum Downstream"
         if mat_name in UPSTREAM_MATS:
@@ -987,19 +977,6 @@ with tab_main:
         groups.pop("IP1", None)   # no Alloying column for crude steel
     for mat, options in ambiguous:
         groups[_stage_label_for(mat)].append((mat, options))
-
-    # Steel fallback: ensure alloying options appear even if not ambiguous
-    if SECTOR_KEY == "Steel" and not stage_is_as_cast and not groups.get("IP1"):
-        try:
-            prod_idx = build_producers_index(recipes_for_ui)
-            opts = [
-                r.name for r in prod_idx.get("Cast Steel (IP1)", [])
-                if pre_mask.get(r.name, 1) > 0 and pre_select.get(r.name, 1) > 0
-            ]
-            if opts:
-                groups["IP1"].append(("Cast Steel (IP1)", opts))
-        except Exception:
-            pass
     # If no descriptor labels and everything fell into one bucket for Aluminum, split heuristically
     if SECTOR_KEY == "Aluminum" and not descriptor_stage_labels:
         if len(groups) <= 1:
@@ -1074,11 +1051,9 @@ with tab_main:
             "Aluminum Manufactured",
             "Aluminum Finished",
             "Aluminum Downstream",
+            "Finished",
         ]
         stage_layout = [s for s in base_order if groups.get(s)]
-        # If finished picks are present but bucketed under generic "Finished", append it
-        if groups.get("Finished") and "Finished" not in stage_layout:
-            stage_layout.append("Finished")
         if not stage_layout and groups:
             stage_layout = list(groups.keys())
         if not stage_layout:

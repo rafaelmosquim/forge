@@ -1,0 +1,295 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\title{FORGE: Flexible Optimization of Routes for GHG \& Energy\\
+Model Structure and Data Pipeline}
+\author{FORGE Developers}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Overview}
+
+FORGE is a process-based techno-environmental model for industrial production
+routes, currently focused on steel and aluminum. The model is implemented as a
+Python package with:
+\begin{itemize}[noitemsep]
+  \item a generic core engine (\texttt{forge.core.*}) that solves material and
+        energy balances and computes emissions,
+  \item sector descriptors and YAML datasets under \texttt{datasets/} that
+        encode routes, stages, and parameters,
+  \item an API layer (\texttt{forge.steel\_core\_api\_v2}) used by both CLI and
+        a Streamlit UI (\texttt{forge.apps.streamlit\_app}).
+\end{itemize}
+
+This document sketches the main architecture and---most importantly---the data
+pipeline from YAML input files to emissions outputs. The goal is to serve as a
+starting point for a full academic paper.
+
+\section{High-level Architecture}
+
+\subsection{Core engine (\texttt{forge.core})}
+
+Key modules:
+\begin{itemize}[noitemsep]
+  \item \textbf{\texttt{core.models}}: defines the \texttt{Process} class and
+        constants such as \texttt{OUTSIDE\_MILL\_PROCS}.
+  \item \textbf{\texttt{core.engine}}:
+    \begin{itemize}[noitemsep]
+      \item \texttt{calculate\_balance\_matrix}: material balance solver that
+            walks upstream from final demand to determine production levels
+            per process.
+      \item \texttt{calculate\_energy\_balance}: builds per-process energy
+            balances from production levels, energy intensities, and carrier
+            shares.
+      \item \texttt{calculate\_emissions}: computes energy and direct emissions
+            by process, given energy balances, emission factors, and optional
+            process-specific EFs.
+    \end{itemize}
+  \item \textbf{\texttt{core.gas}}:
+    \begin{itemize}[noitemsep]
+      \item \texttt{apply\_gas\_routing\_and\_credits}: implements process-gas
+            recovery, routing between direct use and electricity, and blended
+            emission factors for gas and internal electricity.
+      \item \texttt{compute\_inside\_energy\_reference\_for\_share}: reference
+            plant run to compute total gas and electricity for blending.
+    \end{itemize}
+  \item \textbf{\texttt{core.io}}:
+    \begin{itemize}[noitemsep]
+      \item \texttt{load\_data\_from\_yaml}: generic YAML loader with light
+            normalization.
+      \item \texttt{load\_recipes\_from\_yaml}: loads recipes, evaluating
+            per-process expressions with access to parameters and energy tables.
+    \end{itemize}
+  \item \textbf{\texttt{core.routing}}:
+    \begin{itemize}[noitemsep]
+      \item \texttt{STAGE\_MATS}: default mapping of stage ids to materials
+            (used as a fallback for legacy steel).
+      \item \texttt{build\_route\_mask}: simple route masks for steel routes
+            (BF--BOF, DRI--EAF, EAF-scrap, External).
+      \item \texttt{enforce\_eaf\_feed}: clamps EAF recipes to a single feed
+            (scrap, DRI, or pig iron) to avoid mixed-feed routes.
+    \end{itemize}
+  \item \textbf{\texttt{core.runner}}:
+    \begin{itemize}[noitemsep]
+      \item \texttt{CoreScenario}: dataclass bundling all inputs the engine
+            needs (recipes, energy tables, EFs, route mask, etc.).
+      \item \texttt{run\_core\_scenario}: orchestrates
+            material balance $\rightarrow$ energy balance $\rightarrow$
+            gas routing $\rightarrow$ emissions (and optional costs).
+    \end{itemize}
+\end{itemize}
+
+\subsection{Sector descriptors (\texttt{forge.descriptor})}
+
+Each dataset folder, e.g.\ \texttt{datasets/steel/likely} or
+\texttt{datasets/aluminum/baseline}, contains a \texttt{sector.yml} that
+describes:
+\begin{itemize}[noitemsep]
+  \item \emph{stages} (ids, materials, labels),
+  \item \emph{stage menu} (what appears in the UI's ``Product'' radio),
+  \item \emph{routes} (BF--BOF, DRI--EAF, EAF-scrap, etc.), including process
+        enables/disables and optional feed modes,
+  \item \emph{process roles} (e.g.\ gas sources),
+  \item gas configuration (carriers, utility process, reference stage).
+\end{itemize}
+
+The descriptor loader (\texttt{forge.descriptor.sector\_descriptor}) turns
+this YAML into a \texttt{SectorDescriptor} object used by:
+\begin{itemize}[noitemsep]
+  \item \texttt{scenario\_resolver} helpers (route masks, stage material
+        resolution, feed mode),
+  \item the Streamlit UI for stage and route selection,
+  \item the API layer to build a \texttt{CoreScenario}.
+\end{itemize}
+
+\subsection{Steel API and Streamlit app}
+
+\begin{itemize}[noitemsep]
+  \item \textbf{\texttt{forge.steel\_core\_api\_v2}}:
+    \begin{itemize}[noitemsep]
+      \item \texttt{RouteConfig}: encapsulates route preset, stage key/role,
+            demand and optional pre-selections.
+      \item \texttt{ScenarioInputs}: wraps a scenario dict (YAML overrides) and
+            the route config.
+      \item \texttt{run\_scenario}: main entrypoint for steel; responsible for
+            loading YAML, applying overrides, building the production route,
+            calling the core runner, and shaping outputs.
+    \end{itemize}
+  \item \textbf{\texttt{forge.apps.streamlit\_app}}:
+    \begin{itemize}[noitemsep]
+      \item multi-sector UI (Steel / Aluminum) with sector gate,
+      \item dataset and scenario selection (sidebar),
+      \item downstream choices (per-stage ambiguous picks) rendered from the
+            descriptor and recipe graph,
+      \item model execution via \texttt{run\_scenario} and result display.
+    \end{itemize}
+\end{itemize}
+
+\section{Data Pipeline}
+
+This section focuses on how data flows from YAML to emissions. The pipeline is
+essentially the same for steel and aluminum; differences are encoded in the
+sector descriptors and dataset content.
+
+\subsection{Input files per dataset}
+
+For each dataset folder under \texttt{datasets/<sector>/<variant>/}, FORGE
+expects a consistent set of core YAML files:
+\begin{itemize}[noitemsep]
+  \item \texttt{sector.yml}: descriptor (stages, routes, process roles, gas config).
+  \item \texttt{recipes.yml}: process-level input/output coefficients.
+  \item \texttt{energy\_int.yml}: energy intensity per process (MJ per run).
+  \item \texttt{energy\_matrix.yml}: carrier shares per process (fractions).
+  \item \texttt{energy\_content.yml}: lower heating values (MJ per unit of fuel).
+  \item \texttt{emission\_factors.yml}: fuel emission factors (gCO\textsubscript{2}e/MJ).
+  \item \texttt{process\_emissions.yml}: direct emissions per process
+        (kgCO\textsubscript{2}e/t output).
+  \item \texttt{parameters.yml}: scalar parameters used in recipe expressions
+        and gas routing (e.g.\ yields, fractions).
+  \item \texttt{mkt\_config.yml}: market vs endogenous production flags.
+  \item optional: \texttt{process\_gases.yml} (gas meta), energy and material
+        price tables, electricity intensity by country.
+\end{itemize}
+
+Scenario YAMLs (e.g.\ \texttt{scenarios/BF\_BOF\_coal.yml} or
+\texttt{scenario\_aluminum.yml}) provide per-run overrides:
+\begin{itemize}[noitemsep]
+  \item route overrides (enable/disable specific processes),
+  \item modifications to energy intensities, shares, or EFs,
+  \item parameter overrides and recipe tweaks,
+  \item gas-routing fractions and optional price/EF tweaks.
+\end{itemize}
+
+\subsection{From scenario to \texttt{CoreScenario}}
+
+At a high level, the API does:
+\begin{enumerate}[noitemsep]
+  \item Load the sector descriptor for the dataset.
+  \item Determine the route preset and stage key from the scenario name or
+        scenario dict.
+  \item Load base YAML tables (recipes, energy, EFs, parameters, markets).
+  \item Apply scenario overrides (fuel substitutions, energy tables, parameters,
+        recipes) and reload recipes to re-evaluate expressions.
+  \item Build a route mask using the descriptor and route preset.
+  \item Construct the production route from ambiguous picks (or defaults) using
+        \texttt{\_build\_routes\_from\_picks}.
+  \item Build a \texttt{CoreScenario} via \texttt{forge.scenarios.builder}
+        (\texttt{build\_core\_scenario}), which:
+    \begin{itemize}[noitemsep]
+      \item locks route preset and EAF feed mode,
+      \item carries energy tables, EFs, process EFs, gas config, and any
+            process-emission whitelists,
+      \item handles fallback materials and optional cost inputs.
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Core runner and gas routing}
+
+Given a \texttt{CoreScenario}, \texttt{run\_core\_scenario} performs:
+\begin{enumerate}[noitemsep]
+  \item \textbf{Material balance}:
+    \begin{itemize}[noitemsep]
+      \item Build final demand dictionary for the chosen stage material
+            (e.g.\ \texttt{Finished Products}, \texttt{Primary Aluminum}).
+      \item Call \texttt{calculate\_balance\_matrix} with recipes, demand, and
+            route mask. This returns:
+        \begin{itemize}[noitemsep]
+          \item a balance matrix (rows = processes + external + final demand;
+                columns = materials),
+          \item per-process production levels (\# runs).
+        \end{itemize}
+    \end{itemize}
+  \item \textbf{Energy balance}:
+    \begin{itemize}[noitemsep]
+      \item Expand energy tables for all active processes
+            (\texttt{expand\_energy\_tables\_for\_active}).
+      \item Call \texttt{calculate\_energy\_balance} to obtain carrier-by-process
+            energy consumption plus a TOTAL row.
+    \end{itemize}
+  \item \textbf{Gas routing and credits}:
+    \begin{itemize}[noitemsep]
+      \item Build a gas-routing scenario (gas config, route preset, demand,
+            stage reference, gas fractions).
+      \item Call \texttt{apply\_gas\_routing\_and\_credits}:
+        \begin{itemize}[noitemsep]
+          \item Identify process-gas sources and compute total recovered gas.
+          \item Split recovered gas between direct use and electricity
+                (utility plant) according to \texttt{direct\_use\_fraction}.
+          \item Compute process-gas EF from fuel blends (excluding electricity
+                and the carrier itself), and blended gas EFs from internal vs
+                grid contributions.
+          \item Adjust the energy balance by:
+            \begin{itemize}[noitemsep]
+              \item adding an internal electricity export row (Utility Plant),
+              \item redirecting a fraction of gas consumption to the process-gas
+                    carrier for direct use.
+            \end{itemize}
+          \item Return updated energy balance, updated energy EFs, and a meta
+                dict with diagnostics.
+        \end{itemize}
+    \end{itemize}
+  \item \textbf{Emissions}:
+    \begin{itemize}[noitemsep]
+      \item Use a robust wrapper to call \texttt{calculate\_emissions} with
+            whatever combination of arguments it accepts (maintains backwards
+            compatibility).
+      \item \texttt{calculate\_emissions} separates market vs onsite processes,
+            applies blended electricity and fuel EFs, and adds direct process
+            emissions when whitelisted.
+      \item A total row/column is computed when necessary; total emissions are
+            returned in kg CO\textsubscript{2}e.
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Aluminum specifics}
+
+Aluminum uses the same core but different descriptors and datasets:
+\begin{itemize}[noitemsep]
+  \item \textbf{Routes and stages} are defined in
+        \texttt{datasets/aluminum/baseline/sector.yml}, with stages for
+        primary, remelt, and finished aluminum.
+  \item \textbf{Downstream alloying and finishing} are described via recipes
+        for:
+    \begin{itemize}[noitemsep]
+      \item \emph{Remelt blending} and alloy series (1, 5, 6, 7),
+      \item metallurgical aluminum aggregation,
+      \item rolling, extrusion, ingot casting, and raw products,
+      \item manufactured products and final coatings (no coating, powder
+            coating, liquid painting).
+    \end{itemize}
+  \item \textbf{Direct process emissions} for aluminum are configured via
+        \texttt{process\_emissions.yml} and a scenario-level whitelist
+        (\texttt{allow\_direct\_onsite}) that flags which processes count as
+        onsite direct emitters.
+\end{itemize}
+
+\section{Next Steps for the Full Paper}
+
+This skeleton focuses on:
+\begin{itemize}[noitemsep]
+  \item code structure and responsibilities,
+  \item file-level data pipeline,
+  \item gas-routing scheme and its integration with the core.
+\end{itemize}
+
+For a complete academic paper, suggested additions:
+\begin{itemize}[noitemsep]
+  \item mathematical formulation of the balance solver (graph walk, uniqueness
+        of producers, handling of external purchases),
+  \item explicit equations for gas routing and EF blending,
+  \item validation section (comparison vs external benchmarks for steel and
+        aluminum),
+  \item uncertainty ranges and scenario variants (likely/optimistic/pessimistic),
+  \item discussion of limitations and future work (e.g.\ costs, other sectors).
+\end{itemize}
+
+\end{document}
+

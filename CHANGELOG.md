@@ -1,6 +1,15 @@
 # Changelog
 
 ## Unreleased
+
+### Added
+- Aluminum: finished-stage downstream flow exposed in UI (remelt → alloying → basic → manufactured → finished), descriptor stages expanded, and default picks cleaned up.
+- Gas routing: skip process-gas recovery adjustments for non-BF routes while preserving carrier EFs; DRI/EAF regressions fixed.
+
+### Fixed
+- Energy matrices: normalized shares for charcoal/steam/EAF rows across steel datasets to satisfy data consistency tests.
+- Steel UI: restored alloying column; aluminum downstream choices no longer collide with steel widgets.
+
 - Core refactor: no `steel_model_core` dependency
   - Introduced `forge.core.engine` (engine trio): `calculate_balance_matrix`, `calculate_energy_balance`, `calculate_emissions`.
   - Split helpers into `forge.core.compute` (gas routing, intensity adjustments, reference helpers), `forge.core.io`, `forge.core.models`, `forge.core.routing`, `forge.core.transforms`, `forge.core.costs`, and `forge.core.viz`.

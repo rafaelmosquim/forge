@@ -245,7 +245,7 @@ processes:
     Charcoal: 0
     Coke: 0
   Charcoal Production:
-    Electricity: 0.005
+    Electricity: 0.045
     Gas: 0
     Wood: 0.955
     Coal: 0
@@ -273,8 +273,8 @@ processes:
     Charcoal: 0
     Coke: 0
   Steam Production:
-    Electricity: 0.01
-    Gas: 1
+    Electricity: 0.0
+    Gas: 1.0
     Wood: 0
     Coal: 0
     Charcoal: 0
@@ -407,7 +407,7 @@ processes:
     Charcoal: 0
     Coke: 0
   Electric Arc Furnace:
-    Electricity: 0.77
+    Electricity: 0.76
     Gas: 0.24
     Wood: 0
     Coal: 0

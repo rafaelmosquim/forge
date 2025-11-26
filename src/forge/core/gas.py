@@ -86,6 +86,7 @@ def apply_gas_routing_and_credits(
     compute_inside_reference_fn=None,
 ):
     """Gas routing, EF blending and electricity credits."""
+    route_preset = (scenario.get("route_preset") or "").upper()
     recipes_dict = {r.name: r for r in recipes}
 
     # scenario refers to gas only logic, built in the runner
@@ -95,6 +96,9 @@ def apply_gas_routing_and_credits(
 
     process_gas_carrier = gas_config.get('process_gas_carrier') or 'Process Gas'
     natural_gas_carrier = gas_config.get('natural_gas_carrier') or 'Gas'
+
+    process_gas_carrier = gas_config.get('process_gas_carrier') or process_gas_carrier
+    natural_gas_carrier = gas_config.get('natural_gas_carrier') or natural_gas_carrier
     utility_process_name = gas_config.get('utility_process') or 'Utility Plant'
 
     def _roles_for(proc_name: str) -> set:
@@ -162,6 +166,10 @@ def apply_gas_routing_and_credits(
     EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
 
     process_gas_specs = gas_config.get('process_gas_sources') or []
+    if route_preset and route_preset not in {"BF-BOF", "BF_BOF"}:
+        process_gas_specs = []
+    if route_preset and route_preset not in {"BF-BOF", "BF_BOF"}:
+        process_gas_specs = []
     gas_source_details: Dict[str, float] = {}
     gas_credit_details: Dict[str, Dict[str, float]] = {}
     gas_coke_MJ = 0.0

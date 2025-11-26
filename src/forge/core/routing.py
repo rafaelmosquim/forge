@@ -133,7 +133,15 @@ def enforce_eaf_feed(recipes, mode: str | None):
     if mode == "scrap":
         want = _first_existing(("Scrap", "Scrap Steel"), all_mats)
     elif mode == "dri":
-        want = _first_existing(("Direct Reduced Iron", "DRI", "HBI"), all_mats)
+        want = _first_existing(
+            (
+                "Direct Reduced Iron",
+                "Direct Reduction Iron",
+                "DRI",
+                "HBI",
+            ),
+            all_mats,
+        )
     elif mode == "pigiron":
         want = _first_existing(("Pig Iron", "Hot Metal"), all_mats)
     else:

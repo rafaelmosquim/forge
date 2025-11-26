@@ -24,12 +24,20 @@ Al Alloy Series 7: 1.278
 Al Casting Alloy 3: 2.278
 Al Casting Alloy 4: 2.843
 Metallurgical Aluminum: 0.0
+Metallurgical Aluminum from Series 1: 0.0
+Metallurgical Aluminum from Series 5: 0.0
+Metallurgical Aluminum from Series 6: 0.0
+Metallurgical Aluminum from Series 7: 0.0
+Metallurgical Aluminum from Casting Alloy 3: 0.0
+Metallurgical Aluminum from Casting Alloy 4: 0.0
 Ingot Melting and CC: 3.752
 Hot and Cold Rolling: 3.882
 Extrusion: 6.830
 Metallurgical Aluminum Ingot Casting: 2.621
 Casting: 4.888
 Raw Aluminum: 0.0
+Raw Aluminum (extrusion): 0.0
+Raw Aluminum (ingot): 0.0
 Direct use of Basic Aluminum Products: 0.00
 Stamping: 1.800
 Drilling: 0.824
@@ -39,7 +47,5 @@ Welding: 0.270
 No Coating: 0.0
 Powder Coating: 28.791
 Liquid Painting: 1.000
-
-
 
 

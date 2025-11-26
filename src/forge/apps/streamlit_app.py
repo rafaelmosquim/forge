@@ -778,7 +778,7 @@ with tab_main:
     # ---------------------------------
     # Read Post-CC values (no UI here)
     # ---------------------------------
-    enable_post_cc = (stage_is_after_cr or stage_is_finished)
+    enable_post_cc = (SECTOR_KEY == "Steel") and (stage_is_after_cr or stage_is_finished)
     
     
     if enable_post_cc:
@@ -796,13 +796,13 @@ with tab_main:
     forced_pre_select = {}
     
     # 1) Lock CRUDE STEEL to Regular (R) and remove any lingering post-CC picks
-    if stage_is_as_cast or stage_is_validation:
+    if (SECTOR_KEY == "Steel") and (stage_is_as_cast or stage_is_validation):
         forced_pre_select["Cast Steel (IP1)"] = "Continuous Casting (R)"
         pbm = st.session_state.setdefault("picks_by_material", {})
         for k in ("Raw Products (types)", "Intermediate Process 3"):
             pbm.pop(k, None)
     # 1b) Validation upstream defaults (pre-selects hide those radios)
-    if stage_is_validation:
+    if (SECTOR_KEY == "Steel") and stage_is_validation:
         forced_pre_select.update({
             "Nitrogen":   "Nitrogen from market",
             "Oxygen":     "Oxygen from market",
@@ -885,12 +885,24 @@ with tab_main:
         "Cast Steel (IP1)": "Alloying (choose class)",
         "Manufactured Feed (IP4)": "Shaping (IP4)",
     }
+    # Descriptor-driven stage labels (fallback to steel defaults)
+    descriptor_stage_map = {getattr(st, "material", ""): getattr(st, "id", "") for st in getattr(descriptor, "stages", {}).values()}
+    descriptor_stage_labels = {item.stage_id: (item.label or item.stage_id) for item in getattr(descriptor, "stage_menu", [])}
     STAGE_DISPLAY = {
         "IP1": "Alloying",
         "Raw": "Post-CC",
         "IP4": "Shaping (off-site)",
-        "Finished": "Finishing (off-site)"
+        "Finished": "Finishing (off-site)",
+        "PostCC": "After CC",
+        "Remelt": "Remelt",
+        "Aluminum Alloying": "Alloying",
+        "Aluminum Basic": "Basic products",
+        "Aluminum Manufactured": "Manufactured products",
+        "Aluminum Finished": "Finishing",
+        "Aluminum Downstream": "Downstream",
     }
+    if descriptor_stage_labels:
+        STAGE_DISPLAY.update({sid: descriptor_stage_labels.get(sid, sid) for sid in descriptor_stage_labels})
     
     def _fmt_proc(name: str) -> str:
         return PROC_RENAMES.get(name, name)
@@ -926,6 +938,26 @@ with tab_main:
     })
     
     def _stage_label_for(mat_name: str) -> str:
+        # Descriptor-driven mapping first
+        try:
+            if mat_name in descriptor_stage_map:
+                return descriptor_stage_map[mat_name]
+        except Exception:
+            pass
+        # Aluminum: explicit downstream buckets so UI columns stay ordered
+        if SECTOR_KEY == "Aluminum":
+            name = mat_name.lower()
+            if "remelt" in name:
+                return "Remelt"
+            if "metallurgical aluminum" in name or "alloy" in name:
+                return "Aluminum Alloying"
+            if "basic aluminum products" in name or "basic aluminum" in name:
+                return "Aluminum Basic"
+            if "manufactured aluminum" in name:
+                return "Aluminum Manufactured"
+            if "finished aluminum" in name:
+                return "Aluminum Finished"
+            return "Aluminum Downstream"
         if mat_name in UPSTREAM_MATS:
             return "Upstream"
         if "Finished" in mat_name: return "Finished"
@@ -933,6 +965,7 @@ with tab_main:
         if "Intermediate Process 3" in mat_name: return "IP3"
         if "Cold Raw Steel (IP2)" in mat_name: return "IP2"
         if "Raw Products" in mat_name: return "Raw"
+        if "Remelt" in mat_name: return "Remelt"
         m = re.search(r"\(IP(\d)\)", mat_name)
         if m: return f"IP{m.group(1)}"
         if "Liquid" in mat_name: return "Liquid"
@@ -944,11 +977,25 @@ with tab_main:
         groups.pop("IP1", None)   # no Alloying column for crude steel
     for mat, options in ambiguous:
         groups[_stage_label_for(mat)].append((mat, options))
+    # If no descriptor labels and everything fell into one bucket for Aluminum, split heuristically
+    if SECTOR_KEY == "Aluminum" and not descriptor_stage_labels:
+        if len(groups) <= 1:
+            tmp = defaultdict(list)
+            for mat, opts in ambiguous:
+                label = "Aluminum Finished"
+                name = mat.lower()
+                if "metallurgical aluminum" in name or "alloy" in name:
+                    label = "Aluminum Alloying"
+                elif "basic aluminum products" in name:
+                    label = "Aluminum Basic"
+                elif "manufactured aluminum products" in name:
+                    label = "Aluminum Manufactured"
+                elif "finished aluminum" in name:
+                    label = "Aluminum Finished"
+                tmp[label].append((mat, opts))
+            if tmp:
+                groups = tmp
     
-    # Desired left→right column order
-    primary_order = ["IP1", "Raw", "IP4", "Finished"]
-    
-           
     # --- Downstream header + "Process Map" button, same font as Upstream
     left, right = st.columns([1, 3])
     with left:
@@ -984,7 +1031,35 @@ with tab_main:
             st.caption(f"Map not found at: {MAP_PNG}")
 
         
-    cols = st.columns(len(primary_order))
+    # Compute column layout dynamically
+    if SECTOR_KEY == "Steel":
+        stage_layout: List[str] = []
+        if not stage_is_as_cast:
+            stage_layout.append("IP1")
+        if enable_post_cc:
+            stage_layout.append("PostCC")
+        if groups.get("IP4"):
+            stage_layout.append("IP4")
+        stage_layout.append("Finished")
+        if not stage_layout:
+            stage_layout = ["Finished"]
+    else:
+        base_order = [
+            "Remelt",
+            "Aluminum Alloying",
+            "Aluminum Basic",
+            "Aluminum Manufactured",
+            "Aluminum Finished",
+            "Aluminum Downstream",
+            "Finished",
+        ]
+        stage_layout = [s for s in base_order if groups.get(s)]
+        if not stage_layout and groups:
+            stage_layout = list(groups.keys())
+        if not stage_layout:
+            stage_layout = ["Finished"]
+
+    cols = st.columns(len(stage_layout))
     
     def _use_selectbox(options: list[str]) -> bool:
         return (len(options) > 5) or (max(len(o) for o in options) > 28)
@@ -1027,37 +1102,42 @@ with tab_main:
                         )
                         st.session_state.picks_by_material[mat] = options[choice_idx]
     
-    # 1) Alloying (IP1)
-    #'_render_group("IP1", cols[0])' if False else None  # placeholder to avoid accidental edits
-    if not stage_is_as_cast:
-        _render_group("IP1", cols[0])
-    
-    with cols[1]:
-        if enable_post_cc:
-            st.markdown("**After Continuous Casting**")
-            cc_choice_widget = st.radio(
-                "",
-                ["Hot Rolling", "Rod/bar/section Mill"],
-                index = 0 if st.session_state.get("cc_choice_radio", "Hot Rolling") == "Hot Rolling" else 1,
-                key = "cc_choice_radio",
-                horizontal = True,
-                label_visibility="collapsed",
-            )
-            if cc_choice_widget == "Hot Rolling":
-                st.checkbox(
-                    "Apply Cold Rolling",
-                    value = st.session_state.get("cr_toggle", False),
-                    key = "cr_toggle",
+    # Render columns according to layout
+    col_idx = 0
+    if SECTOR_KEY == "Steel":
+        if not stage_is_as_cast and "IP1" in stage_layout:
+            _render_group("IP1", cols[col_idx])
+            col_idx += 1
+        if enable_post_cc and "PostCC" in stage_layout:
+            with cols[col_idx]:
+                st.markdown("**After Continuous Casting**")
+                cc_choice_widget = st.radio(
+                    "",
+                    ["Hot Rolling", "Rod/bar/section Mill"],
+                    index = 0 if st.session_state.get("cc_choice_radio", "Hot Rolling") == "Hot Rolling" else 1,
+                    key = "cc_choice_radio",
+                    horizontal = True,
+                    label_visibility="collapsed",
                 )
-            else:
-                st.session_state["cr_toggle"] = False
-
-    
-    # 3) Shaping (IP4)
-    _render_group("IP4", cols[2])
-    
-    # 4) Finished
-    _render_group("Finished", cols[3])
+                if cc_choice_widget == "Hot Rolling":
+                    st.checkbox(
+                        "Apply Cold Rolling",
+                        value = st.session_state.get("cr_toggle", False),
+                        key = "cr_toggle",
+                    )
+                else:
+                    st.session_state["cr_toggle"] = False
+            col_idx += 1
+        if "IP4" in stage_layout:
+            _render_group("IP4", cols[col_idx])
+            col_idx += 1
+        if "Finished" in stage_layout and col_idx < len(cols):
+            _render_group("Finished", cols[col_idx])
+    else:
+        for stage_name, container in zip(stage_layout, cols):
+            if stage_name == "PostCC":
+                continue
+            _render_group(stage_name, container)
 
     # --- Upstream picks, no title line ---
     st.subheader("Upstream choices", help="Model considers Scopes 1+2 only; upstream purchases excludes emissions from this process.")

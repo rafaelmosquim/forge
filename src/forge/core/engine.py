@@ -10,7 +10,7 @@ import pandas as pd
 from collections import defaultdict, deque
 from typing import Dict
 
-def calculate_balance_matrix(recipes, final_demand, production_routes):
+def calculate_balance_matrix(recipes, final_demand, production_routes, material_credit_map=None):
     """
     This function is the heart of the system. If solves material balances to give production levelsf or all processes needed to satisfy a given final demand, based on available recipes and enabled production routes.
     """
@@ -21,6 +21,8 @@ def calculate_balance_matrix(recipes, final_demand, production_routes):
     """
 
     all_materials, producers = set(), defaultdict(list)
+    material_credit_map = material_credit_map or {}
+    credit_stock = defaultdict(float)  # accumulated credits for target materials
     recipes_dict = {r.name: r for r in recipes}
     for r in recipes:
         all_materials |= set(r.inputs) | set(r.outputs) # gather all possible materials
@@ -63,6 +65,16 @@ def calculate_balance_matrix(recipes, final_demand, production_routes):
         if amount_required <= 1e-9:
             continue
 
+        credit_available = credit_stock.get(material, 0.0)
+        if credit_available > 0.0:
+            used_credit = min(credit_available, amount_required)
+            amount_required -= used_credit
+            credit_stock[material] = credit_available - used_credit
+            required[material] = amount_required
+
+        if amount_required <= 1e-9:
+            continue
+
         all_recipes = producers.get(material, []) # possible recipes for this material
         enabled_recipes = [recipe for recipe in all_recipes if (production_routes.get(recipe.name, 1.0) > 0.0)] # filter recipes by enabled routes
 
@@ -87,6 +99,26 @@ def calculate_balance_matrix(recipes, final_demand, production_routes):
             required[input_material] += production_runs_needed * float(input_amount)
             if input_material in producers and input_material not in seen:
                 queue.append(input_material); seen.add(input_material)
+
+        for output_material, output_amount in selected_recipe.outputs.items():
+            rule = material_credit_map.get(output_material)
+            if not rule:
+                continue
+            target_mat, ratio = rule
+            try:
+                ratio_val = float(ratio)
+            except Exception:
+                ratio_val = 1.0
+            credit_amount = production_runs_needed * float(output_amount) * ratio_val
+            if credit_amount <= 0.0:
+                continue
+            remaining_req = required.get(target_mat, 0.0)
+            if remaining_req > 0.0:
+                applied = min(remaining_req, credit_amount)
+                required[target_mat] = remaining_req - applied
+                credit_amount -= applied
+            if credit_amount > 1e-9:
+                credit_stock[target_mat] += credit_amount
 
         required[material] = 0.0 # loop stops when no material is left on the queue
 

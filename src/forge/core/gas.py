@@ -4,7 +4,7 @@ Gas logic is as follows: Blast Furnace, Coke Oven and Basic Oxygen Furnace can r
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 import pandas as pd
 
 from .models import Process
@@ -341,6 +341,7 @@ def compute_inside_energy_reference_for_share(
     stage_lookup: Optional[Dict[str, str]] = None,
     gas_carriers: Optional[List[str]] = None,
     fallback_materials: Optional[Set[str]] = None,
+    material_credit_map: Optional[Dict[str, Tuple[str, float]]] = None,
 ) -> Dict[str, float]:
     """Single reference plant run that returns both gas and electricity totals."""
     pre_mask = build_route_mask(route_key, recipes)
@@ -356,7 +357,7 @@ def compute_inside_energy_reference_for_share(
     recipes_full = _copy.deepcopy(recipes)
     _ensure_fallback_processes(recipes_full, production_routes_full, fallback_materials)
     balance_matrix_full, prod_levels_full = calculate_balance_matrix(
-        recipes_full, final_demand_full, production_routes_full
+        recipes_full, final_demand_full, production_routes_full, material_credit_map
     )
     if balance_matrix_full is None:
         return {"gas_total": 0.0, "electricity_total": 0.0}
@@ -385,6 +386,7 @@ def compute_inside_gas_reference_for_share(
     stage_lookup: Optional[Dict[str, str]] = None,
     gas_carriers: Optional[List[str]] = None,
     fallback_materials: Optional[Set[str]] = None,
+    material_credit_map: Optional[Dict[str, Tuple[str, float]]] = None,
 ) -> float:
     refs = compute_inside_energy_reference_for_share(
         recipes=recipes,
@@ -398,6 +400,7 @@ def compute_inside_gas_reference_for_share(
         stage_lookup=stage_lookup,
         gas_carriers=gas_carriers,
         fallback_materials=fallback_materials,
+        material_credit_map=material_credit_map,
     )
     try:
         return float(refs.get("gas_total", 0.0))

@@ -13,3 +13,8 @@ allow_direct_onsite:
   - Aluminum Fluoride Production
   - Scrap Melting and Processing
   # add any others you want to count as process emissions
+
+material_credit_map:
+  NaOHp:
+    target: NaOH
+    ratio: 1.0

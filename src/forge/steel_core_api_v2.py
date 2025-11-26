@@ -582,6 +582,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         energy_prices=energy_prices,
         material_prices=material_prices,
         outside_mill_procs=set(OUTSIDE_MILL_PROCS or []),
+        allow_direct_onsite=scenario.get('allow_direct_onsite'),
+        material_credit_map=scenario.get('material_credit_map'),
     )
     core_inputs = build_result.core
     prefer_internal_map = build_result.prefer_internal_map
@@ -629,6 +631,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
                     gas_config.get("process_gas_carrier") or "Process Gas",
                 ],
                 fallback_materials=fallback_materials,
+                material_credit_map=core_inputs.material_credit_map,
             )
             inside_elec_ref = float(ref_totals.get('electricity_total', 0.0))
         except Exception:

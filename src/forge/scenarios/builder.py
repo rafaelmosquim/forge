@@ -112,6 +112,8 @@ def build_core_scenario(
     energy_prices: Optional[Dict[str, float]] = None,
     material_prices: Optional[Dict[str, float]] = None,
     outside_mill_procs: Optional[Set[str]] = None,
+    allow_direct_onsite: Optional[Iterable[str]] = None,
+    material_credit_map: Optional[Dict[str, Any]] = None,
 ) -> ScenarioBuildResult:
     fallback_set = set(fallback_materials or set())
     is_validation = (str(stage_role or '').strip().lower() == 'validation')
@@ -163,6 +165,51 @@ def build_core_scenario(
     )
     _ensure_fallback_processes(recipes_calc, production_routes, fallback_set)
 
+    allow_direct_set = None
+    if allow_direct_onsite:
+        allow_direct_set = {
+            str(proc).strip()
+            for proc in allow_direct_onsite
+            if isinstance(proc, str) and str(proc).strip()
+        } or None
+
+    credit_map_clean: Dict[str, Tuple[str, float]] = {}
+    for source, raw_spec in (material_credit_map or {}).items():
+        try:
+            src_name = str(source).strip()
+        except Exception:
+            src_name = ""
+        if not src_name:
+            continue
+        target_name = None
+        ratio_val = 1.0
+        if isinstance(raw_spec, str):
+            target_name = raw_spec.strip()
+        elif isinstance(raw_spec, dict):
+            target_name = str(
+                raw_spec.get("target")
+                or raw_spec.get("to")
+                or raw_spec.get("material")
+                or raw_spec.get("dest")
+                or raw_spec.get("destination")
+                or ""
+            ).strip()
+            ratio_raw = raw_spec.get("ratio", raw_spec.get("factor", raw_spec.get("multiplier", 1.0)))
+            try:
+                ratio_val = float(ratio_raw)
+            except Exception:
+                ratio_val = 1.0
+        elif isinstance(raw_spec, (tuple, list)) and raw_spec:
+            target_name = str(raw_spec[0]).strip()
+            if len(raw_spec) > 1:
+                try:
+                    ratio_val = float(raw_spec[1])
+                except Exception:
+                    ratio_val = 1.0
+        if not target_name:
+            continue
+        credit_map_clean[src_name] = (target_name, ratio_val)
+
     core_scn = CoreScenario(
         recipes=recipes_calc,
         energy_int=energy_int,
@@ -180,8 +227,9 @@ def build_core_scenario(
         gas_config=gas_config or {},
         gas_routing=gas_routing or {},
         fallback_materials=fallback_set,
-        allow_direct_onsite=None,
+        allow_direct_onsite=allow_direct_set,
         outside_mill_procs=outside_mill_procs or set(),
+        material_credit_map=credit_map_clean or None,
         energy_prices=energy_prices,
         material_prices=material_prices,
         external_purchase_rows=list(external_purchase_rows or []),

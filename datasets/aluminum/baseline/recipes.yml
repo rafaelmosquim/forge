@@ -41,7 +41,7 @@
   inputs:
     Alumina: 0.2480 
     HF: 0.5840
-    NaOH: 0.0702 # accounting for NaOH recovered in Precipitation 
+    NaOH: 0.5830 # accounting for NaOH recovered in Precipitation 
   outputs: 
     Cryolite: 1.0    
 
@@ -70,6 +70,7 @@
     NaAlO2: 1.5128 
   outputs:
     AlOH3: 1.0
+    NaOHp: 0.5128
 
 
 - process: Calcination  

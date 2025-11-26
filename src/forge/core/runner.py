@@ -11,7 +11,7 @@ resolving route picks/masks, and shaping a CoreScenario for execution.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Iterable
+from typing import Any, Dict, List, Optional, Set, Iterable, Tuple
 from functools import partial
 import inspect
 import os
@@ -93,6 +93,7 @@ class CoreScenario:
     fallback_materials: Set[str] | None = None
     allow_direct_onsite: Set[str] | None = None
     outside_mill_procs: Set[str] | None = None
+    material_credit_map: Dict[str, Tuple[str, float]] | None = None
     # Optional cost inputs
     energy_prices: Optional[Dict[str, float]] = None
     material_prices: Optional[Dict[str, float]] = None
@@ -125,7 +126,7 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
     # 1) Balance
     final_demand = {scn.demand_material: float(scn.demand_qty)}
     balance_matrix, prod_levels = calculate_balance_matrix(
-        scn.recipes, final_demand, scn.production_routes
+        scn.recipes, final_demand, scn.production_routes, scn.material_credit_map
     )
     if balance_matrix is None:
         return CoreResults(
@@ -150,6 +151,7 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
         compute_inside_energy_reference_for_share,
         stage_lookup=STAGE_MATS,
         fallback_materials=scn.fallback_materials or set(),
+        material_credit_map=scn.material_credit_map,
     )
     eb_adj, e_efs, gas_meta = apply_gas_routing_and_credits(
         energy_balance=energy_balance,

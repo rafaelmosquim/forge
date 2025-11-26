@@ -34,9 +34,6 @@ import pandas as pd
 import streamlit as st
 import yaml
 
-# Ensure LCI flag defaults on when running via the app (can still be overridden externally)
-os.environ.setdefault("FORGE_ENABLE_LCI", "1")
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -47,8 +44,8 @@ from forge.steel_core_api_v2 import (
     RouteConfig,
     ScenarioInputs,
     run_scenario,
-    is_lci_enabled,
     write_run_log,  # for simple JSON logging
+    _apply_process_gas_metadata,
 )
 
 from forge.core.models import Process
@@ -63,8 +60,6 @@ from forge.core.transforms import (
     apply_fuel_substitutions,
     apply_dict_overrides,
     apply_recipe_overrides,
-    adjust_blast_furnace_intensity,
-    adjust_process_gas_intensity,
 )
 from forge.core.viz import (
     make_mass_sankey,
@@ -103,6 +98,14 @@ DATA_ROOT = st.session_state.get("DATA_ROOT", DEFAULT_DATA_ROOT)
 APP_DIR = Path(__file__).parent
 ASSETS  = APP_DIR / "assets"
 MAP_PNG = ASSETS / "process_map.png"
+
+
+def _costs_enabled() -> bool:
+    try:
+        raw = os.environ.get("FORGE_ENABLE_COSTS", "")
+    except Exception:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 SECTOR_CONFIG = {
     "Steel": {
@@ -427,6 +430,14 @@ def _load_for_picks(
     energy_content = load_data_from_yaml(os.path.join(base, 'energy_content.yml'))
     e_efs          = load_data_from_yaml(os.path.join(base, 'emission_factors.yml'))
     params         = load_parameters      (os.path.join(base, 'parameters.yml'))
+    descriptor_gas = getattr(descriptor, "gas", None) if descriptor is not None else None
+    gas_config = {
+        "process_gas_carrier": getattr(descriptor_gas, "process_gas_carrier", None) or "Process Gas",
+        "natural_gas_carrier": getattr(descriptor_gas, "natural_gas_carrier", None) or "Gas",
+        "utility_process": getattr(descriptor_gas, "utility_process", None),
+        "default_direct_use_fraction": getattr(descriptor_gas, "default_direct_use_fraction", None),
+    }
+    gas_config = _apply_process_gas_metadata(base, energy_content, params, gas_config)
 
     # Initial recipes
     recipes = load_recipes_from_yaml(
@@ -466,10 +477,6 @@ def _load_for_picks(
     if _param_patch is None:
         _param_patch = scenario.get('parameters', {})
     _recursive_ns_update(params, _param_patch)
-
-    # Intensity adjustments that affect connectivity/modes
-    adjust_blast_furnace_intensity(energy_int, energy_shares, params)
-    adjust_process_gas_intensity('Coke Production', 'process_gas_coke', energy_int, energy_shares, params)
 
     # Re-load recipes to re-evaluate expressions with new params
     recipes = load_recipes_from_yaml(
@@ -733,7 +740,6 @@ with st.sidebar:
     stage_is_validation = (stage_role == "validation")
     stage_is_as_cast = stage_role in {"crude", "validation"}
     stage_is_after_cr = stage_role in {"after_cr", "post_cr"}
-    stage_is_pig_iron = (stage_role == "pig_iron")
     stage_is_finished = (stage_role == "finished") or (stage_key.lower() == "finished")
 
     stage_material_map = build_stage_material_map(descriptor)
@@ -772,7 +778,7 @@ with tab_main:
     # ---------------------------------
     # Read Post-CC values (no UI here)
     # ---------------------------------
-    enable_post_cc = (stage_is_after_cr or stage_is_finished)
+    enable_post_cc = (SECTOR_KEY == "Steel") and (stage_is_after_cr or stage_is_finished)
     
     
     if enable_post_cc:
@@ -790,13 +796,13 @@ with tab_main:
     forced_pre_select = {}
     
     # 1) Lock CRUDE STEEL to Regular (R) and remove any lingering post-CC picks
-    if stage_is_as_cast or stage_is_validation:
+    if (SECTOR_KEY == "Steel") and (stage_is_as_cast or stage_is_validation):
         forced_pre_select["Cast Steel (IP1)"] = "Continuous Casting (R)"
         pbm = st.session_state.setdefault("picks_by_material", {})
         for k in ("Raw Products (types)", "Intermediate Process 3"):
             pbm.pop(k, None)
     # 1b) Validation upstream defaults (pre-selects hide those radios)
-    if stage_is_validation:
+    if (SECTOR_KEY == "Steel") and stage_is_validation:
         forced_pre_select.update({
             "Nitrogen":   "Nitrogen from market",
             "Oxygen":     "Oxygen from market",
@@ -874,21 +880,29 @@ with tab_main:
         "Continuous Casting (R)": "Regular (R)",
         "Continuous Casting (L)": "Low-alloy (L)",
         "Continuous Casting (H)": "High-alloy (H)",
-        "Iron Foundry (Exit R)": "Regular (R)",
-        "Iron Foundry (Exit L)": "Low-alloy (L)",
-        "Iron Foundry (Exit H)": "High-alloy (H)",
     }
     LABEL_RENAMES = {
         "Cast Steel (IP1)": "Alloying (choose class)",
-        "Cast Iron (Exit)": "Alloying (choose class)",
         "Manufactured Feed (IP4)": "Shaping (IP4)",
     }
+    # Descriptor-driven stage labels (fallback to steel defaults)
+    descriptor_stage_map = {getattr(st, "material", ""): getattr(st, "id", "") for st in getattr(descriptor, "stages", {}).values()}
+    descriptor_stage_labels = {item.stage_id: (item.label or item.stage_id) for item in getattr(descriptor, "stage_menu", [])}
     STAGE_DISPLAY = {
         "IP1": "Alloying",
         "Raw": "Post-CC",
         "IP4": "Shaping (off-site)",
-        "Finished": "Finishing (off-site)"
+        "Finished": "Finishing (off-site)",
+        "PostCC": "After CC",
+        "Remelt": "Remelt",
+        "Aluminum Alloying": "Alloying",
+        "Aluminum Basic": "Basic products",
+        "Aluminum Manufactured": "Manufactured products",
+        "Aluminum Finished": "Finishing",
+        "Aluminum Downstream": "Downstream",
     }
+    if descriptor_stage_labels:
+        STAGE_DISPLAY.update({sid: descriptor_stage_labels.get(sid, sid) for sid in descriptor_stage_labels})
     
     def _fmt_proc(name: str) -> str:
         return PROC_RENAMES.get(name, name)
@@ -924,6 +938,36 @@ with tab_main:
     })
     
     def _stage_label_for(mat_name: str) -> str:
+        # Descriptor-driven mapping first
+        try:
+            if mat_name in descriptor_stage_map:
+                sid = descriptor_stage_map[mat_name]
+                if not sid:
+                    return sid
+                sid_lower = str(sid).lower()
+                if sid_lower in {"ip1", "ip2", "ip3", "ip4"}:
+                    return sid_upper if (sid_upper := str(sid).upper()) else sid
+                if sid_lower == "finished":
+                    return "Finished"
+                if sid_lower == "remelt":
+                    return "Remelt"
+                return str(sid)
+        except Exception:
+            pass
+        # Aluminum: explicit downstream buckets so UI columns stay ordered
+        if SECTOR_KEY == "Aluminum":
+            name = mat_name.lower()
+            if "remelt" in name:
+                return "Remelt"
+            if "metallurgical aluminum" in name or "alloy" in name:
+                return "Aluminum Alloying"
+            if "basic aluminum products" in name or "basic aluminum" in name:
+                return "Aluminum Basic"
+            if "manufactured aluminum" in name:
+                return "Aluminum Manufactured"
+            if "finished aluminum" in name or "finished" in name:
+                return "Aluminum Finished"
+            return "Aluminum Downstream"
         if mat_name in UPSTREAM_MATS:
             return "Upstream"
         if "Finished" in mat_name: return "Finished"
@@ -931,7 +975,7 @@ with tab_main:
         if "Intermediate Process 3" in mat_name: return "IP3"
         if "Cold Raw Steel (IP2)" in mat_name: return "IP2"
         if "Raw Products" in mat_name: return "Raw"
-        if "Cast Iron" in mat_name: return "IP1"
+        if "Remelt" in mat_name: return "Remelt"
         m = re.search(r"\(IP(\d)\)", mat_name)
         if m: return f"IP{m.group(1)}"
         if "Liquid" in mat_name: return "Liquid"
@@ -943,11 +987,38 @@ with tab_main:
         groups.pop("IP1", None)   # no Alloying column for crude steel
     for mat, options in ambiguous:
         groups[_stage_label_for(mat)].append((mat, options))
+
+    # Steel fallback: ensure alloying options appear even if not ambiguous
+    if SECTOR_KEY == "Steel" and not stage_is_as_cast and not groups.get("IP1"):
+        try:
+            prod_idx = build_producers_index(recipes_for_ui)
+            opts = [
+                r.name for r in prod_idx.get("Cast Steel (IP1)", [])
+                if pre_mask.get(r.name, 1) > 0 and pre_select.get(r.name, 1) > 0
+            ]
+            if opts:
+                groups["IP1"].append(("Cast Steel (IP1)", opts))
+        except Exception:
+            pass
+    # If no descriptor labels and everything fell into one bucket for Aluminum, split heuristically
+    if SECTOR_KEY == "Aluminum" and not descriptor_stage_labels:
+        if len(groups) <= 1:
+            tmp = defaultdict(list)
+            for mat, opts in ambiguous:
+                label = "Aluminum Finished"
+                name = mat.lower()
+                if "metallurgical aluminum" in name or "alloy" in name:
+                    label = "Aluminum Alloying"
+                elif "basic aluminum products" in name:
+                    label = "Aluminum Basic"
+                elif "manufactured aluminum products" in name:
+                    label = "Aluminum Manufactured"
+                elif "finished aluminum" in name:
+                    label = "Aluminum Finished"
+                tmp[label].append((mat, opts))
+            if tmp:
+                groups = tmp
     
-    # Desired left→right column order
-    primary_order = ["IP1", "Raw", "IP4", "Finished"]
-    
-           
     # --- Downstream header + "Process Map" button, same font as Upstream
     left, right = st.columns([1, 3])
     with left:
@@ -983,7 +1054,37 @@ with tab_main:
             st.caption(f"Map not found at: {MAP_PNG}")
 
         
-    cols = st.columns(len(primary_order))
+    # Compute column layout dynamically
+    if SECTOR_KEY == "Steel":
+        stage_layout: List[str] = []
+        if not stage_is_as_cast:
+            stage_layout.append("IP1")
+        if enable_post_cc:
+            stage_layout.append("PostCC")
+        if groups.get("IP4"):
+            stage_layout.append("IP4")
+        stage_layout.append("Finished")
+        if not stage_layout:
+            stage_layout = ["Finished"]
+    else:
+        base_order = [
+            "Remelt",
+            "Aluminum Alloying",
+            "Aluminum Basic",
+            "Aluminum Manufactured",
+            "Aluminum Finished",
+            "Aluminum Downstream",
+        ]
+        stage_layout = [s for s in base_order if groups.get(s)]
+        # If finished picks are present but bucketed under generic "Finished", append it
+        if groups.get("Finished") and "Finished" not in stage_layout:
+            stage_layout.append("Finished")
+        if not stage_layout and groups:
+            stage_layout = list(groups.keys())
+        if not stage_layout:
+            stage_layout = ["Finished"]
+
+    cols = st.columns(len(stage_layout))
     
     def _use_selectbox(options: list[str]) -> bool:
         return (len(options) > 5) or (max(len(o) for o in options) > 28)
@@ -1026,37 +1127,42 @@ with tab_main:
                         )
                         st.session_state.picks_by_material[mat] = options[choice_idx]
     
-    # 1) Alloying (IP1)
-    #'_render_group("IP1", cols[0])' if False else None  # placeholder to avoid accidental edits
-    if not stage_is_as_cast:
-        _render_group("IP1", cols[0])
-    
-    with cols[1]:
-        if enable_post_cc:
-            st.markdown("**After Continuous Casting**")
-            cc_choice_widget = st.radio(
-                "",
-                ["Hot Rolling", "Rod/bar/section Mill"],
-                index = 0 if st.session_state.get("cc_choice_radio", "Hot Rolling") == "Hot Rolling" else 1,
-                key = "cc_choice_radio",
-                horizontal = True,
-                label_visibility="collapsed",
-            )
-            if cc_choice_widget == "Hot Rolling":
-                st.checkbox(
-                    "Apply Cold Rolling",
-                    value = st.session_state.get("cr_toggle", False),
-                    key = "cr_toggle",
+    # Render columns according to layout
+    col_idx = 0
+    if SECTOR_KEY == "Steel":
+        if not stage_is_as_cast and "IP1" in stage_layout:
+            _render_group("IP1", cols[col_idx])
+            col_idx += 1
+        if enable_post_cc and "PostCC" in stage_layout:
+            with cols[col_idx]:
+                st.markdown("**After Continuous Casting**")
+                cc_choice_widget = st.radio(
+                    "",
+                    ["Hot Rolling", "Rod/bar/section Mill"],
+                    index = 0 if st.session_state.get("cc_choice_radio", "Hot Rolling") == "Hot Rolling" else 1,
+                    key = "cc_choice_radio",
+                    horizontal = True,
+                    label_visibility="collapsed",
                 )
-            else:
-                st.session_state["cr_toggle"] = False
-
-    
-    # 3) Shaping (IP4)
-    _render_group("IP4", cols[2])
-    
-    # 4) Finished
-    _render_group("Finished", cols[3])
+                if cc_choice_widget == "Hot Rolling":
+                    st.checkbox(
+                        "Apply Cold Rolling",
+                        value = st.session_state.get("cr_toggle", False),
+                        key = "cr_toggle",
+                    )
+                else:
+                    st.session_state["cr_toggle"] = False
+            col_idx += 1
+        if "IP4" in stage_layout:
+            _render_group("IP4", cols[col_idx])
+            col_idx += 1
+        if "Finished" in stage_layout and col_idx < len(cols):
+            _render_group("Finished", cols[col_idx])
+    else:
+        for stage_name, container in zip(stage_layout, cols):
+            if stage_name == "PostCC":
+                continue
+            _render_group(stage_name, container)
 
     # --- Upstream picks, no title line ---
     st.subheader("Upstream choices", help="Model considers Scopes 1+2 only; upstream purchases excludes emissions from this process.")
@@ -1547,14 +1653,6 @@ if not IS_PAPER:
                 pci_th = max(0.0, 1.0 - coke_frac_th)  # remaining thermal is PCI
                 pci_char_frac = (char0 / max(1e-9, (coal0 + char0))) if (coal0 + char0) > 0 else 0.0
 
-                # Reset BF fuel sliders when scenario/data switch so YAML defaults (e.g., charcoal)
-                # don't get overwritten by stale Streamlit widget state.
-                scenario_token = f"{DATA_ROOT}::{scenario_name or '(no scenario)'}::{route}"
-                if st.session_state.get("_bf_slider_token") != scenario_token:
-                    st.session_state["_bf_slider_token"] = scenario_token
-                    st.session_state["static_bf_coke"] = float(coke_frac_th)
-                    st.session_state["static_bf_charfrac"] = float(pci_char_frac)
-
                 # UI
                 coke_share_th = st.slider(
                     "Coke share (of BF thermal input)",
@@ -1690,9 +1788,9 @@ if run_now:
         energy_balance   = getattr(out, "energy_balance", None)
         emissions        = getattr(out, "emissions", None)
         total            = getattr(out, "total_co2e_kg", None)
-        total_cost       = getattr(out, "total_cost", None)
-        material_cost    = getattr(out, "material_cost", None)
-        lci_df           = getattr(out, "lci", None)
+        costs_enabled = _costs_enabled()
+        total_cost       = float(getattr(out, "total_cost", 0.0)) if costs_enabled and getattr(out, "total_cost", None) is not None else None
+        material_cost    = float(getattr(out, "material_cost", 0.0)) if costs_enabled and getattr(out, "material_cost", None) is not None else None
 
         # Try to grab the material balance from out under common names
         balance_matrix = next(
@@ -1735,33 +1833,50 @@ if run_now:
             total_kg   = float(getattr(out, "total_co2e_kg", 0.0) or 0.0)
             demand_kg  = float(demand_qty) if float(demand_qty) > 0 else 1000.0  # guard
             raw_per_t  = total_kg / (demand_kg / 1000.0)  # kg CO2e per tonne at current stage
-            total_cost = float(getattr(out, "total_cost", 0.0) or 0.0)
-            material_cost = float(getattr(out, "material_cost", 0.0) or 0.0)
 
             # 3) EF per ton FINISHED (apply yield ONLY if current stage is not Finished)
-            finished_for_metric = stage_is_finished or stage_is_pig_iron or str(stage_key) in ("Finished", "Finished steel")
+            finished_for_metric = stage_is_finished or str(stage_key) in ("Finished", "Finished steel")
             per_t_finished = raw_per_t if not finished_for_metric else (raw_per_t / max(fyield, 1e-9))
 
-            # 4) Display
-            c1, c2, c3, c4 = st.columns(4)
+            # 4) Display — report with vs without Coke Production emissions
+            # Compute an EF that excludes Coke Production (reporting nicety)
+            raw_per_t_incl_coke = raw_per_t
+            raw_per_t_excl_coke = raw_per_t_incl_coke
+            try:
+                if isinstance(emissions, pd.DataFrame) and not emissions.empty:
+                    if 'TOTAL CO2e' in emissions.columns and 'Coke Production' in emissions.index:
+                        coke_total_kg = float(emissions.loc['Coke Production', 'TOTAL CO2e'])
+                        total_no_coke_kg = max(0.0, float(total_kg) - coke_total_kg)
+                        raw_per_t_excl_coke = total_no_coke_kg / (demand_kg / 1000.0)
+            except Exception:
+                pass
+
+            c1, c2 = st.columns(2)
             with c1:
-                st.metric("EF (raw)", f"{raw_per_t:,.0f} kg CO₂e / t at {stage_key}",
-                        help="No yield applied (equivalent to yield = 1.00).")
+                st.metric(
+                    "EF (incl. Coke Production)",
+                    f"{raw_per_t_incl_coke:,.0f} kg CO₂e / t",
+                    help="Includes emissions from Coke Production."
+                )
             with c2:
                 st.metric(
-                    "EF (per t finished)",
-                    f"{per_t_finished:,.0f} kg CO₂e / t finished",
-                    help=f"Raw EF adjusted by yield when the selected stage is finished (yield = {fyield:.2f}).",
+                    "EF (excl. Coke Production)",
+                    f"{raw_per_t_excl_coke:,.0f} kg CO₂e / t",
+                    help="Subtracts Coke Production from total before dividing by demand."
                 )
-            with c3:
-                st.metric("Total Energy Cost", f"${total_cost:,.2f}")
-
-            with c4:
-                st.metric("Material Energy Cost", f"${material_cost:,.2f}")
+            if total_cost is not None or material_cost is not None:
+                cost_cols = st.columns(2)
+                if total_cost is not None:
+                    with cost_cols[0]:
+                        st.metric("Total Energy Cost", f"${total_cost:,.2f}")
+                if material_cost is not None:
+                    target_col = cost_cols[1] if total_cost is not None else cost_cols[0]
+                    with target_col:
+                        st.metric("Material Energy Cost", f"${material_cost:,.2f}")
 
             # Downloads
             df_runs = pd.DataFrame(sorted(prod_lvl.items()), columns=["Process", "Runs"]).set_index("Process")
-            d1, d2, d3, d4 = st.columns(4)
+            d1, d2, d3 = st.columns(3)
             d1.download_button("Production runs (CSV)", data=df_runs.to_csv().encode("utf-8"),
                                file_name="production_runs.csv", mime="text/csv")
             if isinstance(energy_balance, pd.DataFrame) and not energy_balance.empty:
@@ -1770,9 +1885,6 @@ if run_now:
             if isinstance(emissions, pd.DataFrame):
                 d3.download_button("Emissions (CSV)", data=emissions.to_csv().encode("utf-8"),
                                    file_name="emissions.csv", mime="text/csv")
-            if is_lci_enabled() and isinstance(lci_df, pd.DataFrame) and not lci_df.empty:
-                d4.download_button("LCI (CSV)", data=lci_df.to_csv(index=False).encode("utf-8"),
-                                   file_name="lci.csv", mime="text/csv")
 
             # Tables
             
@@ -1787,61 +1899,13 @@ if run_now:
                 st.info("No per-process emissions table for this run.")
 
             if isinstance(energy_balance, pd.DataFrame) and not energy_balance.empty:
-                st.dataframe(energy_balance)
+                eb_display = energy_balance.loc[:, (energy_balance != 0).any(axis=0)]
+                if eb_display.empty:
+                    eb_display = energy_balance
+                st.dataframe(eb_display)
             else:
                 st.info("No energy balance table for this run.")
             
-            if isinstance(lci_df, pd.DataFrame) and not lci_df.empty:
-                st.markdown("**Life Cycle Inventory (per unit of process output)**")
-                for process_name, df_proc in lci_df.groupby("Process"):
-                    st.markdown(f"##### {process_name}")
-                    for output_name, df_out in df_proc.groupby("Output"):
-                        st.caption(f"Reference output: {output_name}")
-                        inputs_section = df_out[df_out["Flow"] == "Input"]
-                        outputs_section = df_out[df_out["Flow"] == "Output"]
-                        # Also show emissions rows (totals and credits)
-                        emissions_section = df_out[(df_out["Flow"].astype(str) == "Emissions") | (df_out["Category"].astype(str) == "Emissions")]
-
-                        rows = []
-                        for _, row in inputs_section.iterrows():
-                            rows.append({
-                                "Section": "Input",
-                                "Name": row["Input"],
-                                "Category": row["Category"],
-                                "ValueUnit": row.get("ValueUnit", ""),
-                                "Amount": float(row["Amount"]),
-                                "Unit": row["Unit"],
-                            })
-                        for _, row in outputs_section.iterrows():
-                            rows.append({
-                                "Section": "Output",
-                                "Name": row["Input"],
-                                "Category": row["Category"],
-                                "ValueUnit": row.get("ValueUnit", ""),
-                                "Amount": float(row["Amount"]),
-                                "Unit": row["Unit"],
-                            })
-
-                        # Append emissions at the end, if present
-                        for _, row in emissions_section.iterrows():
-                            rows.append({
-                                "Section": "Emissions",
-                                "Name": row.get("Input", "Emissions"),
-                                "Category": row.get("Category", "Emissions"),
-                                "ValueUnit": row.get("ValueUnit", ""),
-                                "Amount": float(row.get("Amount", 0.0) or 0.0),
-                                "Unit": row.get("Unit", ""),
-                            })
-
-                        if rows:
-                            display_df = pd.DataFrame(rows)
-                            display_df["Amount"] = display_df["Amount"].round(6)
-                            st.table(display_df)
-                        else:
-                            st.info("No flows recorded for this output.")
-            else:
-                st.info("No life cycle inventory table for this run.")
-                
     except Exception as e:
         st.error("Run crashed. Traceback below:")
         st.exception(e)

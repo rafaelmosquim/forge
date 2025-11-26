@@ -237,6 +237,9 @@
   outputs:
     Metallurgical Aluminum: 1.0    
 
+  outputs:
+    Metallurgical Aluminum: 1.0    
+
 - process: Metallurgical Aluminum from Casting Alloy 4
   inputs:
     Al Casting Alloy 4: 1.0
@@ -273,187 +276,13 @@
   outputs:
     Casted Aluminum (ingot): 1.0    
 
-- process: Raw Aluminium
+- process: Raw Aluminum (extrusion)
   inputs:
     Extruded Aluminum: 1.0
   outputs:
     Basic Aluminum Products: 1.0    
 
-- process: Raw Aluminium
-  inputs:
-    Casted Aluminum (ingot): 1.0
-  outputs:
-    Basic Aluminum Products: 1.0        
-
-- process: Al Alloy Series 1
-  inputs:
-    Si: 0.0
-    Fe: 0.0
-    Mn: 0.0
-    Mg: 0.0
-    Cu: 0.0
-    Ni: 0.0
-    Ti: 0.0
-    Cr: 0.0
-    Zn: 0.0
-    Primary Ingot Aluminum: 0.582
-    Recycled Aluminum: 0.418
-  outputs:
-    Al Alloy Series 1: 1.0         
-
-- process: Al Alloy Series 5
-  inputs:
-    Si: 0.003
-    Fe: 0.004
-    Mn: 0.001
-    Mg: 0.022
-    Cu: 0.001
-    Ni: 0.000
-    Ti: 0.000
-    Cr: 0.002
-    Zn: 0.001
-    Primary Ingot Aluminum: 0.563
-    Recycled Aluminum: 0.404
-  outputs:
-    Al Alloy Series 5: 1.0  
-
-- process: Al Alloy Series 6
-  inputs:
-    Si: 0.007
-    Fe: 0.005
-    Mn: 0.004
-    Mg: 0.006
-    Cu: 0.001
-    Ni: 0.0
-    Ti: 0.0
-    Cr: 0.003
-    Zn: 0.002
-    Primary Ingot Aluminum: 0.566
-    Recycled Aluminum: 0.407
-  outputs:
-    Al Alloy Series 6: 1.0
-
-- process: Al Alloy Series 7  
-  inputs:
-    Si: 0.004
-    Fe: 0.005
-    Mn: 0.003
-    Mg: 0.021
-    Cu: 0.012
-    Ni: 0.0
-    Ti: 0.0
-    Cr: 0.002
-    Zn: 0.051
-    Primary Ingot Aluminum: 0.525
-    Recycled Aluminum: 0.377
-  outputs:
-    Al Alloy Series 7: 1.0
-
-- process: Al Casting Alloy 3
-  inputs:
-    Si: 0.094
-    Fe: 0.003
-    Mn: 0.001
-    Mg: 0.006
-    Cu: 0.003
-    Ni: 0.006
-    Ti: 0.001
-    Cr: 0.000
-    Zn: 0.002
-    Primary Ingot Aluminum: 0.514
-    Recycled Aluminum: 0.370
-  outputs:
-    Al Casting Alloy 3: 1.0              
-
-- process: Al Casting Alloy 4
-  inputs:
-    Si: 0.120
-    Fe: 0.013
-    Mn: 0.004
-    Mg: 0.010
-    Cu: 0.005
-    Ni: 0.000
-    Ti: 0.000
-    Cr: 0.000
-    Zn: 0.000
-    Primary Ingot Aluminum: 0.493
-    Recycled Aluminum: 0.354
-  outputs:
-    Al Casting Alloy 4: 1.0 
-
-- process: Metalurgical Aluminum from Series 1
-  inputs:
-    Al Alloy Series 1: 1.0
-  outputs:
-    Metalurgical Aluminum: 1.0
-
-- process: Metalurgical Aluminum from Series 5
-  inputs:
-    Al Alloy Series 5: 1.0
-  outputs:
-    Metalurgical Aluminum: 1.0
-
-- process: Metalurgical Aluminum from Series 6
-  inputs:
-    Al Alloy Series 6: 1.0
-  outputs:
-    Metalurgical Aluminum: 1.0    
-
-- process: Metalurgical Aluminum from Series 7
-  inputs:
-    Al Alloy Series 7: 1.0
-  outputs:
-    Metalurgical Aluminum: 1.0    
-
-- process: Metalurgical Aluminum from Casting Alloy 3
-  inputs:
-    Al Casting Alloy 3: 1.0
-  outputs:
-    Metalurgical Aluminum: 1.0    
-
-- process: Metalurgical Aluminum from Casting Alloy 4
-  inputs:
-    Al Casting Alloy 4: 1.0
-  outputs:
-    Metalurgical Aluminum: 1.0    
-
-- process: Continuous Casting
-  inputs:
-    Metalurgical Aluminum: 1.0
-  outputs:
-    Casted Aluminum: 1.0
-
-- process: Hot and Cold Rolling
-  inputs:
-    Casted Aluminum: 1.0
-  outputs:
-    Rolled Aluminum: 1.0   
-
-- process: Extrusion
-  inputs:
-    Casted Aluminum: 1.0
-  outputs:
-    Extruded Aluminum: 1.0
-
-- process: Metalurgical Aluminum Ingot Casting
-  inputs:
-    Metalurgical Aluminum: 1.0
-  outputs:
-    Aluminum Ingot Casting: 1.0
-
-- process: Casting
-  inputs:
-    Aluminum Ingot Casting: 1.0
-  outputs:
-    Casted Aluminum (ingot): 1.0    
-
-- process: Raw Aluminium
-  inputs:
-    Extruded Aluminum: 1.0
-  outputs:
-    Basic Aluminum Products: 1.0    
-
-- process: Raw Aluminium
+- process: Raw Aluminum (ingot)
   inputs:
     Casted Aluminum (ingot): 1.0
   outputs:

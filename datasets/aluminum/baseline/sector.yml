@@ -10,12 +10,18 @@ stage_menu:
     stage_id: remelt
     label: "Remelt Aluminum"
     description: "Remelting of aluminum scrap to produce secondary aluminum."
+  - key: finished
+    stage_id: finished
+    label: "Finished Aluminum"
+    description: "Finished aluminum products after downstream processing and coating."
 
 stages:
   primary:
     material: "Primary Aluminum"
   remelt:
     material: "Remelt Blend"
+  finished:
+    material: "Finished Aluminum Products"
 
 routes:
   - id: Primary
@@ -42,6 +48,34 @@ routes:
       - Primary Ingot Melting
       - Remelt Blending
       - Primary Aluminum    
+      - Al Alloy Series 1
+      - Al Alloy Series 5
+      - Al Alloy Series 6
+      - Al Alloy Series 7
+      - Al Casting Alloy 3
+      - Al Casting Alloy 4
+      - Metallurgical Aluminum from Series 1
+      - Metallurgical Aluminum from Series 5
+      - Metallurgical Aluminum from Series 6
+      - Metallurgical Aluminum from Series 7
+      - Metallurgical Aluminum from Casting Alloy 3
+      - Metallurgical Aluminum from Casting Alloy 4
+      - Ingot Melting and CC
+      - Hot and Cold Rolling
+      - Extrusion
+      - Metallurgical Aluminum Ingot Casting
+      - Casting
+      - Raw Aluminum (extrusion)
+      - Raw Aluminum (ingot)
+      - Direct use of Basic Aluminum Products
+      - Stamping
+      - Drilling
+      - Milling
+      - Turning
+      - Welding
+      - No Coating
+      - Powder Coating
+      - Liquid Painting
 
 process_roles:
   Bauxite Mining: [upstream]

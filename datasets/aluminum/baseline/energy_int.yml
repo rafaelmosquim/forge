@@ -8,13 +8,42 @@ Anode Production (Paste): 0.0
 Cryolite Production (HF): 0.0
 Cryolite Production (H2SiF6): 3.31
 Aluminum Fluoride Production: 0.0
-Bauxite Processing: 0.53
-Digestion: 1.79
+Bauxite Processing: 0.5320
+Digestion: 1.7925
 Precipitation: 0.0
-Calcination: 2.85
+Calcination: 2.8528
 Electrolysis (prebaked): 56.70
 Electrolysis (Soderberg): 61.02
 Scrap Melting and Processing: 0.0
 Primary Ingot Melting: 0.80
 Remelt Blending: ~
+
+Al Alloy Series 1: 0.000
+Al Alloy Series 5: 1.278
+Al Alloy Series 6: 1.278
+Al Alloy Series 7: 1.278
+Al Casting Alloy 3:	2.278
+Al Casting Alloy 4:	2.843
+
+Ingot Melting and CC: 3.752
+Hot and Cold Rolling: 3.882
+Extrusion: 6.830
+
+Metalurgical Aluminum Ingot Casting: 2.621
+Casting: 4.888
+
+Direct use of Basic Aluminum Products: 0.00
+Stamping: 1.800
+Drilling: 0.824
+Milling: 1.281
+Turning: 6.586
+Welding: 0.270
+
+No Coating: 0.0
+Powder Coating: 28.791
+Liquid Painting: 1.000
+
+
+
+
 

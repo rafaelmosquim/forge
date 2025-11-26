@@ -14,6 +14,17 @@ allow_direct_onsite:
   - Scrap Melting and Processing
   # add any others you want to count as process emissions
 
+picks_by_material:
+  Metallurgical Aluminum: Metallurgical Aluminum from Series 1
+
+pre_select_soft:
+  Metallurgical Aluminum from Series 1: 1
+  Metallurgical Aluminum from Series 5: 0
+  Metallurgical Aluminum from Series 6: 0
+  Metallurgical Aluminum from Series 7: 0
+  Metallurgical Aluminum from Casting Alloy 3: 0
+  Metallurgical Aluminum from Casting Alloy 4: 0
+
 material_credit_map:
   NaOHp:
     target: NaOH

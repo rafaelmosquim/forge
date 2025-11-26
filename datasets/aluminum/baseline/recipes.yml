@@ -128,6 +128,165 @@
 
 - process: Al Alloy Series 1
   inputs:
+    Remelt Blend: 1.0
+  outputs:
+    Al Alloy Series 1: 1.0
+
+- process: Al Alloy Series 5
+  inputs:
+    Remelt Blend: 0.967
+    Si: 0.003
+    Fe: 0.004
+    Mn: 0.001
+    Mg: 0.022
+    Cu: 0.001
+    Ni: 0.000
+    Ti: 0.000
+    Cr: 0.002
+    Zn: 0.001
+  outputs:
+    Al Alloy Series 5: 1.0  
+
+- process: Al Alloy Series 6
+  inputs:
+    Remelt Blend: 0.973
+    Si: 0.007
+    Fe: 0.005
+    Mn: 0.004
+    Mg: 0.006
+    Cu: 0.001
+    Ni: 0.0
+    Ti: 0.0
+    Cr: 0.003
+    Zn: 0.002
+  outputs:
+    Al Alloy Series 6: 1.0
+
+- process: Al Alloy Series 7  
+  inputs:
+    Remelt Blend: 0.902
+    Si: 0.004
+    Fe: 0.005
+    Mn: 0.003
+    Mg: 0.021
+    Cu: 0.012
+    Ni: 0.0
+    Ti: 0.0
+    Cr: 0.002
+    Zn: 0.051
+  outputs:
+    Al Alloy Series 7: 1.0
+
+- process: Al Casting Alloy 3
+  inputs:
+    Remelt Blend: 0.884
+    Si: 0.094
+    Fe: 0.003
+    Mn: 0.001
+    Mg: 0.006
+    Cu: 0.003
+    Ni: 0.006
+    Ti: 0.001
+    Cr: 0.000
+    Zn: 0.002
+  outputs:
+    Al Casting Alloy 3: 1.0              
+
+- process: Al Casting Alloy 4
+  inputs:
+    Remelt Blend: 0.847
+    Si: 0.120
+    Fe: 0.013
+    Mn: 0.004
+    Mg: 0.010
+    Cu: 0.005
+    Ni: 0.000
+    Ti: 0.000
+    Cr: 0.000
+    Zn: 0.000
+  outputs:
+    Al Casting Alloy 4: 1.0 
+
+- process: Metallurgical Aluminum from Series 1
+  inputs:
+    Al Alloy Series 1: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0
+
+- process: Metallurgical Aluminum from Series 5
+  inputs:
+    Al Alloy Series 5: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0
+
+- process: Metallurgical Aluminum from Series 6
+  inputs:
+    Al Alloy Series 6: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0    
+
+- process: Metallurgical Aluminum from Series 7
+  inputs:
+    Al Alloy Series 7: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0    
+
+- process: Metallurgical Aluminum from Casting Alloy 3
+  inputs:
+    Al Casting Alloy 3: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0    
+
+- process: Metallurgical Aluminum from Casting Alloy 4
+  inputs:
+    Al Casting Alloy 4: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0    
+
+- process: Ingot Melting and CC
+  inputs:
+    Metallurgical Aluminum: 1.0
+  outputs:
+    Casted Aluminum: 1.0
+
+- process: Hot and Cold Rolling
+  inputs:
+    Casted Aluminum: 1.0
+  outputs:
+    Rolled Aluminum: 1.0   
+
+- process: Extrusion
+  inputs:
+    Casted Aluminum: 1.0
+  outputs:
+    Extruded Aluminum: 1.0
+
+- process: Metallurgical Aluminum Ingot Casting
+  inputs:
+    Metallurgical Aluminum: 1.0
+  outputs:
+    Aluminum Ingot Casting: 1.0
+
+- process: Casting
+  inputs:
+    Aluminum Ingot Casting: 1.0
+  outputs:
+    Casted Aluminum (ingot): 1.0    
+
+- process: Raw Aluminium
+  inputs:
+    Extruded Aluminum: 1.0
+  outputs:
+    Basic Aluminum Products: 1.0    
+
+- process: Raw Aluminium
+  inputs:
+    Casted Aluminum (ingot): 1.0
+  outputs:
+    Basic Aluminum Products: 1.0        
+
+- process: Al Alloy Series 1
+  inputs:
     Si: 0.0
     Fe: 0.0
     Mn: 0.0

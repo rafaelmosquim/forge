@@ -1,4 +1,4 @@
-\documentclass[11pt]{article}
+\documentclass[12pt]{article}
 
 \usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
@@ -17,6 +17,18 @@ Model Structure and Data Pipeline}
 
 \section{Overview}
 
+Steel and aluminum production are energy-intensive industrial sectors with
+significant greenhouse gas (GHG) emissions. Accurate modeling of production routes,
+energy consumption, and emissions is essential for assessing decarbonization
+pathways and policy impacts. However, most existing models fall in one of two
+categories: detailed process-based LCA models that are complex and inflexible, or top-down sectoral models that lack process detail, usually behind proprietary data.
+
+FORGE (Flexible Optimization of Routes for GHG \& Energy) aims to bridge this gap by
+providing an open-source, process-based techno-environmental model that is both
+flexible and user-friendly. It allows users to define and modify production routes,
+energy sources, and emission factors through simple YAML configuration files,
+enabling scenario analysis and sensitivity testing. Along with full transparency of inputs, outputs and parameters, FORGE is designed to be extensible to other industrial sectors beyond steel and aluminum. It can also be integrated with broader energy and economic models for comprehensive assessments.
+
 FORGE is a process-based techno-environmental model for industrial production
 routes, currently focused on steel and aluminum. The model is implemented as a
 Python package with:
@@ -32,6 +44,13 @@ Python package with:
 This document sketches the main architecture and---most importantly---the data
 pipeline from YAML input files to emissions outputs. The goal is to serve as a
 starting point for a full academic paper.
+
+At its core, FORGE implements a material balance solver that walks upstream from
+final demand to determine production levels per process. Given production
+levels, energy intensities, and carrier shares, it builds per-process energy
+balances. This makes the model fully integrated, which allows changes in parameters (ie Blast Furnace energy intensity) to propagate both upstream and downstream. Another feature is that FORGE models process gas recovery in coke making, blast furnace and basic oxygen furncace, in line with the real world practices. A gas-routing module implements process-gas recovery, routing between direct use and electricity, and blended emission factors for gas and internal electricity. Finally, emissions are computed using energy and direct emissions, applying blended emission factors where relevant.
+
+Aluminum implementation does not share the same intricacies of steel, and is shown here as a proof of concept of FORGE's flexibility to model other sectors. The aluminum dataset includes primary and remelt routes, downstream alloying and finishing, and direct process emissions. It does not have process gas recovery or routing, nor alternative data-sets for different scenarios (likely/optimistic/pessimistic).
 
 \section{High-level Architecture}
 

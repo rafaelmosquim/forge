@@ -733,6 +733,7 @@ with st.sidebar:
     stage_is_validation = (stage_role == "validation")
     stage_is_as_cast = stage_role in {"crude", "validation"}
     stage_is_after_cr = stage_role in {"after_cr", "post_cr"}
+    stage_is_pig_iron = (stage_role == "pig_iron")
     stage_is_finished = (stage_role == "finished") or (stage_key.lower() == "finished")
 
     stage_material_map = build_stage_material_map(descriptor)
@@ -1733,7 +1734,7 @@ if run_now:
             material_cost = float(getattr(out, "material_cost", 0.0) or 0.0)
 
             # 3) EF per ton FINISHED (apply yield ONLY if current stage is not Finished)
-            finished_for_metric = stage_is_finished or str(stage_key) in ("Finished", "Finished steel")
+            finished_for_metric = stage_is_finished or stage_is_pig_iron or str(stage_key) in ("Finished", "Finished steel")
             per_t_finished = raw_per_t if not finished_for_metric else (raw_per_t / max(fyield, 1e-9))
 
             # 4) Display

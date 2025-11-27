@@ -7,8 +7,8 @@ stage_menu:
     label: 'Validation (as cast)'
     description: 'Reference chain up to continuous casting.'
   - key: pig_iron
-    stage_id: PigIron
-    label: 'Pig iron'
+    stage_id: PigIronFoundryExit
+    label: 'Cast iron'
     description: 'Pig iron at ironmaking exit (Blast Furnace or Direct Reduction).'
   - key: crude
     stage_id: Cast
@@ -42,6 +42,8 @@ stages:
     material: 'Liquid Steel H'
   PigIronExit:
     material: 'Pig Iron (Exit)'
+  PigIronFoundryExit:
+    material: 'Cast Iron (Exit)'
   IngotExit:
     material: 'Ingot (Exit)'
   DirectExit:

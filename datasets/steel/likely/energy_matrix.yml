@@ -503,11 +503,11 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
-  "Iron Foundry":
-    Electricity: 1
+  "Iron Foundry (Exit)":
+    Electricity: 0
     FLF: 0
     RLF: 0
-    Gas: 0
+    Gas: 1
     Wood: 0
     Coal: 0
     Charcoal: 0

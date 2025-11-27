@@ -355,9 +355,9 @@
   outputs:
     Pig Iron: 1.0
 
-- process: Ship Pig Iron (Exit)
-  inputs:  { Pig Iron: 1.0 }
-  outputs: { Pig Iron (Exit): 1.0 }
+# - process: Ship Pig Iron (Exit)
+#   inputs:  { Pig Iron: 1.0 }
+#   outputs: { Pig Iron (Exit): 1.0 }
 
 - process: Iron Foundry (Exit)
   inputs:  { Pig Iron: 1.0 }

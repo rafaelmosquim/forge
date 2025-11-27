@@ -54,7 +54,7 @@ processes:
   "Pelletizing": 1.1
   "Blast Furnace": 13.0
   "Direct Reduction Iron": 10.0
-  "Iron Foundry": 0.0
+  "Iron Foundry (Exit)": 4.0
   "Electric Arc Furnace": 4.0
   "Basic Oxygen Furnace": 0.35
   "Regular Steel": ~

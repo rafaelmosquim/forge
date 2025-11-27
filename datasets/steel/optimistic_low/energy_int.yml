@@ -8,7 +8,8 @@ processes:
   "Burnt Lime Production": 6.61
   "Dolomite Production": 6.61
   "Blast Furnace": 12.00                   # Iron Oxide Reduction (BF coal/pig iron)
-  "Direct Reduction Iron": 9.00            # Redução do Óxido de Ferro (DRI)
+  "Direct Reduction Iron": 9.00  
+  "Iron Foundry (Exit)": 4.0       
   "Electric Arc Furnace": 2.10             # Secondary Steel Production (EAF/Scrap)
   "Basic Oxygen Furnace": 0.00             # Steel Production (BOF/Steel)
   "Iron Foundry": 0.0

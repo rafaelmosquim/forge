@@ -1,0 +1,1061 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{float}
+\usepackage{lmodern}
+\usepackage{geometry}
+\geometry{a4paper, margin=25mm}
+\usepackage{tabularx}
+\usepackage[numbers]{natbib} % or [authoryear]
+\bibliographystyle{plainnat} % or unsrtnat, abbrvnat, etc.
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath, amssymb}
+\usepackage{siunitx}
+\usepackage{threeparttable}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{adjustbox}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{listings}
+% Safe CO2e text macro (no \textsubscript needed)
+\newcommand{\COtwoe}{CO\(_2\)e}
+\newcommand{\COtwo}{CO\(_2\)}
+
+
+% Boundaries (steel mass units)
+\DeclareSIUnit{\tcs}{t_{\mathrm{cs}}}
+\DeclareSIUnit{\tfs}{t_{\mathrm{fs}}}
+\DeclareSIUnit{\ts}{t_{\mathrm{s}}}
+\DeclareSIUnit{\toem}{t_{\mathrm{oem}}}
+
+
+% Composite emissions unit
+\DeclareSIUnit{\tCOtwoe}{t\ \text{\COtwoe}}
+\DeclareSIUnit{\gCOtwoe}{g\ \text{\COtwoe}}
+
+% Money
+\DeclareSIUnit{\USD}{USD}
+\usepackage{mhchem} % for \ce{Fe2O3}, etc.
+\sisetup{
+  locale = US,
+  group-minimum-digits = 4,
+  group-separator = {\,},
+  per-mode = symbol
+}
+\lstset{basicstyle=\ttfamily\small,columns=fullflexible,breaklines=true,frame=single}
+
+\title{\textbf{FORGE: Flexible Optimization of Routes for GHG \& Energy}\\[2mm]
+\Large Methods \& Validation Note}
+\author{Rafael Mosquim\thanks{Universidade Estadual de Campinas (UNICAMP), Faculdade de Engenharia Mec\^anica. Corresponding author: \texttt{rmosquim@unicamp.br}} \and Coauthors}
+\date{September 12, 2025}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+FORGE is an open, YAML--driven model that computes cradle-to-gate energy use and greenhouse-gas emissions for steel under multiple routes (BF–BOF , DRI–EAF, EAF–scrap) and downstream options. The model integrates process recipes, energy-carrier shares and contents, electricity crediting for on-site utility plants, and scenario overrides. Route selection is scenario-locked; users specify stage boundaries (crude steel, finished steel). Verification includes mass/energy/elemental closure, unit tests for recipes and yields, and regression tests. Validation triangulates model outputs against published ranges for sections, hot-rolled coil, and hot-dip galvanized coil. Sensitivities (1-D) and Monte Carlo (multi-parameter) quantify uncertainty. We publish all code, inputs, and seeds for exact reproduction and provide a lightweight API for external studies.
+\end{abstract}
+
+\section{Introduction}
+
+Assessment of environmental impacts often rely on obscure, black-box, proprietary excel spreadsheets. This hinders some important things: first, it makes verification difficult. Second, reproduction is pretty much impossible. This paper will thoroughly detail the workings of a steel environmental impact model that tackles the problem, while making some more general science discussions. This is also at odds with a fundamental aspect of science: transparency and openness. Here, all functions, all inputs, all validations are open for scrutiny, and the code is freely available for use and improvements. 
+
+
+Steel LCIs and plant models are often opaque, non-parametric, or locked to proprietary datasets. FORGE addresses three gaps: (i) route transparency (explicit recipes and route configurations); (ii) boundary correctness (no double counting of internal electricity; clear co-product handling); and (iii) reproducibility (single-source YAML parameters; deterministic seeds; tests). The model supports comparative scenario analysis for technology choices, energy-intensity improvements, and electricity/gas EF changes, with country-specific electricity intensities. It is suitable for academic studies, policy sensitivity, and plant-level what-ifs.
+
+\subsection{Integrated modeling framework}
+
+FORGE tracks \emph{materials}, \emph{energy}, and \emph{capital} in one system:
+(i) 78 unit operations from ore prep to finishing,
+(ii) 44 tracked materials,
+(iii) explicit recovery loops (coke-oven gas, BF/BOF gas) and onsite utilities,
+(iv) configurable route graphs (BF–BOF, DRI–EAF, EAF-scrap) with energy carrier blend fractions,
+(v) boundary selection (crude, crude-liquid, finished, OEM), and
+(vi) a policy-ready scenario engine that swaps BFs for DRI at relining or end-of-life.
+
+Most steel studies (and many national roadmaps) compare options using partially aggregated intensities, implicit boundaries, or free-standing CAPEX/OPEX spreadsheets. Our framework (i) \emph{derives} energy purchases from mass and carrier splits, (ii) assigns \emph{indirects} (\ce{O2}/\ce{N2}, self-gen electricity) consistently, and (iii) computes emissions and costs from the same flow basis, so abatement and cost deltas are not boundary artifacts. The framework's computational implementation ensures that these methodological advantages are preserved through structured code rather than error-prone spreadsheet calculations. Contrasts are summarized in Table~\ref{tab:model_contrast}. 
+
+\begin{itemize}
+  \item \textbf{Apples-to-apples} route comparison at any reporting boundary (cs/fs/as).
+  \item \textbf{Locked} mass/energy/emission consistency—no mixing plant averages with route averages.
+  \item \textbf{Policy-legible} outputs: intensity, CAC, cumulative emissions, and capacity paths driven by realistic BF life cycles.
+  \item \textbf{Reusability}: FORGE is country-agnostic.
+\end{itemize}
+
+The FORGE yields route emission intensities in any desired configurations. Energy and mass requirements for each route feed the cost layer for CAC, and drives the BF phase-out simulator for cumulative emissions and capacity trajectories. Complete inputs and code are available in the Zenodo release (see §Data availability), and a more detailed explanation of the main model is given in~\ref{app:model}.
+
+
+\subsection{Computational Implementation}
+
+FORGE represents a methodological transition from spreadsheet-based approaches to structured computational frameworks. The implementation comprises 2,500+ lines of Python code across three modular components: (i) a core calculation engine (\texttt{steel\_model\_core.py}) handling mass-energy balances and process gas recovery, (ii) a configuration layer using YAML for reproducibility and scenario management, and (iii) a Streamlit-based interface (\texttt{streamlit\_app.py}) for interactive scenario exploration. This architecture enables version control, uncertainty propagation, and computational scalability that were infeasible in the original Excel prototype, while maintaining full transparency through open-source release.
+
+The transition from Excel to Python was completed in two months using AI-assisted development. Large Language Models (LLMs) accelerated routine coding tasks, while the authors maintained full supervisory control through iterative validation: each Python module was cross-validated against the original Excel prototype, ensuring computational equivalence before extending functionality. This hybrid approach combined AI productivity gains with rigorous methodological consistency.
+
+This architecture enables version control, uncertainty propagation, and computational scalability that were infeasible in the original Excel prototype, while maintaining full transparency through open-source release.
+
+\begin{table}[H]
+\centering
+\caption{How this framework differs from common approaches in the literature}
+\label{tab:model_contrast}
+\begin{tabularx}{\linewidth}{>{\RaggedRight\arraybackslash}X >{\RaggedRight\arraybackslash}X >{\RaggedRight\arraybackslash}X}
+
+\toprule
+\textbf{Dimension} & \textbf{Typical approach} & \textbf{This work} \\
+\midrule
+System boundary & Often implicit or crude-steel only; downstream steps omitted or averaged & Explicit selectable boundaries with downstream steps (refining, forming, losses) included \\
+Mass/energy basis & Aggregated energy intensities per route & Unit-operation recipes $\rightarrow$ plant energy matrix $\rightarrow$ net purchases \\
+Process gases \& self-gen & Treated as average credits or ignored & Explicit gas recovery to onsite utilities; blended electricity EF (self-gen + grid) \\
+Route graph & Fixed route, fixed blends & Parallel paths with user-set blends (sinter/pellet/lump; BF vs.\ DRI; BOF vs.\ EAF) \\
+Fuel switching & Applied as static EF swaps & Applied to carrier splits and prices; propagates to emissions \emph{and} OPEX \\
+Cost layer & Standalone spreadsheets & Same flows power CAPEX/OPEX $\rightarrow$ CAC, consistent with emissions \\
+Capital stock & Exogenous capacity shares & BF inventory with relining/end-of-life logic; DRI substitution rules \\
+Uncertainty & Point estimates & Min/avg/max bands propagated to figures and tables \\
+Openness & Partial spreadsheets with opaque logic and calculations & Full inputs/code released (Zenodo) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+
+
+
+\clearpage
+
+\section{Software Architecture and Design Rationale}
+
+\subsection{Three-Tier Architecture}
+
+FORGE implements a three-tier architecture that separates computational logic from user interaction and data management (Figure~\ref{fig:architecture}):
+
+\begin{itemize}
+\item \textbf{Computational Core}: Pure mathematical engine for mass-energy balances and emissions calculations
+\item \textbf{API Service Layer}: Mediates between UI and core, ensuring data validation and computational consistency  
+\item \textbf{Presentation Layer}: Streamlit-based interface for interactive scenario exploration
+\end{itemize}
+
+This separation enables domain experts to modify scenarios without programming expertise while maintaining computational integrity through the validated core engine.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\linewidth]{architecture.png}
+\caption{FORGE three-tier architecture separating computational logic, service orchestration, and user interaction}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{Configuration-Driven Design}
+
+A key design principle was \emph{configuration-driven computation}, where all modifiable parameters reside in YAML files rather than hard-coded values. This approach:
+
+\begin{itemize}
+\item Enables steel production experts to modify assumptions without programming knowledge
+\item Supports version control and reproducibility of scenario definitions
+\item Allows hierarchical configuration (base parameters + scenario overrides)
+\item Facilitates uncertainty analysis through parameter sets (min/likely/max)
+\end{itemize}
+
+The YAML schema was chosen over alternatives (JSON, XML) for its human-readability, commenting capability, and hierarchical structure that matches how steel engineers organize process parameters.
+
+\subsection{Deterministic Route Resolution}
+
+Production routes are resolved using graph traversal algorithms that:
+\begin{itemize}
+\item Start from user-selected final product and traverse upstream
+\item Resolve ambiguous producers through explicit user choices
+\item Ensure mass balance closure at each process step
+\item Maintain computational determinism for reproducible results
+\end{itemize}
+
+This approach mirrors industrial practice where material flows are traced through process networks, ensuring physical plausibility of all calculated routes.
+
+\subsection{API Design for Computational Integrity}
+
+The API layer implements data contracts using Python dataclasses to ensure:
+\begin{itemize}
+\item Type safety and validation before computational execution
+\item Clear separation between user inputs and calculated outputs  
+\item Consistent error handling and data serialization
+\item Future extensibility for additional interfaces (REST API, batch processing)
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption=Data contracts ensure computational integrity]
+@dataclass
+class ScenarioInputs:
+    country_code: Optional[str]     # Electricity EF country
+    scenario: Dict[str, Any]        # Full scenario configuration
+    route: RouteConfig              # Production route specification
+
+@dataclass  
+class RunOutputs:
+    production_routes: Dict[str, int]  # Enabled processes
+    energy_balance: pd.DataFrame       # MJ by process and carrier
+    emissions: pd.DataFrame            # CO2e by process
+    total_co2e_kg: Optional[float]     # Aggregate result
+\end{lstlisting}
+
+
+\section{Methodological Innovations}
+
+\subsection{Excel-to-Python Translation Framework}
+
+The transition from Excel to Python followed a systematic methodology:
+
+\begin{enumerate}
+\item \textbf{Algorithm Identification}: Extraction of computational logic from spreadsheet formulas and macros
+\item \textbf{Data Flow Mapping}: Tracing of parameter dependencies and calculation sequences  
+\item \textbf{Unit Validation}: Cross-verification of each Python function against Excel calculations
+\item \textbf{System Integration}: Assembly of validated components into cohesive architecture
+\end{enumerate}
+
+This process ensured computational equivalence while enabling enhancements infeasible in spreadsheets (version control, uncertainty propagation, API access).
+
+\subsection{Process Gas Accounting System}
+
+FORGE implements a novel approach to process gas recovery and internal electricity crediting:
+
+\begin{itemize}
+\item \textbf{Avoids Double Counting}: Process gas carbon attributed to electricity generation, not original processes
+\item \textbf{Fixed Reference Basis}: Internal electricity share determined from standardized reference case
+\item \textbf{Transparent Allocation}: Clear methodology for gas-to-electricity conversion efficiencies
+\item \textbf{Configurable Recovery}: Recovery rates exposed as parameters for sensitivity analysis
+\end{itemize}
+
+This systematic approach prevents common accounting errors in industrial energy modeling.
+
+\subsection{Design for Domain Expert Accessibility}
+
+The architecture prioritizes accessibility for steel production experts through:
+
+\textbf{Progressive Disclosure of Complexity}: Simple UI choices (route selection, stage boundaries) mask complex process graph resolution automatically handled by the computational core.
+
+\textbf{Configuration over Code}: All process parameters, energy intensities, and emission factors modifiable via YAML files without programming knowledge.
+
+\textbf{Deterministic Results}: Same inputs always produce identical outputs, enabling reproducible scenario analysis and policy comparison.
+
+\subsection{Computational Advantages over Spreadsheet Implementation}
+
+The Python implementation enables capabilities impossible in the original Excel prototype:
+
+\begin{itemize}
+\item \textbf{Version Control}: Track parameter changes and scenario evolution
+\item \textbf{Uncertainty Propagation}: Native support for parameter distributions and Monte Carlo analysis  
+\item \textbf{Computational Scalability}: Efficient handling of complex scenario trees and sensitivity analyses
+\item \textbf{API Access}: Programmatic interface for integration with other models and data systems
+\item \textbf{Validation Framework}: Automated testing of mass/energy balance closure and boundary conditions
+\end{itemize}
+
+\section{Model Overview}
+The fundamental parameter inputs are the unitary mass recipes for each production process. Auxiliary inputs are energy intensities and energy matrices for these processes. Complementary parameters  are emission factors for all energetics used. All parameters are modeled to have minimum (best-case), likely and maximum (worst-case) values. Some important parameters are dynamic and can be modified in sensitivity analysis. These inputs are listed below:
+
+\subsection{Inputs}
+\begin{itemize}[leftmargin=1.5em]
+  \item \texttt{recipes.yml},
+  \item \texttt{energy\_int.yml},  
+  \item \texttt{energy\_matrix.yml}, 
+  \item \texttt{energy\_content.yml}, 
+    \item \texttt{emission\_factors.yml},
+      \item \texttt{parameters.yml},
+   \item \texttt{process\_emissions.yml},
+   \item \texttt{mkt\_config.yml},
+  \item \texttt{data/scenarios/*.yml}
+\end{itemize}
+
+Note: there is one data-folder for each set of parameters. This will be updated for better data-handling and efficiency. 
+
+\subsection{Core Computation}
+
+The main calculation is demand-driven via mass recipes, working backwards from the user-selected product (Cast Steel, Finished Steel) until raw-material input is reached upstream in plant-boundary. For example, to produce \SI{1}{\kilogram} of Pig Iron, \SI{0.075}{\kilogram} of \ce{N2}, \SI{0.080}{\kilogram} of \ce{O2}, iron ore (lump ore), sinter and pellet are needed. To produce \SI{1}{\kilogram} of sinter, \SI{0.140}{\kilogram} of limestone, as well as iron ore, are needed. Table~\ref{tab:process_recipes} shows the recipe logic.
+
+If a process has multiple possible producers (i.e. producing nitrogen within plant, or market purchase), the ambiguity is resolved by user selection in the model's interface. When the material production is completed, the model outputs production runs for every process . These runs are then multiplied by their per-run energy intensities. This energy use is then rationed by energy carrier, via energy matrices. Lastly, per-carrier energy demand is computed, and appropriate emission factors are applied to reach final emission intensity. Demand is set fixed at 1000 kg of final desired product, to ensure consistency with emission factors.
+
+
+\begin{table}[h]
+\centering
+\caption{Ironmaking sub-system: sample mass recipes (per \SI{1}{t} output)}
+\label{tab:process_recipes}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+ & \textbf{Iron Ore (market)} & \textbf{Sintering} & \textbf{Pelletizing} & \textbf{Blast Furnace} \\
+\midrule
+\textbf{Inputs} & & & & \\
+\quad Iron ore             & 1.000 & $k_s$ & $k_p$ & $F\,\phi_l$ \\
+\quad Limestone            & —     & 0.140 & 0.065 & 0.040 \\
+\quad Burnt lime           & —     & —     & 0.100 & — \\
+\quad Nitrogen             & —     & —     & —     & 0.075 \\
+\quad Oxygen               & —     & —     & —     & 0.080 \\
+\quad Sinter               & —     & —     & —     & $F\,\phi_s$ \\
+\quad Pellet               & —     & —     & —     & $F\,\phi_p$ \\
+\midrule
+\textbf{Outputs} & & & & \\
+\quad Sinter               & —     & 1.000 & —     & — \\
+\quad Pellet               & —     & —     & 1.000 & — \\
+\quad Pig iron             & —     & —     & —     & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Parameters:
+\begin{align*}
+k_s &= \frac{w_s}{w_l} = \frac{0.80}{0.879} \approx 0.910,
+& k_p &= \frac{w_p}{w_l} = \frac{0.90}{0.879} \approx 1.024, \\
+F &= \frac{1}{\alpha}\,\frac{w_l}{D}, 
+& D &= \phi_s w_s + \phi_p w_p + \phi_l w_l, \\
+w_s &= \text{mass fraction of }\ce{Fe2O3}\text{ in sinter} = 0.80, \\
+w_p &= \text{mass fraction of }\ce{Fe2O3}\text{ in pellets} = 0.90, \\
+w_l &= \text{mass fraction of }\ce{Fe2O3}\text{ in lump ore} = 0.879, \\
+\alpha &= \text{iron content in iron ore} = 0.615, \\
+\phi_s,\phi_p,\phi_l &= \text{sinter/pellet/lump blend ratios at the BF charge.}
+\end{align*}
+
+
+\subsection{Route Control}
+
+The three main routes are modeled, with respective scenario configuration files. These files force some ambiguity choices, guaranteeing consistency. For example, the BF–BOF  scenario file disables the DRI and EAF from the ambiguous producers. The scrap EAF configuration file forces EAF feed to be \SI{100}{\percent} scrap, not a mixture of pig iron and scrap, default in the BF–BOF  route, for example. 
+
+
+\subsection{Boundaries}
+System boundaries can be selected by the user, but three main presets are available: Liquid steel sets boundary after the BOF-EAF. Crude steel boundary is just after continuous casting. Finished lets users select optional downstream processing such as Hot Rolling. Upstream material inputs, such as coke, nitrogen or oxygen, can be selected to be produced within the mill, or purchased from the market. Optional downstream steel treatments are included, and again user-selected. 
+
+The model uses subscripts to define boundary: 
+
+\begin{itemize}
+  \item \textbf{Crude steel (cs)}: Semi-finished steel \emph{after} continuous casting (as-cast). Unit: \si{\tcs}.
+    \item Crude liquid steel: includes crude steel emissions, plus \ce{O2} and \ce{N2} onsite production, raw material freight emissions and alloying. 
+  \item \textbf{Finished steel (fs)}: Rolled steel after hot rolling (flat) or bar/rod (long); excludes post-forming and surface finishing. Unit: \si{\tfs}.
+  \item \textbf{Steel at OEM (oem)}: Finished steel \emph{plus} post-forming and surface finishing, including processing losses and shipping to the OEM. Unit: \si{\toem}.
+\end{itemize}
+
+
+\subsection*{Boundary alignment with the Streamlit app}
+The current Streamlit build exposes a single “Finished steel” option that includes post-forming and surface finishing; i.e., it corresponds to \emph{Steel at OEM (oem)} in this paper.
+
+\begin{table}[h]
+\centering
+\caption{Boundary mapping: paper vs. app}
+\label{tab:boundary_mapping}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Paper/Zenodo boundary & Unit example & App label (current) \\
+\midrule
+Crude steel (cs, as-cast) & \(\si{\tCOtwoe\per\tcs}\) & “Crude steel” \\
+Finished (fs)           & \(\si{\tCOtwoe\per\tfs}\)  & (not exposed separately) \\
+Steel at OEM (oem)      & \(\si{\tCOtwoe\per\toem}\) & “Finished steel” \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The Validation product option uses the same downstream configurations as Crude Steel, but locks upstream choices. This is done to eliminate possible ambiguity in reproducibility.
+
+
+\subsection{Uncertainty}
+
+The complexity of the production process calls for parameter malleability. In the sidebar, the user can select three main data-sets: likely, optimistic (low) and pessimistic (high). Also there is the choice of grid electricity emission factors (2024 values) for the 10 main steel producers. Two more options are possible in the "Sensitivity" and "Static mods" tabs in the UI. The first is to allow One-dimensional sweeps for the most important parameters, such as Blast Furnace energy intensity for the BF–BOF, or DRI and EAF for the DRI-EAF and scrap-EAF route. The user can also set the scrap percentage used as input in BOF or EAF, in the primary route. The last parameter is grid electricity, with lower, median and higher value from the data-set mentioned above. This section can be further expanded for more parameters, but main objective for this version is test model robustness and response to parameter variation. 
+
+These parameters can be varied simultaneously in a basic Monte Carlo run. Again, main concern is to ensure model responds well to variation. This section can be expanded by running Monte Carlo with all parameters in the three main data-sets. 
+
+\subsubsection{Gas recovery and internal electricity production}
+
+The model allows recovery of coke-oven gas (COG), blast-furnace gas (BFG) and basic-oxygen-furnace gas (BOFG). Recovery shares for each process are set in the \texttt{parameters.yml} configuration file. In the current version, all recovered gas is routed to an on-site utility plant that converts it to electricity at a fixed efficiency of \SI{34}{\percent} (LHV basis). No electricity export is modeled. This simplification replaces the multiple real-world uses of process gas (direct firing, steam generation, or power/CHP). Future releases will expose routing and CHP options, but here a single sink (power) is used to avoid allocation choices across heat and power.
+
+The plant’s electricity emission factor is computed as a fixed blend of on-site generation and grid purchases. To avoid circularity, we proceed in two steps: 
+\begin{enumerate}
+  \item run a reference ``average'' plant with an average product basket and the chosen recovery shares; record total electricity demand $E_{\text{tot}}$ and the implied shares of on-site and grid electricity, $\alpha_{\text{int}}$ and $\alpha_{\text{grid}} = 1-\alpha_{\text{int}}$;
+  \item hold $\alpha_{\text{int}}$ fixed for all subsequent scenarios/boundaries and compute a constant electricity emission factor
+  \[
+    \mathrm{EF}_{\text{elec}} = \alpha_{\text{int}} \, \mathrm{EF}_{\text{int}} + \alpha_{\text{grid}} \, \mathrm{EF}_{\text{grid}}.
+  \]
+\end{enumerate}
+
+
+This definition ensures that the carbon in process gas is credited to the electricity block and not double counted in other fuel uses. The \SI{34}{\percent} conversion efficiency is a fixed parameter representing a simple boiler/turbine equivalent; it does not capture load-dependent heat rates or CHP operation. Because many mills use BFG/COG primarily for heat, this ``all-to-power'' routing may overstate on-site electricity and understate direct fuel firing; the net bias depends on the grid factor. We therefore keep the blend fixed across boundaries to maintain consistency and recommend sensitivity tests over the efficiency and recovery shares.
+
+\subsubsection{Gas recovery and internal electricity production (as implemented)}
+
+
+
+\paragraph{Reference run and fixed blend.}
+We fix the plant-wide split between on-site electricity and grid purchases from a deterministic
+reference chain that ends after Cold Rolling. In that run we compute:
+(i) the in-mill electricity demand, $E_{\text{elec,inside}}^{\text{ref}}$ (MJ), as the sum of
+``Electricity'' consumed by all in-mill processes; and
+(ii) the process-gas potential, in MJ, from (a) coke-oven gas and (b) blast-furnace top-gas:
+\[
+G_{\text{COG}}^{\text{ref}}=\text{runs}_{\text{Coke}}\times
+\text{COG}_{\text{per run}}\,,\qquad
+G_{\text{BF}}^{\text{ref}}=(I_{\text{BF}}^{\text{adj}}-I_{\text{BF}}^{\text{base}})
+\times \text{runs}_{\text{BF}}\,,
+\]
+where $I_{\text{BF}}^{\text{base}}$ and $I_{\text{BF}}^{\text{adj}}$ are, respectively, the base and
+process-gas–adjusted BF energy intensities read/derived in the model. The net electricity that the
+utility island could produce in this reference plant is
+\[
+E_{\text{int,pot}}^{\text{ref}}=\eta_{\text{el}}\,
+\bigl(G_{\text{COG}}^{\text{ref}}+G_{\text{BF}}^{\text{ref}}\bigr),
+\]
+with a fixed conversion efficiency $\eta_{\text{el}}=0.34$ (LHV basis), taken from the
+\texttt{Utility Plant} recipe output \texttt{Electricity} per MJ of gas.
+
+We then define and \emph{freeze} the internal share
+\[
+f_{\text{int}}=\min\!\left(1,\;
+\frac{E_{\text{int,pot}}^{\text{ref}}}{E_{\text{elec,inside}}^{\text{ref}}}\right),
+\]
+and use this same $f_{\text{int}}$ for all user boundaries/scenarios.
+For any present run, the blended plant electricity emission factor is
+\[
+\mathrm{EF}_{\text{elec,plant}}=f_{\text{int}}\,\mathrm{EF}_{\text{int}}
++(1-f_{\text{int}})\,\mathrm{EF}_{\text{grid}},
+\]
+and the in-mill electricity credited as ``internal'' is
+$E_{\text{int,used}}=f_{\text{int}}\;E_{\text{elec,inside}}^{\text{present}}$.
+
+\paragraph{Internal electricity EF (proxy used in code).}
+The model computes $\mathrm{EF}_{\text{int}}$ from a \emph{fuel-share proxy} of upstream energy
+burdens in the reference run. Specifically, it forms a carrier-EF for coke-making and for the BF by
+excluding Electricity from each unit's energy-share vector and averaging the carrier emission
+factors by those shares:
+\[
+\mathrm{EF}_{\text{COG}}=
+\frac{\sum_{c\neq \text{Electricity}} s_{\text{Coke},c}\,\mathrm{EF}_c}
+{\sum_{c\neq \text{Electricity}} s_{\text{Coke},c}},\qquad
+\mathrm{EF}_{\text{BFgas}}=
+\frac{\sum_{c\neq \text{Electricity}} s_{\text{BF},c}\,\mathrm{EF}_c}
+{\sum_{c\neq \text{Electricity}} s_{\text{BF},c}}.
+\]
+It then weights these two numbers by the \emph{reference} gas MJ volumes:
+\[
+\mathrm{EF}_{\text{proc-gas}}^{\text{ref}}=
+\frac{\mathrm{EF}_{\text{COG}}\,G_{\text{COG}}^{\text{ref}}
+      +\mathrm{EF}_{\text{BFgas}}\,G_{\text{BF}}^{\text{ref}}}
+     {G_{\text{COG}}^{\text{ref}}+G_{\text{BF}}^{\text{ref}}},
+\]
+and sets
+\[
+\mathrm{EF}_{\text{int}}=\frac{\mathrm{EF}_{\text{proc-gas}}^{\text{ref}}}{\eta_{\text{el}}}.
+\]
+
+\paragraph{Scope and limitations (important).}
+This implementation is intentionally simple and \emph{attributional}. It:
+(i) does \textbf{not} add an explicit combustion term for the carbon in process gas;
+(ii) does \textbf{not} include gas-cleaning/compression auxiliaries or fugitives; and
+(iii) does \textbf{not} reallocate upstream burdens away from coke/BF into the electricity block.
+As a result, $\mathrm{EF}_{\text{int}}$ should be read as a consistent \emph{proxy} derived from
+upstream energy carriers, and some upstream burdens remain accounted at their originating units.
+In the current version, BOF gas is only included if present in the recipes; otherwise it is ignored.
+Future releases will (a) expose gas routing/CHP, and (b) optionally switch to a combustion\,+\,aux
+definition with explicit upstream allocation to avoid any double counting.
+ 
+
+\section{Model Validation}
+
+The intent of this section is to demonstrate the model's robustness, not reproduction. As such, the main objective is to show that the model responds consistently to parameter variation, and so avoid overfitting. 
+
+To reproduce results in this section, the Validation (as cast) product option was selected. This choice resolves ambiguous producers beforehand, to make reproductions explicit. This configuration uses the same selections used as Crude Steel, thus plant boundary is set just after continuous casting. For upstream options, all material inputs (i.e. nitrogen, oxygen, burnt lime and dolomite) are purchased, except coke, which is produced on-site. 
+
+Table~\ref{tab:emissions_routes} shows cradle-to-gate emissions for the three main routes across the three data sets, alongside Worldsteel’s 2023 values for reference~\cite{worldsteel_2023_routes}. Given the sector’s complexity and the large number of variables involved, these values should be interpreted as indicative rather than as an attempt at exact reproduction. As the results are obtained using Brazilian electricity grid values, and considering that the Scrap-EAF is highly dependent on this number, results for USA and China grids are also shown, in the table's footnotes. 
+
+\begin{table}[h]
+\caption{Cradle-to-gate emissions by route (\si{\tCOtwoe\per\tcs}).}
+\label{tab:emissions_routes}
+\centering
+\sisetup{
+  output-decimal-marker = {.},
+  group-minimum-digits = 4,
+  group-separator = {\,},
+  round-mode = places,
+  round-precision = 2
+}
+\begin{threeparttable}
+\begin{tabular}{@{}l S[table-format=1.3] S[table-format=1.3] S[table-format=1.3] S[table-format=1.2]@{}}
+\toprule
+\textbf{Route} & \textbf{Min} & \textbf{Likely} & \textbf{Max} & \textbf{Worldsteel 2023} \\
+\midrule
+BF–BOF     & \num{1.815} & \num{2.216} & \num{2.609} & \num{2.32} \\
+DRI–EAF    & \num{0.803} & \num{0.971} & \num{1.217} & \num{1.43} \\
+EAF–Scrap  (Brazil grid) & \num{0.117} & \num{0.208} & \num{0.332}\tnote{a} & \num{0.70} \\
+EAF–Scrap  (United States grid) & \num{0.240} & \num{0.434} & \num{0.699}\tnote{a} & \num{0.70} \\
+EAF–Scrap  (China grid) & \num{0.329} & \num{0.597} & \num{0.963}\tnote{a} & \num{0.70} \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item[a] Grid intensity for Brazil, United States and China are, respectively, \SIlist{138.6;383.5;559.5}{\gCOtwoe\per\kilo\watt\per\hour}. \SI{1}{\kilo\watt\hour} = \SI{3.6}{\mega\joule}. Grid intensity values from \cite{owid_electricity_mix}.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+Table~\ref{tab:1d} reports results for individual parameter sensitivities. In this case, only one parameter is varied at a time, in order to capture specific effects that might be masked when all parameters are changed simultaneously.
+
+\begin{table}[h]
+  \centering
+    \caption{Parameter sensitivities}
+  % For comma decimals add: \sisetup{output-decimal-marker={,}}
+\sisetup{
+  output-decimal-marker = {.},
+  group-minimum-digits = 4,
+  group-separator = {\,},
+  round-mode = places,
+  round-precision = 2
+}
+  \begin{tabular}{@{} l r r r @{}}
+    \toprule
+    \textbf{Parameter} & \textbf{Min} & \textbf{Likely} & \textbf{Max} \\
+    \midrule
+    BF base energy intensity (\si{\giga\joule\per\tonne}) & \num{11.0} & \num{13.0} & \num{15.0} \\
+    \emph{Emissions (\si{\tCOtwoe\per\tcs})} & \num{1.938} & \num{2.216} & \num{2.497} \\
+    \addlinespace
+    BOF scrap share (\si{\percent}) & \num{0.0} & \num{0.1} & \num{0.2} \\
+    \emph{Emissions (\si{\tCOtwoe\per\tcs})} & \num{2.038} & \num{2.293} & \num{2.550} \\
+    \addlinespace
+    Grid electricity intensity (\si{\gCOtwoe\per\mega\joule}) & \num{38.50} & \num{124.85} & \num{197.76} \\
+    \emph{Emissions (\si{\tCOtwoe\per\tcs})} & \num{2.216} & \num{2.304} & \num{2.377} \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:1d}
+\end{table}
+
+Lastly, a simple Monte Carlo run is made for the BF-BOF route, varying all the parameters in Table~\ref{tab:1d} simultaneously. For model configuration, 500 samples were selected, and the random seed number is 42. Results are shown in Figure~\ref{fig:monte_carlo}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.75\linewidth]{mc_bf.png}
+    \caption{Monte Carlo runs for BF-BOF route}
+    \label{fig:monte_carlo}
+\end{figure}
+
+Lastly, Table~\ref{tab:downstream_deltas} gives the contribution of each possible processing downstream of hot-rolling. Again, all runs are for the likely data-set, with Brazilian grid. 
+
+\begin{table}[h]
+\caption{Cradle-to-gate emissions by route (\si{{\tCOtwoe}\per\ts}).}
+\label{tab:downstream_deltas}
+\centering
+\sisetup{
+  output-decimal-marker = {.},
+  group-minimum-digits = 4,
+  group-separator = {\,},
+  round-mode = places,
+  round-precision = 2
+}
+\begin{threeparttable}
+\begin{tabular}{@{}l S[table-format=1.3] S[table-format=1.3]@{}}
+\toprule
+\multicolumn{1}{@{}l}{Route / Option} & {\makebox[0pt][c]{Emissions}} & {$\Delta$ vs baseline} \\
+\multicolumn{1}{@{}l}{} & {\si{{\tCOtwoe}\per\ts}} & {\si{{\tCOtwoe}\per\ts}} \\
+\midrule
+Regular (baseline) & 2.455 & {} \\
+Low                 & 3.239 & 0.784 \\
+High                & 6.644 & 4.189 \\
+\addlinespace
+Cold Rolling        & 2.585 & 0.130 \\
+Rod Bar             & 2.503 & 0.048 \\
+\addlinespace
+Casting             & 2.528 & 0.073 \\
+Stamping            & 2.526 & 0.071 \\
+Machining           & 2.500 & 0.045 \\
+\addlinespace
+Hot Dip             & 2.620 & 0.165 \\
+Electrolytic        & 2.758 & 0.303 \\
+Coating             & 2.511 & 0.056 \\
+\bottomrule
+\end{tabular}
+\end{threeparttable}
+\end{table}
+
+
+
+\section{Reproducibility Capsule}
+\subsection{Suggested Repository Layout}
+\begin{lstlisting}
+forge/
+  steel_core_api_v2.py
+  streamlit_app.py
+  data/
+    energy_int.yml
+    electricity_intensity.yml
+    energy_matrix.yml
+    energy_content.yml
+    emission_factors.yml
+    parameters.yml
+    process_emissions.yml
+    recipes.yml
+    mkt_config.yml
+    scenarios/
+  LICENSE
+  CITATION.cff
+  README.md
+\end{lstlisting}
+
+
+
+\section{Software Metadata}
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Versioning}: Semantic (v1.0.0 = paper release).
+  \item \textbf{License}: MIT
+  \item \textbf{Dependencies}: Python $\geq$ 3.10; \texttt{pandas}, \texttt{numpy}, \texttt{pyyaml}, \texttt{streamlit}, \texttt{plotly}/\texttt{matplotlib}.
+  \item \textbf{OS}: Platform-agnostic.
+  \item \textbf{Funding \& Acknowledgments}: 
+First author would like to thank the funding from \textit{Fundação de Desenvolvimento da Pesquisa} (FUNDEP), Project 27192*57 - Linha V Mover ''Do berço ao Portão''.
+\end{itemize}
+
+\section{Known Limitations}
+Background datasets (electricity/gas EFs) affect absolute levels; we provide country-specific electricity intensities and allow overrides. Worldsteel's proprietary backgrounds cannot be exactly replicated; we compare to \emph{ranges} and report non-renewable biomass (NRB) separately. Downstream finishing outside the steel-mill boundary is configurable; defaults are conservative.
+
+\section{Ethical \& Transparency Statement}
+We publish inputs, code, and tests under an OSI license; include seeds and snapshots for exact replication; and separate methodological choices (recycling credits) from process performance.
+
+For exact reproducibility of this work (v1.0.0):  
+Mosquim R., \emph{FORGE: Flexible Optimization of Routes for GHG \& Energy} (v1.0.0), Methods \& Validation Note, 2025. Zenodo. DOI: \textbf{10.5281/zenodo.17192803}.
+
+For general citation (latest version):  
+Mosquim R., \emph{FORGE: Flexible Optimization of Routes for GHG \& Energy}, Zenodo. DOI: \textbf{10.5281/zenodo.17145189}.
+
+
+\subsection*{Bib\TeX}
+\begin{lstlisting}
+@software{forge_v1_2025,
+  title     = {FORGE: Flexible Optimization of Routes for GHG & Energy Methods & Validation Note},
+  author    = {Mosquim, Rafael and Coauthors},
+  year      = {2025},
+  version   = {1.0.0},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.17192803}
+}
+
+@software{forge_latest,
+  title     = {FORGE: Flexible Optimization of Routes for GHG & Energy},
+  author    = {Mosquim, Rafael and Coauthors},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.17145189}
+}
+
+\end{lstlisting}
+
+\clearpage
+\appendix
+\section{YAML Schema}
+
+This section details the main configuration files used in the model. 
+
+\begin{itemize}[leftmargin=1.5em]
+    \item \texttt{recipes.yml}: mass coefficients per \emph{1.0 unit of process output}; some coefficients are symbolic and derived from parameters.
+  \item \texttt{energy\_int.yml}: \si{\giga\joule} per unit (tonne) product per process (not per mass of steel produced).
+  \item \texttt{electricity\_intensity.yml}: Stores values in \si{\gCOtwoe\per\mega\joule};\\ tables may display \si{\gCOtwoe\per\kilo\watt\per\hour} for convenience only;
+  \item \texttt{energy\_matrix.yml}: shares by carrier per process; must sum to 1.0;
+  \item \texttt{energy\_content.yml}: \si{\giga\joule\per\tonne} for each energy carrier.
+  \item \texttt{emission\_factors.yml}: \si{\gCOtwoe\per\mega\joule} by energy carrier.
+  \item \texttt{parameters.yml}: process-gas yields in the Blast Furnace and Coke factory; iron content in iron ore; ferrous content in iron ore, sinter and pellet; percentages of lump ore, sinter and pellet charged; 
+  \item \texttt{process\_emissions.yml}: process emissions (\si{\gCOtwoe\per\mega\joule}) for materials used in the mill, but purchased from the market.
+   \item \texttt{mkt\_config.yml}: simple binary file for market (=1) and within mill process (=2). 
+  \item \texttt{data/scenarios/*.yml}: configuration files for each scenario; main functions are to disable ambiguous producer options, change energy carrier (coal for charcoal); iron ore characteristics and specific recipes.
+\end{itemize}
+
+\clearpage
+\section{Main data-sets used in the model}
+
+
+
+\begin{table}[h]
+\centering
+\small
+\caption{Energy intensities by process (Min, Likely, Max). All values in \si{\giga\joule\per\tonne} of process output. }
+\label{tab:Z1_energy_intensities}
+\begin{threeparttable}
+\begin{tabular}{@{}l S[table-format=3.2] S[table-format=3.2] S[table-format=3.2]@{}}
+\toprule
+\textbf{Process} & {\textbf{Min.}} & {\textbf{Likely}} & {\textbf{Max.}} \\
+\midrule
+Basic Oxygen Furnace & 0.00 & 0.35 & 0.58 \\
+Blast Furnace & 12.00 & 13.00 & 14.00 \\
+Burnt Lime Production & 6.61 & 6.61 & 6.61 \\
+Casting/Extrusion/Conformation & 1.00 & 1.00 & 1.00 \\
+Coke Production & 5.68 & 6.54 & 7.36 \\
+Cold Rolling & 1.00 & 1.10 & 2.00 \\
+Continuous Casting & 0.20 & 0.25 & 0.40 \\
+Direct Reduced Iron (DRI) & 9.00 & 10.00 & 11.00 \\
+Dolomite Production & 6.61 & 6.61 & 6.61 \\
+Electric Arc Furnace & 2.10 & 4.00 & 6.50 \\
+Electrolytic Metal Coating & 4.00 & 4.60 & 5.00 \\
+Hot Dip Metal Coating & 2.00 & 2.50 & 3.00 \\
+Hot Rolling & 2.00 & 2.50 & 3.00 \\
+Ingot Casting & 0.00 & 0.00 & 0.00 \\
+Iron Foundry & 0.00 & 0.00 & 0.00 \\
+Machining & 1.00 & 1.16 & 1.30 \\
+Nitrogen Production & 4.80 & 4.94 & 5.30 \\
+Organic or Synthetic Coating (painting) & 1.00 & 1.00 & 1.00 \\
+Oxygen Production & 4.40 & 4.50 & 4.69 \\
+Pelletizing & 0.98 & 1.10 & 1.77 \\
+Rod/bar/section Mill & 2.00 & 3.00 & 5.00 \\
+Sintering & 1.56 & 2.00 & 2.20 \\
+Stamping/calendering/lamination & 1.50 & 1.84 & 2.00 \\
+Steel Refining (High Alloy) & 3.00 & 6.50 & 7.00 \\
+Steel Refining (Low Alloy) & 3.00 & 6.50 & 7.00 \\
+Steel Thermal Treatment & 1.50 & 2.00 & 3.00 \\
+\bottomrule
+\end{tabular}
+\end{threeparttable}
+\end{table}
+
+\begin{table}[h]
+\centering
+\small
+\caption{Energy carrier shares by process}
+\label{tab:Z2_energy_matrix}
+\begin{threeparttable}
+\begin{tabular}{@{}l
+S[table-format=1.2]
+S[table-format=1.2]
+S[table-format=1.2]
+S[table-format=1.2]@{}}
+\toprule
+Process & {Electricity} & {Gas} & {Coal} & {Coke} \\
+\midrule
+Electricity Production & 0.00 & 1.00 & 0.00 & 0.00 \\
+Coke Production & 0.01 & 0.00 & 1.00 & 0.00 \\
+Nitrogen Production & 1.00 & 0.00 & 0.00 & 0.00 \\
+Oxygen Production & 1.00 & 0.00 & 0.00 & 0.00 \\
+Burnt Lime Production & 0.02 & 0.98 & 0.00 & 0.00 \\
+Dolomite Production & 0.02 & 0.98 & 0.00 & 0.00 \\
+Sintering & 0.23 & 0.00 & 0.00 & 0.77 \\
+Pelletizing & 0.10 & 0.90 & 0.00 & 0.00 \\
+Blast Furnace & 0.04 & 0.00 & 0.19 & 0.77 \\
+Direct Reduced Iron (DRI) & 0.06 & 0.94 & 0.00 & 0.00 \\
+Electric Arc Furnace & 0.77 & 0.23 & 0.00 & 0.00 \\
+Basic Oxygen Furnace & 1.00 & 0.00 & 0.00 & 0.00 \\
+Steel Refining (Low Alloy) & 0.01 & 0.99 & 0.00 & 0.00 \\
+Steel Refining (High Alloy) & 0.10 & 0.90 & 0.00 & 0.00 \\
+Continuous Casting & 0.98 & 0.02 & 0.00 & 0.00 \\
+Ingot Casting & 1.00 & 0.00 & 0.00 & 0.00 \\
+Hot Rolling & 0.20 & 0.80 & 0.00 & 0.00 \\
+Cold Rolling & 0.40 & 0.60 & 0.00 & 0.00 \\
+Rod/bar/section Mill & 0.20 & 0.80 & 0.00 & 0.00 \\
+Steel Thermal Treatment & 0.20 & 0.80 & 0.00 & 0.00 \\
+Hot Dip Metal Coating & 0.20 & 0.80 & 0.00 & 0.00 \\
+Electrolytic Metal Coating & 0.20 & 0.80 & 0.00 & 0.00 \\
+Casting/Extrusion/Conformation & 0.00 & 1.00 & 0.00 & 0.00 \\
+Stamping/calendering/lamination & 1.00 & 0.00 & 0.00 & 0.00 \\
+Machining & 1.00 & 0.00 & 0.00 & 0.00 \\
+Organic or Synthetic Coating (painting) & 0.50 & 0.50 & 0.00 & 0.00 \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item Values are carrier shares (fractions of total process energy).
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+
+
+
+\begin{table}[h]
+\centering
+\scriptsize
+\caption{Process recipes used in the mill model (per 1.0 unit of output)}
+\label{tab:Z3_recipes_main}
+\begin{threeparttable}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{}p{4.0cm} X X@{}}
+\toprule
+\textbf{Process} & \textbf{Inputs} & \textbf{Outputs} \\
+\midrule
+
+Charcoal Production &
+Wood 2.5226 &
+Charcoal 1.0 \\
+\midrule
+Coke Production &
+\begin{tabular}[t]{@{}l@{}}
+Nitrogen 0.02 \\
+Coal 1.25 \\
+\end{tabular} &
+Coke 1.0 \\
+\midrule
+Burnt Lime Production &
+Limestone 1.78571 &
+Burnt Lime 1.0 \\
+\midrule
+Dolomite Production &
+Limestone 1.91667 &
+Dolomite 1.0 \\
+\midrule
+
+Sintering &
+\begin{tabular}[t]{@{}l@{}}
+Iron Ore \\
+Limestone 0.140 \\
+Coke
+\end{tabular} &
+Sinter 1.0 \\
+\midrule
+Pelletizing &
+\begin{tabular}[t]{@{}l@{}}
+Iron Ore \\
+Limestone 0.065 \\
+Burnt Lime 0.01
+\end{tabular} &
+Pellet 1.0 \\
+\midrule
+Blast Furnace &
+\begin{tabular}[t]{@{}l@{}}
+Sinter, Pellet, Iron Ore \\
+Nitrogen 0.075 \\
+Oxygen 0.080 \\
+Limestone 0.040 \\
+Coke and Coal
+\end{tabular} &
+Pig Iron 1.0 \\
+\midrule
+Direct Reduced Iron (DRI) &
+\begin{tabular}[t]{@{}l@{}}
+Sinter, Pellet, Iron Ore\\
+Gas
+\end{tabular} &
+Sponge Iron 1.0 \\
+\midrule
+Electric Arc Furnace &
+\begin{tabular}[t]{@{}l@{}}
+Nitrogen 0.113 \\
+Oxygen 0.025 \\
+Dolomite 0.012 \\
+Burnt Lime 0.041 \\
+Pig Iron 1.0 \\
+Gas
+\end{tabular} &
+Liquid Steel 1.0 \\
+\midrule
+Basic Oxygen Furnace &
+\begin{tabular}[t]{@{}l@{}}
+Nitrogen 0.113 \\
+Oxygen 0.090 \\
+Dolomite 0.005 \\
+Burnt Lime 0.045 \\
+Pig Iron 0.9 \\
+Scrap 0.1
+\end{tabular} &
+Liquid Steel 1.0 \\
+\midrule
+Steel Refining (Low Alloy) &
+\begin{tabular}[t]{@{}l@{}}
+Liquid Steel 0.965 \\
+Alloys Mix (LAS) 0.035 \\
+Nitrogen 0.007 \\
+Oxygen 0.025 \\
+Dolomite 0.005 \\
+Burnt Lime 0.030
+\end{tabular} &
+Low-Alloy Liquid Steel 1.0 \\
+\midrule
+Steel Refining (High Alloy) &
+\begin{tabular}[t]{@{}l@{}}
+Liquid Steel 0.670 \\
+Alloys Mix (HAS) 0.330 \\
+Nitrogen 0.007 \\
+Oxygen 0.025 \\
+Dolomite 0.005 \\
+Burnt Lime 0.030
+\end{tabular} &
+High-Alloy Liquid Steel 1.0 \\
+
+\bottomrule
+\end{tabularx}
+\begin{tablenotes}\footnotesize
+\item Coefficients are mass ratios per 1.0 unit of process output. Energy-carrier terms reference the YAML expressions that combine energy intensities, carrier shares, and energy contents in the Zenodo files. Values shown for most likely data-set. Minimum and maximum material inputs are $\pm \SI{10}{\percent}$ unless specified. DRI output named "Pig Iron" in the code. Sintering and Pelletizing use variable blends set in parameters. 
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+Table~\ref{tab:energy_prices} below condenses information found in \texttt{emission\_factors.yml} and\\ \texttt{energy\_content.yml}, as well as prices. The python model does not have the cost module, so no configuration files. 
+
+\begin{table}[h]
+\centering
+\caption{Emission intensity and price for all energy carriers used in the models}
+\label{tab:energy_prices}
+\begin{threeparttable}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Energy Source} &
+\textbf{Calorific Value} &
+\textbf{LCA GHG} & \textbf{LCA GHG}\tnote{1} &
+\textbf{GHG Protocol}\tnote{2} &
+\textbf{Total FE}\tnote{3} &
+\textbf{Price}\tnote{4} & \textbf{Price} \\
+& (\si{\mega\joule\per\kilogram}) & (\si{\gCOtwoe\per\kilogram}) & (\si{\gCOtwoe\per\mega\joule}) &
+(\si{\gCOtwoe\per\mega\joule}) & (\si{\gCOtwoe\per\mega\joule}) & (\si{\USD\per\tonne}) & (\si{\USD\per\giga\joule}) \\
+\midrule
+Fuel Oil                       & 40.12 & 259.96 &  6.48 & 77.62 &  84.10 &  132        &  3.3 \\
+Diesel                         & 42.26 & 406.94 &  9.63 & 74.32 &  83.95 &  805        & 19.2 \\
+Ethanol                        & 26.36 & 784.25 & 29.75 &  0.25 &  30.01 &  506        & 19.2 \\
+Natural Gas                    & 36.82 & 456.06 & 12.39 & 56.16 &  68.54 &  731        & 19.9 \\
+LPG                            & 46.44 & 610.79 & 13.15 & 63.12 &  76.28 & 1336        & 28.8 \\
+Biomethane                     & 36.82 & 202.07 &  5.49 &  0.06 &   5.55 &  877\tnote{5} & 23.8 \\
+\ce{H2} -- SMR\tnote{12}         &120.16 & 0\phantom{.00} &  0.00 & 89.88 &  89.88 & 2925\tnote{7} & 24.3 \\
+\ce{H2} -- Electrolysis\tnote{13}&120.16 & 0\phantom{.00} &  0.00 & 21.47 &  21.47 &13173\tnote{6} &109.6 \\
+Wood                           & 12.97 & 101.65 &  7.84 &  0.00 &   9.82 &   63        &  4.9 \\
+Charcoal M                     & 28.40 & 380.00 & 13.38 &  7.05 &  20.43 &  222\tnote{8} &  8.2 \\
+Coal                           & 30.96 & 523.61 & 16.91 & 95.31 & 112.22 &  220        &  7.1 \\
+Anthracite                     & 30.96 & 523.61 & 16.91 & 98.71 & 115.62 &  264\tnote{9} &  8.5 \\
+PCI                            & 30.96 & 523.61 & 16.91 & 95.31 & 112.22 &  220        &  7.1 \\
+Coke MP                        & 35.10 & 412.32 & 11.75 & 97.79 & 109.53 &  308        &  8.8 \\
+Coke MM                        & 28.87 & 817.16 & 10.57 &107.77 & 136.08 &  308\tnote{10} & 10.7 \\
+Electricity Grid               &  3.60 & 103.27 & 28.70 &  0.00 &  28.70 &  127        & 35.2 \\
+Electricity Hydro              &  3.60 &  72.48 & 20.14 &  0.00 &  20.14 &  133\tnote{11} & 37.0 \\
+Electricity Wind               &  3.60 &  11.07 &  3.08 &  0.00 &   3.08 &  133\tnote{11} & 37.0 \\
+Electricity Solar PV           &  3.60 &  77.02 & 21.40 &  0.00 &  21.40 &  133\tnote{11} & 37.0 \\
+Electricity Biomass            &  3.60 &  77.22 & 21.46 &  0.00 &  21.46 &  133\tnote{11} & 37.0 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+
+\begin{tablenotes}
+\footnotesize
+% Adjust spacing between footnote lines:
+%\renewcommand{\baselineskip}{1pt}
+% Reduce vertical space before footnotes:
+%\vspace{-2mm}
+\item[1] All values from EcoInvent database unless stated. Refers to upstream emissions.
+\item[2] All values from GHG protocol unless stated. Refers to emissions from the use phase.
+\item[3] Sum of LCA and GHG values.
+\item[4] Values obtained from assorted Brazilian agencies MME, EPE, MDIC, ANEEL, CCEE, ANP,\\ Petrobras, IBGE, Anfavea, IEA, U.S. Department of Energy, World Bank.
+\item[5] Considered \SI{20}{\percent} more expensive than Natural Gas.
+\item[6] Considered 2$\times$ electricity price and \SI{52}{\kilo\watt\hour} per \si{\kilogram} of \ce{H2} (from~\cite{vogl2018assessment}).
+\item[7] Considered 4$\times$ NG prices (with \SI{2}{\kilogram} \ce{CH4} per \si{\kilogram} \ce{H2}).
+\item[8] 3.5 times wood price.
+\item[9] \SI{20}{\percent} more expensive than imported coal (Coal).
+\item[10] \SI{40}{\percent} more expensive than imported coal (Coal).
+\item[11] \SI{5}{\percent} more expensive than grid electricity.
+\item[12] Steam Methane Reforming with no CCS, from \cite{maniscalco2024critical}.
+\item[13] Considers only electrolytic \ce{H2} produced via wind/solar PV sources. \\Average values from \cite{maniscalco2024critical,patel2024climate,garcia2023technical,puig2024life}.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+
+
+\begin{table}[!ht]
+\centering
+\caption{Key model parameters (Min, Likely, Max)}
+\label{tab:Z3_parameters}
+\begin{threeparttable}
+\begin{tabular}{@{}l S[table-format=1.3] S[table-format=1.3] S[table-format=1.3]@{}}
+\toprule
+\textbf{Parameter} & \textbf{Min} & \textbf{Likely} & \textbf{Max} \\
+\midrule
+Iron content in iron ore    & 0.699 & 0.615 & 0.565 \\
+Mass fraction of \ce{Fe2O3} in sinter & 0.800 & 0.800 & 0.800 \\
+Mass fraction of \ce{Fe2O3} in pellets & 0.900 & 0.900 & 0.900 \\
+Mass fraction of \ce{Fe2O3} in lump ore                & 1.000 & 0.879 & 0.808 \\
+\midrule
+Process gas recovery rate in the BF and BOF  & 0.250 & 0.275 & 0.300 \\
+Process gas recovery rate in Coke-Making & 0.070 & 0.085 & 0.100 \\
+Material yield for finished product & 0.900 & 0.850 & 0.800 \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item Values are dimensionless shares/factors as defined in \texttt{parameters.yml}. For DRI-EAF, iron content in iron ore is fixed at 0.69 and \ce{Fe2O3} in lump ore 0.987. Material yield refers to material processing losses on downstream processes, not material yield within mills.  
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+
+\clearpage
+\bibliography{bib}
+
+This appendix provides the structure of FORGE calculation logic. It explains (i) the computational flow, (ii) the key definitions and equations used in reporting, and (iii) the fixed “reference run”. Complete parameter catalogs (recipes, energy matrices, carrier factors, price/EI tables), full YAML schemas, and extended validation are hosted in the Zenodo release (see §Data availability; Tables Z1–Z3 there). Where a table or figure is omitted here, we point to its exact Zenodo location.
+
+The model is a cradle-to-gate, route-explicit plant model covering raw-material preparation through finishing. It is deliberately fine-grained to keep accounting faithful to operations while remaining easy to audit. In the current release it includes:
+\begin{itemize}
+  \item \textbf{78 processes} (ore handling, ironmaking, steelmaking, casting, forming, finishing);
+  \item \textbf{44 materials} tracked in the mass balance (ores, fluxes, reductants, scrap, intermediates, products);
+  \item \textbf{500+ parameters}: unit recipes, energy intensities, carrier splits, emission factors, blend ratios, utility-plant parameters, and market inputs. Parameters are mainly bundled in three main data sets, but individual configurations are possible. 
+\end{itemize}
+
+For a user-selected reporting boundary—\emph{crude steel (cs)} or \emph{finished steel (fs)} (cf. §\ref{bound})—the model returns: (i) closed mass and energy balances by unit; (ii) per-carrier energy demand; (iii) process and energy-related GHG; and (iv) intensity metrics in \si{\tCOtwoe\per\tonne} and \si{\giga\joule\per\tonne}. The functional unit is \SI{1}{t} of steel at the chosen boundary. Yields are applied to downstream processing and are explicit and configurable.
+
+\subsection{Unit mass balance}
+Each unit operation is parameterized by a per-unit “recipe” of inputs and outputs on the unit’s \emph{own} output basis. Starting from the chosen reporting boundary and a functional unit of \SI{1}{t} steel, the model expands demands upstream \emph{recursively} until only exogenous (market) flows remain, yielding consistent run levels for every process. 
+
+\subsection{Energy accounting}
+Each process has (i) an energy intensity (\si{\giga\joule\per\tonne} of \emph{that} process output), and (ii) a carrier split. An excerpt is shown in Table~\ref{tab:energy_matrix}. From the mass-derived run levels we compute the plant-wide energy matrix.
+
+\begin{table}[h]
+\centering
+\caption{Energy intensities and carrier shares (excerpt; intensities in \si{\giga\joule\per\tonne} of product output)}
+\label{tab:energy_matrix}
+\begin{tabular}{lccccc}
+\toprule
+& & \multicolumn{4}{c}{Energy carrier shares} \\
+\cmidrule(lr){3-6}
+Process & Intensity & Electricity & Gas & Coal & Coke \\
+\midrule
+Sintering     & 2.00  & \SI{23}{\percent} & \SI{0}{\percent} & \SI{0}{\percent}   & \SI{77}{\percent}  \\
+Pelletizing   & 1.10  & \SI{10}{\percent} & \SI{90}{\percent}& \SI{0}{\percent}   & \SI{0}{\percent} \\
+Blast furnace & 13.00 & \SI{4}{\percent} & \SI{0}{\percent} & \SI{19.2}{\percent}& \SI{76.8}{\percent}\\
+EAF           & 4.00  & \SI{77}{\percent} & \SI{23}{\percent}& \SI{0}{\percent}   & \SI{0}{\percent}  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Emissions}
+Emissions comprise: (i) direct process sources (e.g., calcination in lime, coke-oven fugitives), and (ii) energy-related emissions via carrier-specific factors (in \si{\gram_{\text{\COtwoe}}\per\mega\joule}). If a material is sourced from the market, life-cycle data (e.g., ecoinvent) are used; if produced internally, emissions are computed from the energy matrix and process-specific factors.
+
+\subsection{Onsite utility plant (process-gas recovery and electricity blend)}
+Recovered BF and coke-oven gases feed an onsite utility plant that produces steam and electricity. This yields two effects: (i) an allocation credit to the gas-producing units, and (ii) a \emph{high} effective electricity emission factor for the self-generated share (coal-derived gases), which is then blended with the grid to give the plant’s net electricity factor. To avoid circular accounting, we fix the self-generation share from a single reference run, illustrated in Table~\ref{tab:ref_run_config}, and use the resulting blended plant electricity factor uniformly across scenarios. 
+
+\noindent For reporting, plant electricity has a blended emission factor
+\[
+\mathrm{EF}_{\text{elec}} =
+f_{\text{int}}\,\mathrm{EF}_{\text{int}} + (1-f_{\text{int}})\,\mathrm{EF}_{\text{grid}},
+\]
+where \(f_{\text{int}}\) is the fixed internal-electricity share taken from the reference run; \(\mathrm{EF}_{\text{int}}\) is the attributional proxy for on-site power from process gases, and \(\mathrm{EF}_{\text{grid}}\) is the selected grid factor.
+
+\begin{table}[h]
+\centering
+\caption{Reference-run configuration (product mix and downstream options). Shares are mass shares of finished-steel throughput unless noted.}
+\label{tab:ref_run_config}
+\begin{threeparttable}
+\begin{tabular}{l l c l}
+\toprule
+\textbf{Stage} & \textbf{Option} & \textbf{Share} & \textbf{Note} \\
+\midrule
+Flat/long forming
+& Ingot casting & \SI{0}{\percent} & Not used \\
+& Hot rolling (flat) & \SI{76}{\percent} & Primary route for flats \\
+& Cold rolling & \SI{20}{\percent} & Conditional on hot-rolled\tnote{a} \\
+& Rod/bar/section mill (long) & \SI{24}{\percent} & Long products \\
+\midrule
+Post-forming
+& Direct use of basic steel products & \SI{10}{\percent} &  \\
+& Casting / extrusion / conformation & \SI{10}{\percent} &  \\
+& Stamping / calendering / lamination & \SI{35}{\percent} &  \\
+& Machining & \SI{45}{\percent} &  \\
+\midrule
+Surface finishing
+& No coating & \SI{70}{\percent} &  \\
+& Hot-dip metal coating & \SI{0}{\percent} &  \\
+& Electrolytic metal coating & \SI{0}{\percent} &  \\
+& Organic/synthetic coating (painting) & \SI{30}{\percent} &  \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item[a] Conditional share: \SI{20}{\percent} of \emph{hot-rolled} tonnage is further cold-rolled. On a \SI{1}{t} finished-steel basis, the implied cold-rolled share is $0.76 \times 0.20 = 0.152$ (\SI{15.2}{\percent}).
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+Due to the nature of the Python implementation, a different reference chain, that terminates after Cold Rolling (post-CR), was used, instead of the reference run. The differences in results are negligible. 
+
+\subsection{Validation, yields, and reporting}
+Mass and energy balances close at each unit and plant-wide. Carbon checks are reported at the crude- and finished-steel boundaries, with the finished boundary applying the explicit finished-yield parameter (not hard-coded). Sensitivity and Monte-Carlo runs confirm parameter realism and place results within literature ranges; exact replication of external point values is often not possible due to undocumented assumptions in the sources. Unless stated otherwise, figures and tables use the \emph{Likely} data-set, Brazil’s 2024 grid electricity factor (138.6~g~CO\textsubscript{2}e/kWh), and the fixed internal-electricity share \(f_{\mathrm{int}}\) taken from the reference run. Monte Carlo results use 500 samples with a deterministic seed of 42.
+
+\end{document}

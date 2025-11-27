@@ -6,6 +6,10 @@ stage_menu:
     stage_id: Cast
     label: 'Validation (as cast)'
     description: 'Reference chain up to continuous casting.'
+  - key: pig_iron
+    stage_id: PigIron
+    label: 'Pig iron'
+    description: 'Pig iron at ironmaking exit (Blast Furnace or Direct Reduction).'
   - key: crude
     stage_id: Cast
     label: 'Crude steel'

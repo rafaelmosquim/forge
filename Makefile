@@ -2,17 +2,18 @@
 
 PY ?= python3
 
-.PHONY: help list finished paper run parallel mc-as-cast mc-finished
+.PHONY: help list finished paper aluminum mc-as-cast mc-finished run parallel
 
 help:
 	@echo "Targets:"
 	@echo "  list            - list available run profiles"
 	@echo "  finished        - run finished steel portfolio"
 	@echo "  paper           - run paper portfolio"
+	@echo "  aluminum        - run aluminum baseline scenarios via CLI"
+	@echo "  mc-as-cast      - Monte Carlo as-cast portfolio (via run_profiles)"
+	@echo "  mc-finished     - Monte Carlo finished portfolio (via run_profiles)"
 	@echo "  run PROFILE=... - run a named profile from configs/run_profiles.yml"
 	@echo "  parallel        - run 'finished' and 'paper' in parallel"
-	@echo "  mc-as-cast      - example Monte Carlo (as-cast, ALL countries)"
-	@echo "  mc-finished     - example Monte Carlo (finished portfolio, ALL countries)"
 	@echo "  docker-build    - build Docker image (tag: forge:paper)"
 	@echo "  docker-finished - run 'finished' profile inside Docker"
 	@echo "  docker-paper    - run 'paper' profile inside Docker"
@@ -27,6 +28,9 @@ finished:
 
 paper:
 	$(PY) scripts/run_profiles.py paper
+
+aluminum:
+	$(PY) scripts/run_profiles.py aluminum
 
 run:
 	@test -n "$(PROFILE)" || (echo "Set PROFILE=<name>" && exit 2)
@@ -48,30 +52,11 @@ reproduce-validation:
 	  --demand 1000 \
 	  --out results/reproduce_validation
 
-# --- Monte Carlo examples (edit or copy as needed) ---
 mc-as-cast:
-	$(PY) -m forge.scenarios.monte_carlo_tri \
-		--min datasets/steel/optimistic_low \
-		--mode datasets/steel/likely \
-		--max datasets/steel/pessimistic_high \
-		--base datasets/steel/likely \
-		--route BF-BOF \
-		--portfolio configs/as_cast_portfolio.yml \
-		--countries ALL \
-		--n 500 \
-		--out results/mc_as_cast
+	$(PY) scripts/run_profiles.py mc-as-cast
 
 mc-finished:
-	$(PY) -m forge.scenarios.monte_carlo_tri \
-		--min datasets/steel/optimistic_low \
-		--mode datasets/steel/likely \
-		--max datasets/steel/pessimistic_high \
-		--base datasets/steel/likely \
-		--route BF-BOF \
-		--portfolio configs/finished_steel_portfolio.yml \
-		--countries ALL \
-		--n 500 \
-		--out results/mc_finished
+	$(PY) scripts/run_profiles.py mc-finished
 
 # --- Docker helpers ---
 docker-build:

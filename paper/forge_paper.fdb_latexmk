@@ -1,7 +1,7 @@
 # Fdb version 4
-["pdflatex"] 1764250030.5967 "/home/rafael-mosquim/personal/code/forge/paper/forge_paper.tex" "forge_paper.pdf" "forge_paper" 1764250031.39237 0
+["pdflatex"] 1764337168.30136 "/home/rafael-mosquim/personal/code/forge/paper/forge_paper.tex" "forge_paper.pdf" "forge_paper" 1764337169.12564 0
   "/etc/texmf/web2c/texmf.cnf" 1762859737.76856 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/rafael-mosquim/personal/code/forge/paper/forge_paper.tex" 1764250029.42666 45546 fb69187098c43fb694ed69d0664294c5 ""
+  "/home/rafael-mosquim/personal/code/forge/paper/forge_paper.tex" 1764337006.89596 48750 8d4725dc8cc3381410a9a2c5dd3647d2 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/jknappen/ec/tcrm1000.tfm" 1136768653 1536 e07581a4bb3136ece9eeb4c3ffab8233 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm" 1246382020 1004 54797486969f23fa377b128694d548df ""
@@ -99,9 +99,9 @@
   "/usr/share/texmf/web2c/texmf.cnf" 1707919699 40399 f2c302f7d2af602abb742093540a5834 ""
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1762862675.32548 5472669 54eaf61a88b6b7896ebd0dac973cb29c ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1762862783 8213235 b6d2ec311aeab9770ca528fcd0f77afd ""
-  "forge_paper.aux" 1764250031.32672 4694 a8e6b45d7afec728ff9528a75482f009 "pdflatex"
-  "forge_paper.spl" 1764250030.87571 0 d41d8cd98f00b204e9800998ecf8427e "pdflatex"
-  "forge_paper.tex" 1764250029.42666 45546 fb69187098c43fb694ed69d0664294c5 ""
+  "forge_paper.aux" 1764337169.04131 5277 84e4de2e1561a64efa11b46a8b1f081d "pdflatex"
+  "forge_paper.spl" 1764337168.55531 0 d41d8cd98f00b204e9800998ecf8427e "pdflatex"
+  "forge_paper.tex" 1764337006.89596 48750 8d4725dc8cc3381410a9a2c5dd3647d2 ""
   (generated)
   "forge_paper.aux"
   "forge_paper.log"

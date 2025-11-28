@@ -50,6 +50,7 @@ import numpy as np
 import yaml
 
 from forge.steel_core_api_v2 import RouteConfig, ScenarioInputs, run_scenario
+from forge.core.io import load_electricity_intensity
 import matplotlib
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
@@ -69,9 +70,13 @@ def _load_yaml_map(path: Path) -> Dict[str, Any]:
 
 
 def _tri(a: float, c: float, b: float) -> float:
-    # numpy.triangular(left, mode, right)
+    """Sample triangular while tolerating mis-ordered min/mode/max."""
     try:
-        return float(np.random.triangular(float(a), float(c), float(b)))
+        left, mode, right = sorted([float(a), float(c), float(b)])
+        if right == left:
+            return left
+        mode = min(max(mode, left), right)
+        return float(np.random.triangular(left, mode, right))
     except Exception:
         return float(c)
 
@@ -220,7 +225,21 @@ def _load_portfolio(spec_path: Path) -> Tuple[Dict[str, Any], Dict[str, Dict[str
     defaults = spec.get("defaults") or {}
     runs = spec.get("runs") or []
     blends = spec.get("blends") or []
-    run_picks = {r.get("name"): (r.get("picks_by_material") or {}) for r in runs if isinstance(r, dict)}
+    run_picks: Dict[str, Dict[str, str]] = {}
+    run_weights: list[Tuple[str, float]] = []
+    for r in runs:
+        if not isinstance(r, dict):
+            continue
+        name = r.get("name")
+        if not name:
+            continue
+        run_picks[name] = r.get("picks_by_material") or {}
+        try:
+            w_raw = r.get("share", r.get("weight"))
+            w = float(w_raw) if w_raw is not None else 1.0
+        except Exception:
+            w = 1.0
+        run_weights.append((name, w))
     # pick first blend
     blend = None
     for b in blends:
@@ -233,6 +252,9 @@ def _load_portfolio(spec_path: Path) -> Tuple[Dict[str, Any], Dict[str, Dict[str
                 comps.append((c.get("run"), float(c.get("share", 0.0) or 0.0)))
             except Exception:
                 continue
+    # If no blend specified, fall back to the listed runs (equal weights unless provided)
+    if not comps and run_weights:
+        comps = run_weights
     return defaults, run_picks, comps
 
 
@@ -262,9 +284,8 @@ def run_mc(
         # Special 'ALL' → take keys from electricity_intensity.yml in mode_dir
         if len(countries) == 1 and countries[0].strip().upper() == 'ALL':
             try:
-                ein = _load_yaml_map(mode_dir / 'electricity_intensity.yml')
-                keys = list(ein.keys()) if isinstance(ein, dict) else []
-                country_list = [str(k) for k in keys]
+                ein = load_electricity_intensity(mode_dir / 'electricity_intensity.yml')
+                country_list = [str(k) for k in ein.keys()]
             except Exception:
                 country_list = [None]
         else:
@@ -291,12 +312,15 @@ def run_mc(
                     total += float(share) * val
                     total_w += float(share)
                 total = total / total_w if total_w > 0 else total
+                stage_used = sk
             else:
                 scn_eff = _clamp_downstream_processes(stage_key, scn)
                 total = _run_single(base_dir, route, picks or {}, scn_eff, country_code=cc, stage_key=stage_key, stage_role=stage_role)
+                stage_used = stage_key or "Finished"
             rows.append({
                 "sample": i+1,
                 "country_code": cc or "",
+                "stage_key": stage_used,
                 "total_co2e_kg": total,
                 "ef_kg_per_unit": total/1000.0,
             })

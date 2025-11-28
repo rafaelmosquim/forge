@@ -63,6 +63,7 @@ Convenience targets wrap the refactored API.
 make list           # list profiles
 make finished       # finished steel portfolio (paper_scenarios)
 make paper          # paper portfolio (paper_scenarios)
+make aluminum       # aluminum baseline CLI batch (primary/remelt/finished)
 make parallel       # run both in parallel
 make engine-smoke   # single refactored engine run (BF-BOF, Finished, 1000 kg)
 ```
@@ -99,6 +100,18 @@ out = run_scenario(
 )
 print(out.total_co2e_kg)
 ```
+
+## Aluminum CLI batch
+
+Run the baseline aluminum stages via the batch CLI (no Streamlit UI required):
+
+```bash
+PYTHONPATH=src python3 -m forge.cli.steel_batch_cli run \
+  --spec configs/aluminum_cli_examples.yml \
+  --output results/aluminum_cli_summary.json
+```
+
+Stage keys come from `datasets/aluminum/baseline/sector.yml` (`primary`, `remelt`, `finished`).
 
 ## Tests
 Run the lightweight consistency checks:

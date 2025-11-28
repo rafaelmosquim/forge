@@ -835,6 +835,90 @@ units. As a result, the internal electricity factor should be read as a
 consistent proxy derived from upstream carriers, suitable for comparative
 scenarios and sensitivity analysis.
 
+\section{Automation and User-Defined Scenarios}
+
+Reproducible runs and user experiments are driven by simple CLI and Makefile
+wrappers; no UI interaction is required.
+
+\paragraph{Makefile targets.}
+Common runs are exposed as \texttt{make} targets that delegate to
+\texttt{scripts/run\_profiles.py}: \texttt{make finished} (paper finished
+portfolio), \texttt{make paper} (paper portfolio), \texttt{make aluminum}
+(baseline aluminum batch), \texttt{make mc-as-cast} and \texttt{make
+mc-finished} (Monte Carlo sweeps), plus \texttt{make list} to show available
+profiles. Each target maps to a profile in \texttt{configs/run\_profiles.yml},
+which records the command and environment variables needed for that run.
+
+\paragraph{Adding a profile.}
+Profiles are YAML entries with a description, an \texttt{env} map, and a
+\texttt{cmd} array. Example:
+\begin{verbatim}
+my_profile:
+  desc: "Custom batch"
+  env: { PYTHONPATH: src }
+  cmd:
+    - "python3"
+    - "-m"
+    - "forge.cli.steel_batch_cli"
+    - "run"
+    - "--spec"
+    - "configs/my_batch.yml"
+\end{verbatim}
+Execute with \texttt{make run PROFILE=my\_profile}.
+
+\paragraph{Single-scenario run.}
+\begin{enumerate}
+  \item Choose a dataset (e.g.\ \texttt{datasets/steel/likely}) and copy an
+        existing scenario YAML under \texttt{scenarios/}.
+  \item Edit \texttt{route\_overrides} (enable/disable processes) and, if
+        needed, adjust \texttt{energy\_int}, \texttt{energy\_matrix},
+        \texttt{emission\_factors}, \texttt{parameters}, or
+        \texttt{recipe\_overrides}.
+  \item Run via:
+\begin{verbatim}
+PYTHONPATH=src python3 -m forge.cli.steel_batch_cli run \
+  --data-dir datasets/steel/likely \
+  --scenario datasets/steel/likely/scenarios/BF_BOF_coal.yml \
+  --route BF-BOF --stage-key Finished --country BRA \
+  --output results/custom_run.json
+\end{verbatim}
+\end{enumerate}
+
+\paragraph{Batch spec.}
+For multiple runs, define a spec with optional \texttt{defaults} and a
+\texttt{runs} list:
+\begin{verbatim}
+defaults:
+  data_dir: datasets/steel/likely
+  route: {route_preset: BF-BOF, stage_key: Finished, demand_qty: 1000}
+runs:
+  - name: coal
+    scenario_file: datasets/steel/likely/scenarios/BF_BOF_coal.yml
+  - name: charcoal
+    scenario_file: datasets/steel/likely/scenarios/BF_BOF_charcoal.yml
+    overrides: { emission_factors.Charcoal: 5.0 }
+\end{verbatim}
+Run with \texttt{python3 -m forge.cli.steel\_batch\_cli run --spec
+configs/my\_batch.yml --output results/my\_batch.csv}. Each run can set country
+codes, \texttt{picks\_by\_material}, or \texttt{pre\_select\_soft}.
+
+\paragraph{Monte Carlo.}
+The Monte Carlo utility (\texttt{forge.scenarios.monte\_carlo\_tri}) samples
+energy intensities, carrier shares, and emission factors between min/mode/max
+datasets and can blend multiple runs from a portfolio. A typical call is:
+\begin{verbatim}
+python3 -m forge.scenarios.monte_carlo_tri \
+  --min datasets/steel/optimistic_low \
+  --mode datasets/steel/likely \
+  --max datasets/steel/pessimistic_high \
+  --route BF-BOF \
+  --portfolio configs/as_cast_portfolio.yml \
+  --countries BRA \
+  --n 500 \
+  --out results/mc_as_cast
+\end{verbatim}
+Outputs include \texttt{mc\_summary.csv} and optional histogram/ECDF PNGs.
+
 \subsection{Aluminum specifics}
 
 Aluminum uses the same core but different descriptors and datasets:

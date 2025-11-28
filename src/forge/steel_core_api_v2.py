@@ -498,13 +498,13 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "EAF-Scrap": "Electric Arc Furnace",
     }
     allowed_proc = allowed_proc_by_route.get(route_preset)
+    ei_raw = scenario.get('energy_int')
+    proc_map = {}
+    if isinstance(ei_raw, dict):
+        proc_map = ei_raw.get('processes') if isinstance(ei_raw.get('processes'), dict) else ei_raw
     if allowed_proc:
-        ei = scenario.get('energy_int')
-        if isinstance(ei, dict):
-            # keep only the allowed key; drop all others
-            scenario['energy_int'] = {k: v for k, v in ei.items() if k == allowed_proc and v is not None}
-        else:
-            scenario['energy_int'] = {}
+        # keep only the allowed key; drop all others
+        scenario['energy_int'] = {k: v for k, v in proc_map.items() if k == allowed_proc and v is not None}
     else:
         # No overrides allowed for 'External'/'auto'
         scenario['energy_int'] = {}

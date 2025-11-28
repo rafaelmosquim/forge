@@ -1,0 +1,35 @@
+# Example CLI runs for the aluminum baseline dataset.
+# Invoke with:
+#   python3 -m forge.cli.steel_batch_cli run \
+#     --spec configs/aluminum_cli_examples.yml \
+#     --output results/aluminum_cli_summary.json
+#
+# Notes:
+# - Stage keys come from datasets/aluminum/baseline/sector.yml
+#   (primary, remelt, finished).
+# - Route preset is "Primary" for all runs; adjust if new presets are added.
+defaults:
+  data_dir: datasets/aluminum/baseline
+  scenario_file: datasets/aluminum/baseline/scenario_aluminum.yml
+  country_code: BRA
+  log_dir: results/logs/aluminum_cli
+  route:
+    route_preset: Primary
+    stage_key: primary
+    demand_qty: 1000
+
+runs:
+  - name: aluminum_primary
+
+  - name: aluminum_remelt
+    route:
+      stage_key: remelt
+    # Bias toward ingot remelt when running the remelt stage
+    scenario:
+      pre_select_soft:
+        Raw Aluminum (extrusion): 0
+        Raw Aluminum (ingot): 1
+
+  - name: aluminum_finished
+    route:
+      stage_key: finished

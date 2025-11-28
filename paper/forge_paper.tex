@@ -48,7 +48,7 @@
 \newcolumntype{Y}{>{\RaggedRight\arraybackslash}p{4.2cm}}
 \newcolumntype{C}{>{\centering\arraybackslash}X}
 
-\graphicspath{{Figs/}}
+\graphicspath{{figs/}}
 
 \title{FORGE: Flexible Optimization of Routes for GHG \& Energy\\
 Model Structure and Data Pipeline}
@@ -117,6 +117,14 @@ balances. This makes the model fully integrated, which allows changes in paramet
 Aluminum implementation does not share the same intricacies of steel, and is shown here as a proof of concept of FORGE's flexibility to model other sectors. The aluminum dataset includes primary and remelt routes, downstream alloying and finishing, and direct process emissions. It does not have process gas recovery or routing, nor alternative data-sets for different scenarios (likely/optimistic/pessimistic).
 
 \section{High-level Architecture}
+
+\subsection{Plant Overview}
+
+\begin{figure}
+      \centering
+      \includegraphics[width=0.9\textwidth]{process_map.png}
+      \caption{Overview of the plant layout and process flow}
+\end{figure}
 
 \subsection{Core engine (\texttt{forge.core})}
 
@@ -1052,7 +1060,20 @@ This samples energy and emission tables between the three steel datasets,
 runs each draw through \texttt{run\_scenario}, and writes CSV summaries plus
 basic histograms/ECDF plots of emission factors.
 
+
+
 \section{Next Steps for the Full Paper}
+
+\section{Model Results}
+
+Monte Carlo for the as-cast configuration, for Brazil, using mininum, likely and maximum datasets, shows the following results:
+
+\begin{figure}
+      \centering
+      \includegraphics[width=0.9\textwidth]{mc-cast.png}
+      \caption{Monte Carlo Simulation for cast steel in Brazil}
+\end{figure}
+
 
 This skeleton focuses on:
 \begin{itemize}

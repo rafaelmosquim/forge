@@ -6,12 +6,12 @@
 #
 # Notes:
 # - Stage keys come from datasets/aluminum/baseline/sector.yml
-#   (primary, remelt, finished).
+#   (primary only in this batch).
 # - Route preset is "Primary" for all runs; adjust if new presets are added.
+# - Runs cover every country with an electricity intensity entry.
 defaults:
   data_dir: datasets/aluminum/baseline
   scenario_file: datasets/aluminum/baseline/scenario_aluminum.yml
-  country_code: BRA
   log_dir: results/logs/aluminum_cli
   route:
     route_preset: Primary
@@ -19,17 +19,24 @@ defaults:
     demand_qty: 1000
 
 runs:
-  - name: aluminum_primary
-
-  - name: aluminum_remelt
-    route:
-      stage_key: remelt
-    # Bias toward ingot remelt when running the remelt stage
-    scenario:
-      pre_select_soft:
-        Raw Aluminum (extrusion): 0
-        Raw Aluminum (ingot): 1
-
-  - name: aluminum_finished
-    route:
-      stage_key: finished
+  # Country codes from datasets/aluminum/baseline/electricity_intensity.yml
+  - name: aluminum_primary_bra
+    country_code: BRA
+  - name: aluminum_primary_chn
+    country_code: CHN
+  - name: aluminum_primary_deu
+    country_code: DEU
+  - name: aluminum_primary_ind
+    country_code: IND
+  - name: aluminum_primary_jpn
+    country_code: JPN
+  - name: aluminum_primary_rus
+    country_code: RUS
+  - name: aluminum_primary_kor
+    country_code: KOR
+  - name: aluminum_primary_usa
+    country_code: USA
+  - name: aluminum_primary_irn
+    country_code: IRN
+  - name: aluminum_primary_tur
+    country_code: TUR

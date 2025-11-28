@@ -29,7 +29,7 @@ profiles:
     cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
 
   aluminum:
-    desc: "CLI aluminum baseline runs (primary, remelt, finished)"
+    desc: "CLI aluminum baseline runs (primary, all countries)"
     env:
       PYTHONPATH: src
       FORGE_OUTPUT_LABEL: aluminum_cli
@@ -66,7 +66,7 @@ profiles:
       - "--countries"
       - "BRA"
       - "--n"
-      - "5000"
+      - "1000"
       - "--out"
       - "results/mc_as_cast"
 

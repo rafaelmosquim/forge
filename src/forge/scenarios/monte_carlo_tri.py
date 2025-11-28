@@ -343,8 +343,8 @@ def run_mc(
             p05 = float(np.percentile(vals, 5)); p95 = float(np.percentile(vals, 95))
             title_suffix = f"route={route}, n={n}"
             if portfolio and portfolio.exists():
-                title_suffix += f", basket={portfolio.name}"
-            title_suffix += f", stage={stage_lbl_global}"
+                #title_suffix += f", basket={portfolio.name}"
+                title_suffix += f", stage={stage_lbl_global}"
             title_suffix += f", country={label}"
             # Hist
             plt.figure(figsize=(8,5))

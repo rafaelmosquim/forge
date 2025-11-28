@@ -7,6 +7,10 @@ defaults:
     Oxygen: Oxygen Production
     Dolomite: Dolomite Production
     Burnt Lime: Burnt Lime Production
+  scenario:
+    route_overrides:
+      Coke Production: 0
+      Coke from market: 1  
 
 runs:
   - name: regular_as_cast

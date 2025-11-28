@@ -63,7 +63,7 @@ Convenience targets wrap the refactored API.
 make list           # list profiles
 make finished       # finished steel portfolio (paper_scenarios)
 make paper          # paper portfolio (paper_scenarios)
-make aluminum       # aluminum baseline CLI batch (primary/remelt/finished)
+make aluminum       # primary aluminum CLI batch (all countries)
 make parallel       # run both in parallel
 make engine-smoke   # single refactored engine run (BF-BOF, Finished, 1000 kg)
 ```

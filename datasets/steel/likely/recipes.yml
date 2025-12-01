@@ -274,12 +274,12 @@
 
 - process: Alloys Mix for High Alloy Steel (HAS)
   inputs:
-    Manganese: 0.061
-    Chromium: 0.545
-    Nickel: 0.303
-    Molibdenium: 0.061
+    Manganese: 0.00
+    Chromium: 0.605
+    Nickel: 0.355
+    Molibdenium: 0.043
     Copper: 0.0
-    Silicon: 0.030
+    Silicon: 0.0
     Vanadium: 0.0
     Titanium: 0.0
     Niobium: 0.0
@@ -405,8 +405,8 @@
 
 - process: Steel Refining (High Alloy)
   inputs:
-    Liquid Steel: 1.0 - 0.330
-    Alloys Mix for High Alloy Steel (HAS): 0.33
+    Liquid Steel: 1.0 - 0.299  
+    Alloys Mix for High Alloy Steel (HAS): 0.299
     Nitrogen: 0.0070
     Oxygen: 0.0250
     Dolomite: 0.0050

@@ -373,6 +373,10 @@ def _build_routes_from_picks(
             continue
         enabled = [r for r in cand if pre_mask.get(r.name, 1) > 0 and pre_select.get(r.name, 1) > 0]
         if not enabled:
+            # Respect hard route bans by explicitly marking the candidates as disabled;
+            # otherwise calculate_balance_matrix will treat missing keys as enabled.
+            for r in cand:
+                chosen[r.name] = 0
             continue
 
         # Decide pick

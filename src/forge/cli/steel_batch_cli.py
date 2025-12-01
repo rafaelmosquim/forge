@@ -651,12 +651,18 @@ def _build_route_cfg(plan: RunPlan) -> RouteConfig:
 
 def _summarize_result(plan: RunPlan, route_cfg: RouteConfig, result) -> Dict[str, Any]:
     total = getattr(result, "total_co2e_kg", None)
+    demand_qty = _float_or(route_cfg.demand_qty, 0.0)
     raw_total = None
     total_with_yield = None
+    raw_ef = None
+    gross_ef = None
     if total is not None:
         try:
             raw_total = float(total)
             total_with_yield = raw_total * REPORTED_YIELD_DIVISOR
+            if demand_qty > 0:
+                raw_ef = raw_total / demand_qty
+                gross_ef = total_with_yield / demand_qty
         except (TypeError, ValueError):
             raw_total = None
             total_with_yield = None
@@ -669,12 +675,17 @@ def _summarize_result(plan: RunPlan, route_cfg: RouteConfig, result) -> Dict[str
         "country_code": plan.country_code or "",
         "raw_co2e_kg": raw_total if raw_total is not None else None,
         "total_co2e_kg": total_with_yield if total_with_yield is not None else None,
+        "raw_ef_kg_per_unit": raw_ef,
+        "gross_ef_kg_per_unit": gross_ef,
     }
     if total is not None:
         try:
             total_val = float(total)
             summary["raw_co2e_kg"] = total_val
             summary["total_co2e_kg"] = total_val * REPORTED_YIELD_DIVISOR
+            if demand_qty > 0:
+                summary["raw_ef_kg_per_unit"] = total_val / demand_qty
+                summary["gross_ef_kg_per_unit"] = (total_val * REPORTED_YIELD_DIVISOR) / demand_qty
         except (TypeError, ValueError):
             pass
     return summary
@@ -862,6 +873,7 @@ def _compute_blend_result(
             "input_share": component.share,
             "raw_co2e_kg": component_raw,
             "total_co2e_kg": float(component_raw) * REPORTED_YIELD_DIVISOR if component_raw is not None else None,
+            "raw_ef_kg_per_unit": summary.get("raw_ef_kg_per_unit"),
             "gross_ef_kg_per_unit": summary.get("gross_ef_kg_per_unit"),
             "demand_qty": record.route_cfg.demand_qty,
         })
@@ -891,6 +903,8 @@ def _compute_blend_result(
         "blend": True,
         "raw_co2e_kg": total_co2e,
         "total_co2e_kg": total_co2e * REPORTED_YIELD_DIVISOR,
+        "raw_ef_kg_per_unit": (total_co2e / demand_qty) if demand_qty > 0 else None,
+        "gross_ef_kg_per_unit": (total_co2e * REPORTED_YIELD_DIVISOR / demand_qty) if demand_qty > 0 else None,
     }
     if route_set:
         summary["route_preset"] = route_set.pop() if len(route_set) == 1 else ",".join(sorted(route_set))

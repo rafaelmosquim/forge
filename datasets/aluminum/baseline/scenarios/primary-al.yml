@@ -1,0 +1,31 @@
+route_preset: Primary
+stage_key: primary
+demand_qty: 1000
+
+# Whitelist direct-on-site emitters for aluminum (shared with secondary)
+allow_direct_onsite:
+  - Bauxite Mining
+  - Pitch Production
+  - Coke Production
+  - Caustic Soda Production
+  - Anode Production (Prebaked)
+  - Anode Production (Paste)
+  - Cryolite Production (HF)
+  - Cryolite Blending
+  - Aluminum Fluoride Production
+  - Scrap Melting and Processing
+
+material_credit_map:
+  NaOHp:
+    target: NaOH
+    ratio: 1.0
+
+pre_select_soft:
+  Raw Aluminum (extrusion): 1
+  Raw Aluminum (ingot): 0
+
+recipe_overrides:
+  Remelt Blending:
+    inputs:
+      Primary Ingot Aluminum: 1.0
+      Recycled Aluminum: 0.0

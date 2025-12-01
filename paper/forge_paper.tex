@@ -1,0 +1,1099 @@
+\documentclass [review]{elsarticle}
+
+% --- core packages
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{makecell}
+\usepackage{multirow}
+\usepackage{ragged2e}
+\usepackage{rotating}
+\usepackage{adjustbox}
+\usepackage{subcaption}
+\usepackage{tabularx}
+\usepackage{threeparttable}
+\usepackage[version=4]{mhchem}
+\usepackage[table,xcdraw]{xcolor}
+\usepackage{siunitx}
+% --- siunitx setup ---
+\sisetup{
+  per-mode            = symbol,
+  output-decimal-marker = {.},
+  group-separator     = {\,},
+  group-minimum-digits= 4
+}
+
+% Safe CO2e text macro (no \textsubscript needed)
+\newcommand{\COtwoe}{CO\(_2\)e}
+\newcommand{\COtwo}{CO\(_2\)}
+
+% Boundaries (steel mass units)
+\DeclareSIUnit{\tcs}{t_{\mathrm{cs}}}
+\DeclareSIUnit{\tfs}{t_{\mathrm{fs}}}
+\DeclareSIUnit{\ts}{t_{\mathrm{s}}}
+\DeclareSIUnit{\toem}{t_{\mathrm{oem}}}
+
+% Composite emissions unit
+\DeclareSIUnit{\tCOtwoe}{t\ \text{\COtwoe}}
+\DeclareSIUnit{\gCOtwoe}{g\ \text{\COtwoe}}
+
+% Money
+\DeclareSIUnit{\USD}{USD}
+
+% Other domain units
+\DeclareSIUnit{\thm}{t\textsubscript{HM}}  % hot metal (for kg/thm → \si{\kilogram\per\thm})
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}p{4.2cm}}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+
+\graphicspath{{figs/}}
+
+\title{FORGE: Flexible Optimization of Routes for GHG \& Energy\\
+Model Structure and Data Pipeline}
+\author{FORGE Developers}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Overview}
+
+Steel and aluminum production are energy-intensive industrial sectors with
+significant greenhouse gas (GHG) emissions. Accurate modeling of production routes,
+energy consumption, and emissions is essential for assessing decarbonization
+pathways and policy impacts. However, most existing models fall in one of two
+categories: detailed process-based LCA models that are complex and inflexible, or top-down sectoral models that lack process detail, usually behind proprietary data.
+
+FORGE (Flexible Optimization of Routes for GHG \& Energy) aims to bridge this gap by
+providing an open-source, process-based techno-environmental model that is both
+flexible and user-friendly. It allows users to define and modify production routes,
+energy sources, and emission factors through simple YAML configuration files,
+enabling scenario analysis and sensitivity testing. Along with full transparency of inputs, outputs and parameters, FORGE is designed to be extensible to other industrial sectors beyond steel and aluminum. It can also be integrated with broader energy and economic models for comprehensive assessments.
+
+FORGE is a process-based techno-environmental model for industrial production
+routes, currently focused on steel and aluminum. The model is implemented as a
+Python package with:
+\begin{itemize}
+  \item a generic core engine (\texttt{forge.core.*}) that solves material and
+        energy balances and computes emissions,
+  \item sector descriptors and YAML datasets under \texttt{datasets/} that
+        encode routes, stages, and parameters,
+  \item an API layer (\texttt{forge.steel\_core\_api\_v2}) used by both CLI and
+        a Streamlit UI (\texttt{forge.apps.streamlit\_app}).
+\end{itemize}
+
+Industrial LCAs and plant models are often opaque, non-parametric, or locked
+behind proprietary spreadsheets and datasets. This hinders verification, makes
+reproduction difficult, and complicates boundary comparisons.
+
+FORGE is designed explicitly around transparency. All functions, configuration
+files, and validation scripts live in a public repository and are driven by
+human-readable YAML inputs. In the steel case, this addresses three recurring
+gaps:
+\begin{itemize}
+  \item \emph{Route transparency}: explicit unit-operation recipes and route
+        configurations instead of aggregated route-level intensities;
+  \item \emph{Boundary correctness}: consistent handling of process gases,
+        internal electricity credits, and co-products, avoiding double
+        counting;
+  \item \emph{Reproducibility}: single-source YAML parameters, deterministic
+        runs, and regression tests embedded in the codebase.
+\end{itemize}
+These design choices make FORGE suitable for academic studies, policy
+sensitivity analysis, and plant-level ``what-if'' scenarios, while remaining
+extensible to other sectors.
+
+This document sketches the main architecture and---most importantly---the data
+pipeline from YAML input files to emissions outputs. The goal is to serve as a
+starting point for a full academic paper.
+
+At its core, FORGE implements a material balance solver that walks upstream from
+final demand to determine production levels per process. Given production
+levels, energy intensities, and carrier shares, it builds per-process energy
+balances. This makes the model fully integrated, which allows changes in parameters (ie Blast Furnace energy intensity) to propagate both upstream and downstream. Another feature is that FORGE models process gas recovery in coke making, blast furnace and basic oxygen furncace, in line with the real world practices. A gas-routing module implements process-gas recovery, routing between direct use and electricity, and blended emission factors for gas and internal electricity. Finally, emissions are computed using energy and direct emissions, applying blended emission factors where relevant.
+
+Aluminum implementation does not share the same intricacies of steel, and is shown here as a proof of concept of FORGE's flexibility to model other sectors. The aluminum dataset includes primary and remelt routes, downstream alloying and finishing, and direct process emissions. It does not have process gas recovery or routing, nor alternative data-sets for different scenarios (likely/optimistic/pessimistic).
+
+\section{High-level Architecture}
+
+\subsection{Plant Overview}
+
+\begin{figure}
+      \centering
+      \includegraphics[width=0.9\textwidth]{process_map.png}
+      \caption{Overview of the plant layout and process flow}
+\end{figure}
+
+\subsection{Core engine (\texttt{forge.core})}
+
+Key modules:
+\begin{itemize}
+  \item \textbf{\texttt{core.models}}: defines the \texttt{Process} class and
+        constants such as \texttt{OUTSIDE\_MILL\_PROCS}.
+  \item \textbf{\texttt{core.engine}}:
+    \begin{itemize}
+      \item \texttt{calculate\_balance\_matrix}: material balance solver that
+            walks upstream from final demand to determine production levels
+            per process.
+      \item \texttt{calculate\_energy\_balance}: builds per-process energy
+            balances from production levels, energy intensities, and carrier
+            shares.
+      \item \texttt{calculate\_emissions}: computes energy and direct emissions
+            by process, given energy balances, emission factors, and optional
+            process-specific EFs.
+    \end{itemize}
+  \item \textbf{\texttt{core.gas}}:
+    \begin{itemize}
+      \item \texttt{apply\_gas\_routing\_and\_credits}: implements process-gas
+            recovery, routing between direct use and electricity, and blended
+            emission factors for gas and internal electricity.
+      \item \texttt{compute\_inside\_energy\_reference\_for\_share}: reference
+            plant run to compute total gas and electricity for blending.
+    \end{itemize}
+  \item \textbf{\texttt{core.io}}:
+    \begin{itemize}
+      \item \texttt{load\_data\_from\_yaml}: generic YAML loader with light
+            normalization.
+      \item \texttt{load\_recipes\_from\_yaml}: loads recipes, evaluating
+            per-process expressions with access to parameters and energy tables.
+    \end{itemize}
+  \item \textbf{\texttt{core.routing}}:
+    \begin{itemize}
+      \item \texttt{STAGE\_MATS}: default mapping of stage ids to materials
+            (used as a fallback for legacy steel).
+      \item \texttt{build\_route\_mask}: simple route masks for steel routes
+            (BF--BOF, DRI--EAF, EAF-scrap, External).
+      \item \texttt{enforce\_eaf\_feed}: clamps EAF recipes to a single feed
+            (scrap, DRI, or pig iron) to avoid mixed-feed routes.
+    \end{itemize}
+  \item \textbf{\texttt{core.runner}}:
+    \begin{itemize}
+      \item \texttt{CoreScenario}: dataclass bundling all inputs the engine
+            needs (recipes, energy tables, EFs, route mask, etc.).
+      \item \texttt{run\_core\_scenario}: orchestrates
+            material balance $\rightarrow$ energy balance $\rightarrow$
+            gas routing $\rightarrow$ emissions (and optional costs).
+    \end{itemize}
+\end{itemize}
+
+\subsection{Sector descriptors (\texttt{forge.descriptor})}
+
+Each dataset folder, e.g.\ \texttt{datasets/steel/likely} or
+\texttt{datasets/aluminum/baseline}, contains a \texttt{sector.yml} that
+describes:
+\begin{itemize}
+  \item \emph{stages} (ids, materials, labels),
+  \item \emph{stage menu} (what appears in the UI's ``Product'' radio),
+  \item \emph{routes} (BF--BOF, DRI--EAF, EAF-scrap, etc.), including process
+        enables/disables and optional feed modes,
+  \item \emph{process roles} (e.g.\ gas sources),
+  \item gas configuration (carriers, utility process, reference stage).
+\end{itemize}
+
+The descriptor loader (\texttt{forge.descriptor.sector\_descriptor}) turns
+this YAML into a \texttt{SectorDescriptor} object used by:
+\begin{itemize}
+  \item \texttt{scenario\_resolver} helpers (route masks, stage material
+        resolution, feed mode),
+  \item the Streamlit UI for stage and route selection,
+  \item the API layer to build a \texttt{CoreScenario}.
+\end{itemize}
+
+\subsection{Steel API and Streamlit app}
+
+\begin{itemize}
+  \item \textbf{\texttt{forge.steel\_core\_api\_v2}}:
+    \begin{itemize}
+      \item \texttt{RouteConfig}: encapsulates route preset, stage key/role,
+            demand and optional pre-selections.
+      \item \texttt{ScenarioInputs}: wraps a scenario dict (YAML overrides) and
+            the route config.
+      \item \texttt{run\_scenario}: main entrypoint for steel; responsible for
+            loading YAML, applying overrides, building the production route,
+            calling the core runner, and shaping outputs.
+    \end{itemize}
+  \item \textbf{\texttt{forge.apps.streamlit\_app}}:
+    \begin{itemize}
+      \item multi-sector UI (Steel / Aluminum) with sector gate,
+      \item dataset and scenario selection (sidebar),
+      \item downstream choices (per-stage ambiguous picks) rendered from the
+            descriptor and recipe graph,
+      \item model execution via \texttt{run\_scenario} and result display.
+    \end{itemize}
+\end{itemize}
+
+\subsection{Software architecture and design rationale}
+
+Beyond the module-level split, FORGE follows a three-tier architecture:
+\begin{itemize}
+  \item a \emph{computational core} (\texttt{forge.core.*}) that implements
+        mass--energy balances, gas routing, and emissions; it is pure
+        Python/numerics with no UI or file I/O;
+  \item an \emph{API/service layer} (\texttt{forge.steel\_core\_api\_v2},
+        \texttt{forge.scenarios.*}) that loads YAML data, applies overrides,
+        resolves routes, and builds a \texttt{CoreScenario} for execution;
+  \item a \emph{presentation layer} (\texttt{forge.apps.streamlit\_app},
+        CLI helpers) for interactive or batch runs.
+\end{itemize}
+This separation lets domain experts change scenarios and parameters without
+touching core algorithms, while keeping the numerical engine small and
+testable.
+
+Configuration is kept in YAML rather than hard-coded constants. Sector
+descriptors define stages, routes, and gas roles; dataset folders define
+recipes, energy tables, and emission factors; scenario YAMLs encode route
+choices and parameter overrides. The API layer simply merges these structured
+inputs into a resolved scenario, so changing assumptions is a matter of editing
+configuration rather than code.
+
+Route resolution is deterministic. Starting from a demanded material at a
+chosen stage, FORGE walks the recipe graph upstream and enforces a single
+producer for each material. Ambiguities (e.g.\ market vs in-mill nitrogen) are
+resolved either from scenario YAMLs or from explicit UI picks; otherwise the
+core raises an error rather than guessing. This ensures that repeated runs
+with the same inputs produce identical flows and emissions.
+
+The main API dataclasses (\texttt{RouteConfig}, \texttt{ScenarioInputs},
+\texttt{CoreScenario}, \texttt{RunOutputs}) act as data contracts between
+layers. They make the overall interface explicit (what must be provided, what
+is returned) and enable additional front-ends (REST services, Monte Carlo
+drivers, policy simulators) without touching the core math.
+
+\section{Main algorithms}
+
+At its core, FORGE implements a material balance solver that walks upstream from a final demand to determine production levels per process. Given production levels, energy intensities, and carrier shares, it builds per-process energy balances. Finally, emissions are computed using energy and direct emissions, applying blended emission factors where relevant.
+
+\subsection{Material balance}
+The material balance is computed by \texttt{calculate\_balance\_matrix}, which walks the recipe graph upstream from a user-specified final demand, enforcing a single enabled producer per material. The function takes as input the recipes, the final-demand dictionary, and a per-process on/off mask (\texttt{production\_routes}), and returns a balance matrix and per-process production levels. The graph walk implements, in a constructive way, the steady-state balance equations formalized below.
+
+\subsection{Material balance formulation}
+
+Let $\mathcal{R}$ be the set of production recipes (processes), indexed by $r$, 
+and let $\mathcal{M}$ be the set of materials, indexed by $m$.
+Each recipe $r$ consumes inputs $a_{r,m} \ge 0$ and produces outputs $b_{r,m} \ge 0$.
+The user specifies a final demand vector
+\[
+    f_m \ge 0 \qquad (m \in \mathcal{M}).
+\]
+
+\paragraph{Producers.}
+For each material $m$, the set of internal producers is
+\[
+    \mathcal{P}(m) = \{ r \in \mathcal{R} \mid b_{r,m} > 0 \}.
+\]
+Enabled or disabled production routes are indicated by
+\[
+    \pi_r \in \{0,1\},
+\]
+with $\pi_r = 0$ meaning that recipe $r$ is not available.
+
+\paragraph{Credit rules.}
+Some by-products generate credits for other target materials.
+Let $\mathcal{C} \subseteq \mathcal{M} \times \mathcal{M}$ be the set of credit pairs
+$(j,t)$ with associated ratios $\rho_{j\to t} \ge 0$.  
+The corresponding effective output of recipe $r$ for material $m$ is
+\[
+    \tilde b_{r,m}
+    \;=\;
+    b_{r,m}
+    \;+\;
+    \sum_{j : (j,m)\in\mathcal{C}} \rho_{j\to m}\, b_{r,j}.
+\]
+
+\paragraph{Decision variables.}
+Let $x_r \ge 0$ denote the number of production runs of recipe $r$, and
+let $e_m \ge 0$ denote external purchases of material $m$.
+Disabled routes satisfy $x_r = 0$ whenever $\pi_r = 0$.
+
+\paragraph{Material balances.}
+For every material $m \in \mathcal{M}$, the steady-state material balance is
+\begin{equation}
+    \sum_{r\in\mathcal{R}} \left( \tilde b_{r,m} - a_{r,m} \right) x_r
+    \;+\;
+    e_m
+    \;=\;
+    f_m.
+    \label{eq:material_balance}
+\end{equation}
+
+Materials without internal producers ($\mathcal{P}(m) = \emptyset$) reduce to
+\[
+    - \sum_{r} a_{r,m}\, x_r \;+\; e_m = f_m.
+\]
+
+\paragraph{Balance matrix.}
+Once a feasible vector $x_r$ has been determined, we construct a balance
+matrix with one row per active process, plus rows for external inputs and
+final demand. For each process $r$ and material $m$, the net internal flow is
+\[
+    B_{r,m}
+    \;=\;
+    \bigl( b_{r,m} - a_{r,m} \bigr) x_r.
+\]
+External inputs and final demand are represented by
+\[
+    B_{\mathrm{ext},m} = e_m,
+    \qquad
+    B_{\mathrm{fd},m} = - f_m.
+\]
+
+The resulting matrix
+\[
+    \mathbf{B}
+    =
+    \begin{pmatrix}
+        B_{r_1,m_1} & \cdots & B_{r_1,m_k} \\
+        \vdots      &        & \vdots      \\
+        B_{r_p,m_1} & \cdots & B_{r_p,m_k} \\
+        B_{\mathrm{ext},m_1} & \cdots & B_{\mathrm{ext},m_k} \\
+        B_{\mathrm{fd},m_1}  & \cdots & B_{\mathrm{fd},m_k}
+    \end{pmatrix}
+\]
+contains all net flows for all materials.
+For any material with full internal balancing, the corresponding column of
+$\mathbf{B}$ satisfies
+\[
+    \sum_{\text{rows } i} B_{i,m} = 0,
+\]
+up to numerical tolerance.
+
+\subsection{Energy balance formulation}
+
+Let $\mathcal{R}$ be the set of processes (recipes), indexed by $r$, and let
+$\mathcal{C}$ be the set of energy carriers, indexed by $c$.
+
+For each process $r \in \mathcal{R}$:
+\begin{itemize}
+    \item $x_r \ge 0$ is the production level (number of runs of process $r$),
+    \item $e_r \ge 0$ is the total energy intensity per run (in \si{\mega\joule} per run),
+    \item $s_{r,c} \in [0,1]$ is the share of carrier $c$ in the energy use of process $r$,
+\end{itemize}
+such that
+\[
+    \sum_{c \in \mathcal{C}} s_{r,c} = 1
+    \quad \text{for any process $r$ with defined carrier shares.}
+\]
+
+The energy consumption of process $r$ using carrier $c$ is then
+\begin{equation}
+    E_{r,c}
+    \;=\;
+    x_r \, e_r \, s_{r,c},
+    \qquad
+    r \in \mathcal{R},\; c \in \mathcal{C}.
+    \label{eq:energy_process}
+\end{equation}
+
+The total energy consumption by carrier $c$ across all processes is
+\begin{equation}
+    E_c^{\text{tot}}
+    \;=\;
+    \sum_{r \in \mathcal{R}} E_{r,c}
+    \;=\;
+    \sum_{r \in \mathcal{R}} x_r \, e_r \, s_{r,c},
+    \qquad c \in \mathcal{C}.
+    \label{eq:energy_carrier_total}
+\end{equation}
+
+\paragraph{Energy balance matrix.}
+We collect these quantities in an energy balance matrix with one row per
+active process and one additional ``TOTAL'' row. For each process $r$ and
+carrier $c$ we set
+\[
+    B^{E}_{r,c} = E_{r,c},
+\]
+and the total row is given by
+\[
+    B^{E}_{\mathrm{TOTAL},c} = E_c^{\text{tot}} = \sum_{r \in \mathcal{R}} B^{E}_{r,c}.
+\]
+
+The resulting matrix
+\[
+    \mathbf{B}^E
+    =
+    \begin{pmatrix}
+        B^{E}_{r_1,c_1} & \cdots & B^{E}_{r_1,c_k} \\
+        \vdots          &        & \vdots          \\
+        B^{E}_{r_p,c_1} & \cdots & B^{E}_{r_p,c_k} \\
+        B^{E}_{\mathrm{TOTAL},c_1} & \cdots & B^{E}_{\mathrm{TOTAL},c_k}
+    \end{pmatrix}
+\]
+contains, in each column, the disaggregated energy use per carrier and its
+system-wide total in the last row. ``Electricity'' is always included as one
+of the carriers in $\mathcal{C}$, even if its associated entries are zero.
+
+\subsection{Emission calculation}
+
+We build process-level greenhouse gas emissions by combining energy use,
+carrier-specific emission factors, and process-specific direct emission
+factors, with special treatment for electricity and process gas in
+integrated steel plants.
+
+Let $\mathcal{R}$ be the set of processes and $\mathcal{C}$ the set of
+energy carriers. As in the previous subsection, $x_r \ge 0$ denotes the
+production level (number of runs) of process $r \in \mathcal{R}$, and
+$E_{r,c} \ge 0$ the energy consumption of carrier $c \in \mathcal{C}$ by
+process $r$ (in \si{\mega\joule}).
+
+\paragraph{Emission factors and process sets.}
+For each carrier $c \in \mathcal{C}$ let
+\[
+    \mathrm{EF}^{\mathrm{carrier}}_c \ge 0
+\]
+denote the emission factor (e.g.\ in kg CO\(_2\)e per \si{\mega\joule}).
+For each process $r \in \mathcal{R}$ let
+\[
+    \mathrm{EF}^{\mathrm{proc}}_r \ge 0
+\]
+denote its specific direct emission factor per unit output, which is scaled
+by $x_r$ in the calculation.
+
+We distinguish three process subsets:
+\begin{itemize}
+    \item $\mathcal{R}_{\mathrm{purchase}} \subseteq \mathcal{R}$: processes that represent
+          pure market purchases (``from market'', ``purchase'').
+    \item $\mathcal{R}_{\mathrm{outside}} \subseteq \mathcal{R}$: processes located
+          downstream or outside the mill boundary (e.g.\ finishing).
+    \item $\mathcal{R}_{\mathrm{direct}} \subseteq \mathcal{R}$: onsite processes that are
+          allowed to have direct emissions accounted explicitly.
+\end{itemize}
+
+\paragraph{Electricity mix.}
+Let $f_{\mathrm{int}} \in [0,1]$ denote the fraction of plant electricity
+supplied by internal generation. We denote by
+\[
+    \mathrm{EF}^{\mathrm{grid}}_{\mathrm{el}}
+    \quad\text{and}\quad
+    \mathrm{EF}^{\mathrm{int}}_{\mathrm{el}}
+\]
+the emission factors for grid and internal electricity, respectively.
+For processes inside the mill boundary, electricity uses the blended factor
+\[
+    \mathrm{EF}^{\mathrm{mix}}_{\mathrm{el}}
+    =
+    f_{\mathrm{int}}\, \mathrm{EF}^{\mathrm{int}}_{\mathrm{el}}
+    +
+    (1 - f_{\mathrm{int}})\, \mathrm{EF}^{\mathrm{grid}}_{\mathrm{el}}.
+\]
+For outside-mill processes ($r \in \mathcal{R}_{\mathrm{outside}}$), electricity
+is always taken from the grid.
+
+\paragraph{Process-level emissions.}
+For each process $r \in \mathcal{R}$ we define energy-related emissions
+$E^{\mathrm{em}}_r$ and direct emissions $D_r$.
+
+\emph{(i) Market purchase processes.}
+For processes treated as pure purchases ($r \in \mathcal{R}_{\mathrm{purchase}}$),
+all emissions are accounted as direct, and there are no energy emissions:
+\begin{equation}
+    E^{\mathrm{em}}_r = 0,
+    \qquad
+    D_r = x_r\, \mathrm{EF}^{\mathrm{proc}}_r.
+    \label{eq:emissions_purchase}
+\end{equation}
+
+\emph{(ii) Onsite processes.}
+For onsite processes ($r \notin \mathcal{R}_{\mathrm{purchase}}$), energy-related
+emissions are computed from carrier use. The electricity emission factor
+for process $r$ is
+\[
+    \mathrm{EF}^{\mathrm{el}}_r
+    =
+    \begin{cases}
+        \mathrm{EF}^{\mathrm{grid}}_{\mathrm{el}}, & r \in \mathcal{R}_{\mathrm{outside}},\\[4pt]
+        \mathrm{EF}^{\mathrm{mix}}_{\mathrm{el}}, & r \notin \mathcal{R}_{\mathrm{outside}}.
+    \end{cases}
+\]
+Then
+\begin{equation}
+    E^{\mathrm{em}}_r
+    =
+    \sum_{c \in \mathcal{C} \setminus \{\mathrm{el}\}}
+        E_{r,c}\, \mathrm{EF}^{\mathrm{carrier}}_c
+    \;+\;
+    E_{r,\mathrm{el}}\, \mathrm{EF}^{\mathrm{el}}_r,
+    \label{eq:emissions_energy_generic}
+\end{equation}
+with the exception that, for the coke production process,
+coal is treated as feedstock rather than fuel and is therefore excluded
+from the energy term:
+\begin{equation}
+    \text{if $r = \text{``Coke Production''}$, then the term with $c = \text{Coal}$ is omitted in \eqref{eq:emissions_energy_generic}.}
+\end{equation}
+
+Direct emissions for onsite processes are only included for a whitelisted
+subset $\mathcal{R}_{\mathrm{direct}}$:
+\begin{equation}
+    D_r
+    =
+    \begin{cases}
+        x_r\, \mathrm{EF}^{\mathrm{proc}}_r, & r \in \mathcal{R}_{\mathrm{direct}},\\[4pt]
+        0, & r \notin \mathcal{R}_{\mathrm{direct}}.
+    \end{cases}
+    \label{eq:emissions_direct}
+\end{equation}
+
+\paragraph{Total emissions.}
+The total emissions for process $r$ are
+\begin{equation}
+    T_r
+    =
+    E^{\mathrm{em}}_r + D_r,
+    \qquad r \in \mathcal{R}.
+    \label{eq:emissions_total}
+\end{equation}
+In tabular form, we collect for each active process $r$ the triplet
+$(E^{\mathrm{em}}_r, D_r, T_r)$, which corresponds to the columns
+``Energy Emissions'', ``Direct Emissions'', and ``TOTAL CO$_2$e'' in the
+emissions matrix returned by the model.
+
+
+\section{Data Configuration}
+
+FORGE is driven by human-readable YAML files. 
+\subsection{Recipes}
+
+The main process configuration is done via \texttt{recipes.yml}, which defines
+per-process input and output coefficients. Each process has a recipe dict with
+\texttt{inputs} and \texttt{outputs} sub-dicts mapping material names to
+quantities per run. Quantities can be numeric constants or expressions that
+reference parameters or energy intensities. For example, the Blast Furnace is configured as follows:
+
+\begin{verbatim}
+- process: Blast Furnace
+  inputs:
+    Sinter: "1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.sinter"
+    Pellet: "1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.pellet"
+    Iron Ore: "1.03 * (1 / iron_content_pig_iron) * (feo3_lump / (blend.sinter * feo3_sinter + blend.pellet * feo3_pellet + blend.lump * feo3_lump)) * blend.lump"
+    Nitrogen: 0.0750
+    Oxygen: 0.0800
+    Limestone: 0.0400
+    Coke: >
+      energy_int['Blast Furnace']
+      * energy_shares['Blast Furnace']['Coke']
+      / energy_content['Coke']
+    Coal: >
+      energy_int['Blast Furnace']
+      * energy_shares['Blast Furnace']['Coal']
+      / energy_content['Coal']
+  outputs:
+    Pig Iron: 1.0
+    BF Process Gas: "process_gases['BF Process Gas']['recovery_fraction'] * energy_int['Blast Furnace'] / energy_content['BF Process Gas']" 
+\end{verbatim}
+
+As the most complex process in the entire production chain, the Blast Furnace recipe warrants a detailed explanation. The inputs include iron sources (sinter, pellet, lump ore) calculated based on their iron content and blend ratios, as well as auxiliary materials like nitrogen, oxygen, limestone, coke, and coal. The coke and coal inputs are dynamically calculated based on the energy intensity of the Blast Furnace and the respective energy shares defined in the energy matrix. The outputs include pig iron and recovered blast furnace process gas, with the latter calculated based on a recovery fraction parameter and the energy intensity. Note that the use of expressions allows for flexibility in adjusting the recipe based on different parameters and energy intensities. Also, the energy to mass conversion for both coal and coke are needed to ensure upstream processes (Coke Making, Coal Purchase) are correctly sized.
+
+
+Here, \texttt{scrap\_fraction} is a parameter defined in \texttt{parameters.yml}.
+When loading recipes, the API evaluates these expressions in a namespace that
+includes all parameters and energy intensities, allowing dynamic adjustment of
+recipes based on scenario inputs.
+
+The user must make sure that recipe chains are integrated, meaning that outputs of
+one process are inputs to another, forming a connected graph from raw materials
+to final products. If the chain breaks anywhere, upstream or downstream processes will not run, thus not appear on Production Runs, which can thus be used as a debugger. All possible processes can have recipes on the same file, as a separate implementation was done to specifically solve ambiguities. The core calculations are will not run if this is not done, but will also not disambiguate, by default, to avoid model guessing.
+
+All recipes must be configured as unitary processes (1 unit of process output per run -- NOT PER FINAL PRODUCT RUN). So the Nitrogen recipe is scaled to one unit of nitrogen, not unit of steel. The model engine handles all scaling internally.
+Recipes are usually defined in constant, numerical units; however, some main inputs and outputs can be defined as expressions that reference parameters or energy intensities. This allows dynamic adjustment of recipes based on scenario inputs. Scenario overrides from default will be explained later. 
+
+\subsection{Energy Intensities}
+
+As with recipes, energy intensities are defined per process in
+\texttt{energy\_int.yml} as MJ per run. The engine scales accordingly. For example:
+\begin{verbatim}
+Basic Oxygen Furnace: 2.0
+Electric Arc Furnace: 10.0
+\end{verbatim}
+
+\subsection{Energy Matrix}    
+The energy matrix (\texttt{energy\_matrix.yml}) defines the share of each
+energy carrier used by each process. Shares are fractions that sum to 1.0 per
+process, and a specific test was added for this purpose. For example:
+\begin{verbatim}
+Basic Oxygen Furnace:   
+  Natural Gas: 0.7
+  Electricity: 0.3
+Electric Arc Furnace:
+  Electricity: 1.0
+\end{verbatim}    
+
+\subsection{Process gases}
+
+Process gas recovery can be done in the Blast Furance, Basic Oxygen Furnace and Coke Making processes. The configuration for these gases is done in \texttt{process\_gases.yml}, which defines per-volume energy content and also energy density in kg per normal cubic meterm as well as the recovery fractions (in energy terms), and the producing process. This configuration ensures mass values for recipes and energy values for the gas recovery utility. For example, the Blast Furnace process gas is defined as:
+\begin{verbatim}
+  BF Process Gas:
+    source_process: "Blast Furnace"
+    energy_gj_per_ndam3: 3.232
+    density_kg_per_nm3: 1.250
+    recovery_fraction: 0.30
+\end{verbatim}
+
+\subsection{Auxiliary energy and emissions files}
+
+Other YAML files necessary for model execution include the Lower Heating
+Values (\texttt{energy\_content.yml}), Emission Factors
+(\texttt{emission\_factors.yml}), Electricity Emission Factors (\texttt{electricity\_intensity.yml}), Direct Process Emissions
+(\texttt{process\_emissions.yml}), and Parameters (\texttt{parameters.yml}). An auxiliary file, \texttt{ghg\_protocol.yml} defines combustion only emission factors, as opposed to the main file, with total (life-cycle) emission factors. This is used in gas routing to avoid double counting of process gas carbon.
+
+\subsection{Sector Descriptor}
+
+Due to the flexible nature of FORGE, each material needs a specific configuration file, \texttt{sector.yml}, that defines the stages, routes, process roles and gas configuration. The stages are the possible products that can be modeled. For example, for steel there are the cast steel, with locked choices, crude steel, with upstream processes that can be selected, and also Finished Steel, with all possible combinations. The stages also need to be defined, so the UI can be built uppon it. Whenever multiple producers exists, the user must create a stage. The file also defines what possible routes exists for that specific product. So, for steel, there is the Blast Furnace-Basic Oxygen Furnace (BF-BOF), the BF-BOF with charcoal, the Direct Reduced Iron-Electric Arc Furance (DRI-EAF) and the Scrap-EAF. This file indicates which processes can be producers of recovery gas. 
+
+\section{Data Pipeline}
+
+This section focuses on how data flows from YAML to emissions. The pipeline is
+essentially the same for steel and aluminum; differences are encoded in the
+sector descriptors and dataset content.
+
+\subsection{Input files per dataset}
+
+For each dataset folder under \texttt{datasets/<sector>/<variant>/}, FORGE
+expects a consistent set of core YAML files:
+\begin{itemize}
+  \item \texttt{sector.yml}: descriptor (stages, routes, process roles, gas config).
+  \item \texttt{recipes.yml}: process-level input/output coefficients.
+  \item \texttt{energy\_int.yml}: energy intensity per process (MJ per run).
+  \item \texttt{energy\_matrix.yml}: carrier shares per process (fractions).
+  \item \texttt{energy\_content.yml}: lower heating values (MJ per unit of fuel).
+  \item \texttt{emission\_factors.yml}: fuel emission factors (gCO\textsubscript{2}e/MJ).
+  \item \texttt{process\_emissions.yml}: direct emissions per process
+        (kgCO\textsubscript{2}e/t output).
+  \item \texttt{parameters.yml}: scalar parameters used in recipe expressions
+        and gas routing (e.g.\ yields, fractions).
+  \item \texttt{mkt\_config.yml}: market vs endogenous production flags.
+  \item optional: \texttt{process\_gases.yml} (gas meta), energy and material
+        price tables, electricity intensity by country.
+\end{itemize}
+
+Scenario YAMLs (e.g.\ \texttt{scenarios/BF\_BOF\_coal.yml} or
+\texttt{scenario\_aluminum.yml}) provide per-run overrides:
+\begin{itemize}
+  \item route overrides (enable/disable specific processes),
+  \item modifications to energy intensities, shares, or EFs,
+  \item parameter overrides and recipe tweaks,
+  \item gas-routing fractions and optional price/EF tweaks.
+\end{itemize}
+
+\subsection{From scenario to \texttt{CoreScenario}}
+
+At a high level, the API does:
+\begin{enumerate}
+  \item Load the sector descriptor for the dataset.
+  \item Determine the route preset and stage key from the scenario name or
+        scenario dict.
+  \item Load base YAML tables (recipes, energy, EFs, parameters, markets).
+  \item Apply scenario overrides (fuel substitutions, energy tables, parameters,
+        recipes) and reload recipes to re-evaluate expressions.
+  \item Build a route mask using the descriptor and route preset.
+  \item Construct the production route from ambiguous picks (or defaults) using
+        \texttt{\_build\_routes\_from\_picks}.
+  \item Build a \texttt{CoreScenario} via \texttt{forge.scenarios.builder}
+        (\texttt{build\_core\_scenario}), which:
+    \begin{itemize}
+      \item locks route preset and EAF feed mode,
+      \item carries energy tables, EFs, process EFs, gas config, and any
+            process-emission whitelists,
+      \item handles fallback materials and optional cost inputs.
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Core runner and gas routing}
+
+Given a \texttt{CoreScenario}, \texttt{run\_core\_scenario} performs:
+\begin{enumerate}
+  \item \textbf{Material balance}:
+    \begin{itemize}
+      \item Build final demand dictionary for the chosen stage material
+            (e.g.\ \texttt{Finished Products}, \texttt{Primary Aluminum}).
+      \item Call \texttt{calculate\_balance\_matrix} with recipes, demand, and
+            route mask. This returns:
+        \begin{itemize}
+          \item a balance matrix (rows = processes + external + final demand;
+                columns = materials),
+          \item per-process production levels (\# runs).
+        \end{itemize}
+    \end{itemize}
+  \item \textbf{Energy balance}:
+    \begin{itemize}
+      \item Expand energy tables for all active processes
+            (\texttt{expand\_energy\_tables\_for\_active}).
+      \item Call \texttt{calculate\_energy\_balance} to obtain carrier-by-process
+            energy consumption plus a TOTAL row.
+    \end{itemize}
+  \item \textbf{Gas routing and credits}:
+    \begin{itemize}
+      \item Build a gas-routing scenario (gas config, route preset, demand,
+            stage reference, gas fractions).
+      \item Call \texttt{apply\_gas\_routing\_and\_credits}:
+        \begin{itemize}
+          \item Identify process-gas sources and compute total recovered gas.
+          \item Split recovered gas between direct use and electricity
+                (utility plant) according to \texttt{direct\_use\_fraction}.
+          \item Compute process-gas EF from fuel blends (excluding electricity
+                and the carrier itself), and blended gas EFs from internal vs
+                grid contributions.
+          \item Adjust the energy balance by:
+            \begin{itemize}
+              \item adding an internal electricity export row (Utility Plant),
+              \item redirecting a fraction of gas consumption to the process-gas
+                    carrier for direct use.
+            \end{itemize}
+          \item Return updated energy balance, updated energy EFs, and a meta
+                dict with diagnostics.
+        \end{itemize}
+    \end{itemize}
+  \item \textbf{Emissions}:
+    \begin{itemize}
+      \item Use a robust wrapper to call \texttt{calculate\_emissions} with
+            whatever combination of arguments it accepts (maintains backwards
+            compatibility).
+      \item \texttt{calculate\_emissions} separates market vs onsite processes,
+            applies blended electricity and fuel EFs, and adds direct process
+            emissions when whitelisted.
+      \item A total row/column is computed when necessary; total emissions are
+            returned in kg CO\textsubscript{2}e.
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Gas recovery and internal electricity production}
+
+In the steel datasets, several processes (Coke Production, Blast Furnace, and Basic Oxygen Furnace) are marked as gas sources in the sector descriptor and mapped
+to a process-gas carrier (e.g.\ \texttt{Process Gas (internal)}). Additional
+metadata in \texttt{process\_gases.yml} specifies per-unit energy content,
+recovery fractions, and the producing process. The API attaches this metadata
+to the parameter namespace and gas configuration before building a
+\texttt{CoreScenario}.
+
+The gas module then computes, for a given scenario:
+\begin{itemize}
+  \item the total recovered process gas $G_{\text{proc}}$ in MJ from all gas
+        sources,
+  \item a split between direct fuel use and electricity generation, controlled
+        by the scenario's \texttt{direct\_use\_fraction} and optional
+        \texttt{electricity\_fraction},
+  \item an effective process-gas emission factor
+        $\mathrm{EF}_{\text{proc}}$ built from the upstream energy-carrier
+        mix of gas-producing units, excluding electricity and the gas carrier
+        itself.
+\end{itemize}
+
+Let $f_{\text{dir}}$ be the share routed to direct use and $f_{\text{el}}$ the
+share routed to electricity (with $f_{\text{dir}} + f_{\text{el}} \le 1$).
+Define
+\[
+  G_{\text{dir}} = f_{\text{dir}}\,G_{\text{proc}}, \qquad
+  G_{\text{el}} = f_{\text{el}}\,G_{\text{proc}}.
+\]
+The utility process has a fixed electrical efficiency $\eta_{\text{el}}$
+read from its recipe (MJ of electricity per MJ of gas). The potential internal
+electricity from process gases in the present run is
+\[
+  E_{\text{int}} = \eta_{\text{el}}\,G_{\text{el}}.
+\]
+
+To avoid circularity in the blended electricity emission factor, FORGE also
+performs a reference run via
+\texttt{compute\_inside\_energy\_reference\_for\_share}, using a fixed route
+and stage defined in the descriptor (for steel, an IP3 ``inside-mill''
+boundary). That reference run yields an in-mill electricity demand
+$E_{\text{elec}}^{\text{ref}}$. The fraction of in-mill electricity credited
+to internal gas is then
+\[
+  f_{\text{int}} =
+  \min\!\left(1,\ \frac{E_{\text{int}}}{E_{\text{elec}}^{\text{ref}}}\right),
+\]
+and the internal electricity emission factor is a simple proxy
+\[
+  \mathrm{EF}_{\text{int}} = \frac{\mathrm{EF}_{\text{proc}}}{\eta_{\text{el}}}.
+\]
+The plant-level electricity emission factor used in emissions is the blend
+\[
+  \mathrm{EF}_{\text{elec,plant}}
+  = f_{\text{int}}\,\mathrm{EF}_{\text{int}}
+    + (1-f_{\text{int}})\,\mathrm{EF}_{\text{grid}},
+\]
+where $\mathrm{EF}_{\text{grid}}$ is the grid electricity factor (possibly
+overridden by a country code).
+
+Direct use of process gas is treated as a substitution in the energy balance.
+The model computes a fraction $f_{\text{gas,int}}$ of total plant gas demand
+that can be supplied by recovered process gas and:
+\begin{itemize}
+  \item reduces natural-gas consumption by $f_{\text{gas,int}}$ at each
+        process, and
+  \item adds the same MJ to the process-gas carrier column.
+\end{itemize}
+The resulting blended gas emission factor is
+\[
+  \mathrm{EF}_{\text{gas,blend}} =
+    f_{\text{gas,int}}\,\mathrm{EF}_{\text{proc}}
+    + (1-f_{\text{gas,int}})\,\mathrm{EF}_{\text{nat,grid}}.
+\]
+Both $\mathrm{EF}_{\text{elec,plant}}$ and
+$\mathrm{EF}_{\text{gas,blend}}$ are fed into \texttt{calculate\_emissions}
+so that process gases are credited once, via the electricity block and gas
+substitution, without double counting.
+
+The implementation is intentionally attributional. It does not add an explicit
+combustion step for process-gas carbon, does not model auxiliaries or fugitive
+emissions for gas handling, and keeps most upstream burdens at the originating
+units. As a result, the internal electricity factor should be read as a
+consistent proxy derived from upstream carriers, suitable for comparative
+scenarios and sensitivity analysis.
+
+\section{Automation and User-Defined Scenarios}
+
+Reproducible runs and user experiments are driven by simple CLI and Makefile
+wrappers; no UI interaction is required.
+
+\paragraph{Makefile targets.}
+Common runs are exposed as \texttt{make} targets that delegate to
+\texttt{scripts/run\_profiles.py}: \texttt{make finished} (paper finished
+portfolio), \texttt{make paper} (paper portfolio), \texttt{make aluminum}
+(baseline aluminum batch), \texttt{make mc-as-cast} and \texttt{make
+mc-finished} (Monte Carlo sweeps), plus \texttt{make list} to show available
+profiles. Each target maps to a profile in \texttt{configs/run\_profiles.yml},
+which records the command and environment variables needed for that run.
+
+\paragraph{Adding a profile.}
+Profiles are YAML entries with a description, an \texttt{env} map, and a
+\texttt{cmd} array. Example:
+\begin{verbatim}
+my_profile:
+  desc: "Custom batch"
+  env: { PYTHONPATH: src }
+  cmd:
+    - "python3"
+    - "-m"
+    - "forge.cli.steel_batch_cli"
+    - "run"
+    - "--spec"
+    - "configs/my_batch.yml"
+\end{verbatim}
+Execute with \texttt{make run PROFILE=my\_profile}.
+
+\paragraph{Single-scenario run.}
+\begin{enumerate}
+  \item Choose a dataset (e.g.\ \texttt{datasets/steel/likely}) and copy an
+        existing scenario YAML under \texttt{scenarios/}.
+  \item Edit \texttt{route\_overrides} (enable/disable processes) and, if
+        needed, adjust \texttt{energy\_int}, \texttt{energy\_matrix},
+        \texttt{emission\_factors}, \texttt{parameters}, or
+        \texttt{recipe\_overrides}.
+  \item Run via:
+\begin{verbatim}
+PYTHONPATH=src python3 -m forge.cli.steel_batch_cli run \
+  --data-dir datasets/steel/likely \
+  --scenario datasets/steel/likely/scenarios/BF_BOF_coal.yml \
+  --route BF-BOF --stage-key Finished --country BRA \
+  --output results/custom_run.json
+\end{verbatim}
+\end{enumerate}
+
+\paragraph{Batch spec.}
+For multiple runs, define a spec with optional \texttt{defaults} and a
+\texttt{runs} list:
+\begin{verbatim}
+defaults:
+  data_dir: datasets/steel/likely
+  route: {route_preset: BF-BOF, stage_key: Finished, demand_qty: 1000}
+runs:
+  - name: coal
+    scenario_file: datasets/steel/likely/scenarios/BF_BOF_coal.yml
+  - name: charcoal
+    scenario_file: datasets/steel/likely/scenarios/BF_BOF_charcoal.yml
+    overrides: { emission_factors.Charcoal: 5.0 }
+\end{verbatim}
+Run with \texttt{python3 -m forge.cli.steel\_batch\_cli run --spec
+configs/my\_batch.yml --output results/my\_batch.csv}. Each run can set country
+codes, \texttt{picks\_by\_material}, or \texttt{pre\_select\_soft}.
+
+\paragraph{Monte Carlo.}
+The Monte Carlo utility (\texttt{forge.scenarios.monte\_carlo\_tri}) samples
+energy intensities, carrier shares, and emission factors between min/mode/max
+datasets and can blend multiple runs from a portfolio. A typical call is:
+\begin{verbatim}
+python3 -m forge.scenarios.monte_carlo_tri \
+  --min datasets/steel/optimistic_low \
+  --mode datasets/steel/likely \
+  --max datasets/steel/pessimistic_high \
+  --route BF-BOF \
+  --portfolio configs/as_cast_portfolio.yml \
+  --countries BRA \
+  --n 500 \
+  --out results/mc_as_cast
+\end{verbatim}
+Outputs include \texttt{mc\_summary.csv} and optional histogram/ECDF PNGs.
+
+\subsection{Aluminum specifics}
+
+Aluminum uses the same core but different descriptors and datasets:
+\begin{itemize}
+  \item \textbf{Routes and stages} are defined in
+        \texttt{datasets/aluminum/baseline/sector.yml}, with stages for
+        primary, remelt, and finished aluminum.
+  \item \textbf{Downstream alloying and finishing} are described via recipes
+        for:
+    \begin{itemize}
+      \item \emph{Remelt blending} and alloy series (1, 5, 6, 7),
+      \item metallurgical aluminum aggregation,
+      \item rolling, extrusion, ingot casting, and raw products,
+      \item manufactured products and final coatings (no coating, powder
+            coating, liquid painting).
+    \end{itemize}
+  \item \textbf{Direct process emissions} for aluminum are configured via
+        \texttt{process\_emissions.yml} and a scenario-level whitelist
+        (\texttt{allow\_direct\_onsite}) that flags which processes count as
+        onsite direct emitters.
+\end{itemize}
+
+\section{Uncertainty, sensitivity, and validation}
+
+Uncertainty in FORGE enters primarily through energy intensities, carrier
+shares, emission factors, and selected process parameters. For steel, the
+repository provides three dataset variants (\texttt{optimistic\_low},
+\texttt{likely}, \texttt{pessimistic\_high}) with consistent YAML schemas;
+aluminum currently has a single baseline dataset.
+
+In the Streamlit interface, users can:
+\begin{itemize}
+  \item switch between dataset variants in the sidebar (steel only);
+  \item choose country-specific grid factors from
+        \texttt{electricity\_intensity.yml};
+  \item adjust key parameters in the ``Sensitivity'' and ``Static Mods'' tabs
+        (e.g.\ Blast Furnace energy intensity schedules, DRI/EAF mixes, scrap
+        shares, downstream choices).
+\end{itemize}
+These controls exercise the same API used by scripts, so any combination of
+UI settings can be reproduced with a \texttt{RouteConfig} and scenario dict.
+
+For Monte Carlo analysis, \texttt{forge.scenarios.monte\_carlo\_tri} samples
+uncertain YAML tables between the min/likely/max datasets using triangular
+distributions, renormalizes energy matrices, and runs many independent
+scenarios through \texttt{run\_scenario}. It writes per-sample totals and
+histograms/ECDFs of emission factors, enabling uncertainty bands around route
+comparisons or downstream portfolios.
+
+Validation in the steel case is currently focused on:
+\begin{itemize}
+  \item mass, energy, and elemental closure checks at the process and plant
+        levels;
+  \item unit tests for recipes and yields, including internal consistency of
+        blend parameters;
+  \item regression-style tests that compare route-level cradle-to-gate
+        intensities against published ranges (e.g.\ Worldsteel 2023);
+  \item sensitivity and Monte Carlo sweeps to ensure that the model responds
+        smoothly to parameter perturbations rather than relying on tuned
+        point estimates.
+\end{itemize}
+Aluminum validation is more limited and currently serves mainly as a proof of
+concept for extending the framework to other sectors.
+
+\section{Usage}
+
+FORGE can be used via two main interfaces, an interactive Streamlit app and a Python
+API for scripting and batch runs.
+
+\subsection{Streamlit app}
+The Streamlit app is launched via:
+\begin{verbatim}
+streamlit run src/forge/apps/streamlit_app.py
+\end{verbatim}
+
+The app’s landing screen asks for the industrial sector (Steel or Aluminum).
+Once a sector is selected, the sidebar lets the user choose:
+\begin{itemize}
+  \item a dataset variant (e.g.\ \texttt{datasets/steel/likely});
+  \item a scenario file (e.g.\ \texttt{BF\_BOF\_coal.yml});
+  \item a product stage (Validation / Crude steel / Finished);
+  \item a country code for grid electricity emission factors.
+\end{itemize}
+The main panel provides tabs for the core model, 1-D sensitivity sweeps, and
+static modifications (e.g.\ Blast Furnace energy-intensity schedules, DRI/EAF
+mixes, scrap shares). All runs ultimately call the same
+\texttt{run\_scenario} API described earlier.
+
+\subsection{CLI and scripting}
+
+FORGE’s core can be exercised without the UI using the small engine CLI:
+\begin{verbatim}
+PYTHONPATH=src python3 -m forge.cli.engine_cli \
+  --data datasets/steel/likely \
+  --route BF-BOF \
+  --stage Finished \
+  --country BRA \
+  --demand 1000 \
+  --out results/engine_demo
+\end{verbatim}
+This runs a single scenario through \texttt{run\_scenario}, printing a
+summary (total CO$_2$e and top emitting processes) and writing CSV outputs
+for the energy balance and emissions, plus a small JSON manifest with the
+dataset path, arguments, and Git commit.
+
+For larger sweeps and portfolios, \texttt{forge.cli.steel\_batch\_cli}
+implements a batch runner around the same API:
+\begin{verbatim}
+PYTHONPATH=src python3 -m forge.cli.steel_batch_cli run \
+  --spec configs/finished_steel_portfolio.yml \
+  --data-dir datasets/steel/likely \
+  --output results/finished_portfolio_bf.json
+\end{verbatim}
+The batch spec file describes one or more runs (route, stage, picks,
+scenario overrides), and the CLI fan-outs country codes or portfolio
+components as needed. Outputs are aggregated JSON/CSV suitable for
+post-processing (e.g.\ figures and tables in this paper).
+
+Monte Carlo uncertainty analysis is available via
+\texttt{forge.scenarios.monte\_carlo\_tri}:
+\begin{verbatim}
+PYTHONPATH=src python3 -m forge.scenarios.monte_carlo_tri \
+  --min datasets/steel/optimistic_low \
+  --mode datasets/steel/likely \
+  --max datasets/steel/pessimistic_high \
+  --route BF-BOF \
+  --n 500 \
+  --out results/mc_bf_bof
+\end{verbatim}
+This samples energy and emission tables between the three steel datasets,
+runs each draw through \texttt{run\_scenario}, and writes CSV summaries plus
+basic histograms/ECDF plots of emission factors.
+
+\section{Scenario Creation}
+
+FORGE has some pre-configured route pre-sets, which are set by scenario.yml files. This allows the user to tailor the model for some specifities found only on that route. So by desing the BF-BOF scenario file automatically disables the DRI and EAF processes, creating a pre-mask ('route_overrides'). It also allows the user to override some default parameters ('recipe_overrides). For example, the DRI-EAF needs to run on higher grade iron ore, thus a parameter set on the scenario file will take precedence from the original recipe ('params_overrides'). The pilosophy is that recipes should be more stable, while the user overrides it elsewhere (the app UI also allows some overrides). The model will scan for overrides before sending full specs to core. 
+
+
+
+\section{Next Steps for the Full Paper}
+
+\section{Model Results}
+
+Monte Carlo for the as-cast configuration, for Brazil, using mininum, likely and maximum datasets, shows the following results:
+
+\begin{figure}
+      \centering
+      \includegraphics[width=0.9\textwidth]{mc-cast.png}
+      \caption{Monte Carlo Simulation for cast steel in Brazil}
+\end{figure}
+
+
+This skeleton focuses on:
+\begin{itemize}
+  \item code structure and responsibilities,
+  \item file-level data pipeline,
+  \item gas-routing scheme and its integration with the core.
+\end{itemize}
+
+For a complete academic paper, suggested additions:
+\begin{itemize}
+  \item mathematical formulation of the balance solver (graph walk, uniqueness
+        of producers, handling of external purchases),
+  \item validation section (comparison vs external benchmarks for steel and
+        aluminum),
+  \item uncertainty ranges and scenario variants (likely/optimistic/pessimistic),
+  \item discussion of limitations and future work (e.g.\ costs, other sectors).
+\end{itemize}
+
+\end{document}

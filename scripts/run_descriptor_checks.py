@@ -35,4 +35,4 @@ def run_case(data_dir: str, scenario_name: str, stage_key: str = "Finished"):
 
 if __name__ == "__main__":
     run_case("datasets/steel/likely", "BF_BOF_coal.yml")
-    run_case("datasets/aluminum/baseline", "scenario_aluminum.yml")
+    run_case("datasets/aluminum/baseline", "primary-al.yml", stage_key="primary")

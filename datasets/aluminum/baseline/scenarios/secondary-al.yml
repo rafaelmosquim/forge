@@ -1,7 +1,8 @@
-route_preset: Primary
-stage_key: Primary
-demand_qty: 1000  # or whatever you need
+route_preset: Secondary
+stage_key: remelt
+demand_qty: 1000
 
+# Universal aluminum settings
 allow_direct_onsite:
   - Bauxite Mining
   - Pitch Production
@@ -12,7 +13,6 @@ allow_direct_onsite:
   - Cryolite Production (HF)
   - Aluminum Fluoride Production
   - Scrap Melting and Processing
-  # add any others you want to count as process emissions
 
 material_credit_map:
   NaOHp:
@@ -22,3 +22,10 @@ material_credit_map:
 pre_select_soft:
   Raw Aluminum (extrusion): 1
   Raw Aluminum (ingot): 0
+
+recipe_overrides:
+  # Secondary/remelt: rely fully on scrap, no primary ingot
+  Remelt Blending:
+    inputs:
+      Primary Ingot Aluminum: 0.0
+      Recycled Aluminum: 1.0

@@ -123,7 +123,7 @@ SECTOR_CONFIG = {
             "Baseline": "datasets/aluminum/baseline",
         },
         "default_dataset": "Baseline",
-        "preferred_scenario": "scenario_aluminum.yml",
+        "preferred_scenario": "primary-al.yml",
     },
 }
 
@@ -606,15 +606,10 @@ with st.sidebar:
     # Scenario picker (from dataset/scenarios)
     def list_scenarios(data_dir: str) -> List[str]:
         base_path = pathlib.Path(data_dir)
-        names: List[str] = []
         sc_dir = base_path / "scenarios"
-        if sc_dir.exists():
-            names.extend(sorted(p.name for p in sc_dir.glob("*.yml")))
-        top_level = sorted(p.name for p in base_path.glob("scenario_*.yml"))
-        for name in top_level:
-            if name not in names:
-                names.append(name)
-        return names
+        if not sc_dir.exists():
+            return []
+        return sorted(p.name for p in sc_dir.glob("*.yml"))
 
     st.markdown(f"**Sector:** {SECTOR_KEY}")
     if st.button("Change sector", key="btn_change_sector"):
@@ -664,7 +659,8 @@ with st.sidebar:
         )
         scenario_path = pathlib.Path(DATA_ROOT) / "scenarios" / scenario_choice
         if not scenario_path.exists():
-            scenario_path = pathlib.Path(DATA_ROOT) / scenario_choice
+            st.error(f"Scenario '{scenario_choice}' not found under {DATA_ROOT}/scenarios")
+            st.stop()
         scenario = load_data_from_yaml(str(scenario_path), default_value=None, unwrap_single_key=False)
         scenario_name = scenario_choice
     else:
@@ -672,8 +668,6 @@ with st.sidebar:
         fallback_path = None
         if fallback_name:
             fallback_path = pathlib.Path(DATA_ROOT) / "scenarios" / fallback_name
-            if not fallback_path.exists():
-                fallback_path = pathlib.Path(DATA_ROOT) / fallback_name
         if fallback_path and fallback_path.exists():
             scenario_choice = fallback_name
             scenario = load_data_from_yaml(str(fallback_path), default_value=None, unwrap_single_key=False)

@@ -43,7 +43,22 @@
     HF: 0.5840
     NaOH: 0.5830 # accounting for NaOH recovered in Precipitation 
   outputs: 
-    Cryolite: 1.0    
+    Cryolite (HF): 1.0    
+
+- process: Cryolite Production (H2SiF6)
+  inputs:
+    Alumina: 0.2534
+    H2SiF6: 0.7154 
+    NaOH: 0.5962 # accounting for NaOH recovered in Precipitation 
+  outputs: 
+    Cryolite (H2SiF6): 1.0
+
+- process: Cryolite Blending
+  inputs:
+    Cryolite (HF): 0.75
+    Cryolite (H2SiF6): 0.25
+  outputs:
+    Cryolite: 1.0       
 
 - process: Aluminum Fluoride Production
   inputs:
@@ -88,6 +103,9 @@
     AlF3: 0.0210 
   outputs:
     Primary Liquid Aluminum (prebaked): 1.0
+    CO2: 1.4965
+    CO: 0.0917
+    Other: 0.4284
 
 - process: Electrolysis (Soderberg)
   inputs:
@@ -99,6 +117,9 @@
     AlF3: 0.0207
   outputs:
     Primary Liquid Aluminum (Soderberg): 1.0
+    CO2: 1.4965
+    CO: 0.0917
+    Other: 1.1330
 
 - process: Primary Aluminum
   inputs:
@@ -274,7 +295,13 @@
   inputs:
     Aluminum Ingot Casting: 1.0
   outputs:
-    Casted Aluminum (ingot): 1.0    
+    Casted Aluminum (ingot): 1.0   
+
+- process: Raw Aluminum (rolled)
+  inputs:
+    Rolled Aluminum: 1.0
+  outputs:
+    Basic Aluminum Products: 1.0     
 
 - process: Raw Aluminum (extrusion)
   inputs:

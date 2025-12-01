@@ -1,0 +1,42 @@
+# Example CLI runs for the aluminum baseline dataset.
+# Invoke with:
+#   python3 -m forge.cli.steel_batch_cli run \
+#     --spec configs/aluminum_cli_examples.yml \
+#     --output results/aluminum_cli_summary.json
+#
+# Notes:
+# - Stage keys come from datasets/aluminum/baseline/sector.yml
+#   (primary only in this batch).
+# - Route preset is "Primary" for all runs; adjust if new presets are added.
+# - Runs cover every country with an electricity intensity entry.
+defaults:
+  data_dir: datasets/aluminum/baseline
+  scenario_file: datasets/aluminum/baseline/scenarios/primary-al.yml
+  log_dir: results/logs/aluminum_cli
+  route:
+    route_preset: Primary
+    stage_key: primary
+    demand_qty: 1000
+
+runs:
+  # Country codes from datasets/aluminum/baseline/electricity_intensity.yml
+  - name: aluminum_primary_bra
+    country_code: BRA
+  - name: aluminum_primary_chn
+    country_code: CHN
+  - name: aluminum_primary_deu
+    country_code: DEU
+  - name: aluminum_primary_ind
+    country_code: IND
+  - name: aluminum_primary_jpn
+    country_code: JPN
+  - name: aluminum_primary_rus
+    country_code: RUS
+  - name: aluminum_primary_kor
+    country_code: KOR
+  - name: aluminum_primary_usa
+    country_code: USA
+  - name: aluminum_primary_irn
+    country_code: IRN
+  - name: aluminum_primary_tur
+    country_code: TUR

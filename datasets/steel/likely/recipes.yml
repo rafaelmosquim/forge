@@ -414,6 +414,21 @@
   outputs:
     Liquid Steel H: 1.0
 
+- process: Cast Iron Alloying
+  inputs:
+    Pig Iron: 1.0 - 0.299  
+    Alloys Mix for High Alloy Steel (HAS): 0.299
+    Nitrogen: 0.0070
+    Oxygen: 0.0250
+    Dolomite: 0.0050
+    Burnt Lime: 0.0300
+  outputs:   
+    Pig Iron H: 1.0 
+
+- process: Iron Foundry (Exit)
+  inputs:  { Pig Iron H: 1.0 }
+  outputs: { Cast Iron (H): 1.0 }
+
 # -------------------------
 # Liquid Steel exits & CC
 # -------------------------

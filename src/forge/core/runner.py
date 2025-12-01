@@ -121,6 +121,35 @@ def _robust_call_calculate_emissions(calc_fn, **kwargs):
     return calc_fn(**usable)
 
 
+def _process_output_emissions_from_recipes(recipes: List[Process], prod_levels: Dict[str, float]) -> Dict[str, float]:
+    """
+    Compute direct emissions from explicit gas outputs in recipes (kg CO2e).
+    Currently targets aluminum electrolysis processes with CO2/CO/Other outputs.
+    """
+    totals: Dict[str, float] = {}
+    targets = {"Electrolysis (prebaked)", "Electrolysis (Soderberg)"}
+    for proc in recipes:
+        if proc.name not in targets:
+            continue
+        outs = getattr(proc, "outputs", {}) or {}
+        def _get(key: str) -> float:
+            try:
+                return float(outs.get(key, 0.0) or 0.0)
+            except Exception:
+                return 0.0
+        co2 = _get("CO2")
+        co = _get("CO")
+        other = _get("Other")
+        factor = co2 - 0.7 * co - other
+        if abs(factor) <= 1e-12:
+            continue
+        runs = float(prod_levels.get(proc.name, 0.0))
+        if runs > 1e-12:
+            # factor is per run (per kg of output); convert to kg and scale by runs
+            totals[proc.name] = runs * factor * 1000.0
+    return totals
+
+
 def run_core_scenario(scn: CoreScenario) -> CoreResults:
     """Execute the deterministic compute for a resolved scenario."""
     # 1) Balance
@@ -175,6 +204,8 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
 
     eb_for_emissions = eb_adj.copy()
 
+    process_output_emissions = _process_output_emissions_from_recipes(scn.recipes, prod_levels)
+
     # 4) Emissions (robust signature)
     emissions = _robust_call_calculate_emissions(
         calculate_emissions,
@@ -195,6 +226,7 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
         ef_internal_electricity=gas_meta.get("ef_internal_electricity", 0.0),
         outside_mill_procs=scn.outside_mill_procs,
         allow_direct_onsite=scn.allow_direct_onsite,
+        process_output_emissions=process_output_emissions,
     )
 
     total_co2 = None

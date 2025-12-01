@@ -76,6 +76,59 @@ routes:
       - No Coating
       - Powder Coating
       - Liquid Painting
+  - id: Secondary
+    label: "Secondary Aluminum"
+    aliases: ["Secondary", "Remelt", "Secondary Aluminum"]
+    disable:
+      - Bauxite Mining
+      - Pitch Production
+      - Coke Production
+      - Caustic Soda Production
+      - Anode Production (Prebaked)
+      - Anode Production (Paste)
+      - Cryolite Production (HF)
+      - Cryolite Production (H2SiF6)
+      - Aluminum Fluoride Production
+      - Bauxite Processing
+      - Digestion
+      - Precipitation
+      - Calcination
+      - Electrolysis (prebaked)
+      - Electrolysis (Soderberg)
+      - Primary Aluminum
+      - Primary Ingot Melting
+    enable:
+      - Scrap Purchase
+      - Scrap Melting and Processing
+      - Remelt Blending
+      - Al Alloy Series 1
+      - Al Alloy Series 5
+      - Al Alloy Series 6
+      - Al Alloy Series 7
+      - Al Casting Alloy 3
+      - Al Casting Alloy 4
+      - Metallurgical Aluminum from Series 1
+      - Metallurgical Aluminum from Series 5
+      - Metallurgical Aluminum from Series 6
+      - Metallurgical Aluminum from Series 7
+      - Metallurgical Aluminum from Casting Alloy 3
+      - Metallurgical Aluminum from Casting Alloy 4
+      - Ingot Melting and CC
+      - Hot and Cold Rolling
+      - Extrusion
+      - Metallurgical Aluminum Ingot Casting
+      - Casting
+      - Raw Aluminum (extrusion)
+      - Raw Aluminum (ingot)
+      - Direct use of Basic Aluminum Products
+      - Stamping
+      - Drilling
+      - Milling
+      - Turning
+      - Welding
+      - No Coating
+      - Powder Coating
+      - Liquid Painting
 
 process_roles:
   Bauxite Mining: [upstream]

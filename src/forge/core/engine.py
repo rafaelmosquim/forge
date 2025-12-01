@@ -172,6 +172,7 @@ def calculate_emissions(
     ef_internal_electricity=None,
     outside_mill_procs: set | None = None,
     allow_direct_onsite: set | None = None,
+    process_output_emissions: dict | None = None,
 ):
     """
     This should be a simple emission calculator but needed some tailoring for steel processes. Aluminum will probably need similar treatment.
@@ -207,6 +208,15 @@ def calculate_emissions(
     ef_elec_mix = f_internal * ef_int_e + (1.0 - f_internal) * ef_grid
 
     rows = []
+    output_emissions = {}
+    try:
+        output_emissions = {
+            str(k): float(v)
+            for k, v in (process_output_emissions or {}).items()
+            if v is not None
+        }
+    except Exception:
+        output_emissions = {}
     # Iterate over all processes appearing anywhere
     proc_index = list({*energy_df.index.tolist(), *process_efs.keys(), *prod_level.keys()})
 
@@ -241,6 +251,26 @@ def calculate_emissions(
                 row['Direct Emissions'] = 0.0
 
         rows.append(row)
+
+    # Add per-process direct emissions derived from recipe outputs (e.g., Electrolysis gas streams)
+    if output_emissions:
+        indexed = {row["Process"]: row for row in rows}
+        for proc, extra in output_emissions.items():
+            if abs(extra) <= 1e-12:
+                continue
+            row = indexed.get(proc)
+            if row is None:
+                row = {"Process": proc, "Energy Emissions": 0.0, "Direct Emissions": 0.0}
+                rows.append(row)
+                indexed[proc] = row
+            row["Direct Emissions"] = float(row.get("Direct Emissions", 0.0)) + float(extra)
+        total_extra = sum(v for v in output_emissions.values() if abs(v) > 1e-12)
+        if abs(total_extra) > 1e-12:
+            rows.append({
+                "Process": "Process emissions (Electrolysis)",
+                "Energy Emissions": 0.0,
+                "Direct Emissions": float(total_extra),
+            })
 
     if not rows:
         return None

@@ -11,7 +11,7 @@
 # - Runs cover every country with an electricity intensity entry.
 defaults:
   data_dir: datasets/aluminum/baseline
-  scenario_file: datasets/aluminum/baseline/scenario_aluminum.yml
+  scenario_file: datasets/aluminum/baseline/scenarios/primary-al.yml
   log_dir: results/logs/aluminum_cli
   route:
     route_preset: Primary

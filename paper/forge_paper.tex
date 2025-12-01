@@ -1060,6 +1060,10 @@ This samples energy and emission tables between the three steel datasets,
 runs each draw through \texttt{run\_scenario}, and writes CSV summaries plus
 basic histograms/ECDF plots of emission factors.
 
+\section{Scenario Creation}
+
+FORGE has some pre-configured route pre-sets, which are set by scenario.yml files. This allows the user to tailor the model for some specifities found only on that route. So by desing the BF-BOF scenario file automatically disables the DRI and EAF processes, creating a pre-mask ('route_overrides'). It also allows the user to override some default parameters ('recipe_overrides). For example, the DRI-EAF needs to run on higher grade iron ore, thus a parameter set on the scenario file will take precedence from the original recipe ('params_overrides'). The pilosophy is that recipes should be more stable, while the user overrides it elsewhere (the app UI also allows some overrides). The model will scan for overrides before sending full specs to core. 
+
 
 
 \section{Next Steps for the Full Paper}

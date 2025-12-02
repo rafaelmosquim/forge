@@ -264,13 +264,6 @@ def calculate_emissions(
                 rows.append(row)
                 indexed[proc] = row
             row["Direct Emissions"] = float(row.get("Direct Emissions", 0.0)) + float(extra)
-        total_extra = sum(v for v in output_emissions.values() if abs(v) > 1e-12)
-        if abs(total_extra) > 1e-12:
-            rows.append({
-                "Process": "Process emissions (Electrolysis)",
-                "Energy Emissions": 0.0,
-                "Direct Emissions": float(total_extra),
-            })
 
     if not rows:
         return None

@@ -2,7 +2,7 @@
 
 PY ?= python3
 
-.PHONY: help list finished paper aluminum mc-as-cast mc-finished run parallel
+.PHONY: help list finished paper aluminum aluminum_fgv mc-as-cast mc-finished run parallel
 
 help:
 	@echo "Targets:"
@@ -10,6 +10,7 @@ help:
 	@echo "  finished        - run finished steel portfolio"
 	@echo "  paper           - run paper portfolio"
 	@echo "  aluminum        - run aluminum baseline scenarios via CLI"
+	@echo "  aluminum_fgv    - run aluminum FGV portfolio (rolled/extruded/casted blend)"
 	@echo "  mc-as-cast      - Monte Carlo as-cast portfolio (via run_profiles)"
 	@echo "  mc-finished     - Monte Carlo finished portfolio (via run_profiles)"
 	@echo "  run PROFILE=... - run a named profile from configs/run_profiles.yml"
@@ -31,6 +32,9 @@ paper:
 
 aluminum:
 	$(PY) scripts/run_profiles.py aluminum
+
+aluminum_fgv:
+	$(PY) scripts/run_profiles.py aluminum_fgv
 
 run:
 	@test -n "$(PROFILE)" || (echo "Set PROFILE=<name>" && exit 2)

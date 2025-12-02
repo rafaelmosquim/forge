@@ -9,12 +9,12 @@ Cryolite Production (HF): 0.0
 Cryolite Production (H2SiF6): 3.31
 Cryolite Blending: 0.0
 Aluminum Fluoride Production: 0.0
-Bauxite Processing: 0.5320
-Digestion: 1.7925
+Bauxite Processing: 0.390
+Digestion: 1.315
 Precipitation: 0.0
-Calcination: 2.8528
-Electrolysis (prebaked): 56.70
-Electrolysis (Soderberg): 61.02
+Calcination: 2.617
+Electrolysis (prebaked): 54.70
+Electrolysis (Soderberg): 58.87
 Scrap Melting and Processing: 0.0
 Primary Ingot Melting: 0.80
 Remelt Blending: 0.0
@@ -32,8 +32,8 @@ Metallurgical Aluminum from Series 7: 0.0
 Metallurgical Aluminum from Casting Alloy 3: 0.0
 Metallurgical Aluminum from Casting Alloy 4: 0.0
 Ingot Melting and CC: 3.752
-Hot and Cold Rolling: 3.882
-Extrusion: 6.830
+Hot and Cold Rolling: 10.10
+Extrusion: 12.68
 Metallurgical Aluminum Ingot Casting: 2.621
 Casting: 4.888
 Raw Aluminum: 0.0

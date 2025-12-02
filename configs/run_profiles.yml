@@ -43,6 +43,21 @@ profiles:
       - "--output"
       - "results/aluminum_cli_summary.json"
 
+  aluminum_fgv:
+    desc: "FGV aluminum portfolio (26.5% rolled, 13.5% extruded, 60% casted)"
+    env:
+      PYTHONPATH: src
+      FORGE_OUTPUT_LABEL: aluminum_fgv
+    cmd:
+      - "python3"
+      - "-m"
+      - "forge.cli.steel_batch_cli"
+      - "run"
+      - "--spec"
+      - "configs/aluminum_fgv_portfolio.yml"
+      - "--output"
+      - "results/aluminum_fgv_summary.json"
+
   mc-as-cast:
     desc: "Monte Carlo (as-cast portfolio, BRA grid, 500 draws)"
     env:

@@ -64,7 +64,7 @@ from forge.steel_core_api_v2 import (
 )
 
 DEFAULT_DATA_DIR = Path("datasets/steel/likely")
-REPORTED_YIELD_FACTOR = 0.85  # Core outputs "raw" CO2; divide by 0.85 to gross up totals
+REPORTED_YIELD_FACTOR = 0.85  # Fallback when dataset yield is unavailable (steel)
 REPORTED_YIELD_DIVISOR = 1.0 / REPORTED_YIELD_FACTOR  # ≈1.17647×
 
 
@@ -664,6 +664,27 @@ def _build_route_cfg(plan: RunPlan) -> RouteConfig:
         pre_select_soft=pre_select,
     )
 
+def _reported_yield_factor(meta: Dict[str, Any] | None, route_cfg: RouteConfig) -> float:
+    """
+    Determine the reporting yield divisor:
+    - Aluminum finished stage → 0.95 (requested rule)
+    - Otherwise use dataset finished_yield if present, else 0.85 fallback.
+    """
+    meta = meta or {}
+    sector = str(meta.get("sector_key") or "").strip().lower()
+    stage_key_lower = str(route_cfg.stage_key or "").strip().lower()
+    stage_role_lower = str(route_cfg.stage_role or "").strip().lower()
+    apply_yield = stage_key_lower.startswith("finish") or stage_role_lower == "finished"
+    if not apply_yield:
+        return 1.0
+    if sector == "aluminum":
+        return 0.95
+    try:
+        fyield_val = float(meta.get("finished_yield", REPORTED_YIELD_FACTOR))
+    except (TypeError, ValueError):
+        fyield_val = REPORTED_YIELD_FACTOR
+    return fyield_val if fyield_val > 0 else 1.0
+
 
 def _summarize_result(plan: RunPlan, route_cfg: RouteConfig, result) -> Dict[str, Any]:
     total = getattr(result, "total_co2e_kg", None)
@@ -672,7 +693,8 @@ def _summarize_result(plan: RunPlan, route_cfg: RouteConfig, result) -> Dict[str
     if total is not None:
         try:
             raw_total = float(total)
-            total_with_yield = raw_total * REPORTED_YIELD_DIVISOR
+            factor = _reported_yield_factor(getattr(result, "meta", {}) or {}, route_cfg)
+            total_with_yield = raw_total / factor if factor else raw_total
         except (TypeError, ValueError):
             raw_total = None
             total_with_yield = None
@@ -690,7 +712,7 @@ def _summarize_result(plan: RunPlan, route_cfg: RouteConfig, result) -> Dict[str
         try:
             total_val = float(total)
             summary["raw_co2e_kg"] = total_val
-            summary["total_co2e_kg"] = total_val * REPORTED_YIELD_DIVISOR
+            summary["total_co2e_kg"] = total_with_yield if total_with_yield is not None else total_val
         except (TypeError, ValueError):
             pass
     return summary
@@ -769,6 +791,7 @@ def _compute_blend_result(
         raise ValueError(f"Blend '{blend.name}' has non-positive total share ({total_share}).")
     demand_qty = 0.0
     total_co2e = 0.0
+    total_co2e_reported = 0.0
     costs_enabled = _costs_enabled()
     total_cost = 0.0 if costs_enabled else None
     material_cost = 0.0 if costs_enabled else None
@@ -787,6 +810,9 @@ def _compute_blend_result(
         if component_raw is None:
             raise ValueError(f"Blend '{blend.name}' component '{component.run_name}' missing total CO2e result.")
         total_co2e += weight * float(component_raw)
+        factor = _reported_yield_factor(getattr(record.result, "meta", {}) or {}, record.route_cfg)
+        component_reported = float(component_raw) / factor if factor else float(component_raw)
+        total_co2e_reported += weight * component_reported
         demand_qty += weight * float(record.route_cfg.demand_qty)
         if record.route_cfg.route_preset:
             route_set.add(record.route_cfg.route_preset)
@@ -828,7 +854,7 @@ def _compute_blend_result(
             "normalized_share": weight,
             "input_share": component.share,
             "raw_co2e_kg": component_raw,
-            "total_co2e_kg": float(component_raw) * REPORTED_YIELD_DIVISOR if component_raw is not None else None,
+            "total_co2e_kg": component_reported if component_raw is not None else None,
             "gross_ef_kg_per_unit": summary.get("gross_ef_kg_per_unit"),
             "demand_qty": record.route_cfg.demand_qty,
         })
@@ -856,14 +882,12 @@ def _compute_blend_result(
         "is_blend": True,
         "blend": True,
         "raw_co2e_kg": total_co2e,
-        "total_co2e_kg": total_co2e * REPORTED_YIELD_DIVISOR,
+        "total_co2e_kg": total_co2e_reported,
     }
     if route_set:
         summary["route_preset"] = route_set.pop() if len(route_set) == 1 else ",".join(sorted(route_set))
     if blend.notes:
         summary["notes"] = blend.notes
-    summary["raw_co2e_kg"] = total_co2e
-    summary["total_co2e_kg"] = total_co2e * REPORTED_YIELD_DIVISOR
     return summary, result
 
 

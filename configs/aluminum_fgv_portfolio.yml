@@ -9,6 +9,7 @@ defaults:
     demand_qty: 1000
   # Downstream choices shared across the portfolio
   picks_by_material:
+    Metallurgical Aluminum: Metallurgical Aluminum from Series 1
     Manufactured Aluminum Products: Direct use of Basic Aluminum Products
     Finished Aluminum Products: No Coating
 

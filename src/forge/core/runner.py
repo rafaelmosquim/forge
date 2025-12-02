@@ -140,7 +140,7 @@ def _process_output_emissions_from_recipes(recipes: List[Process], prod_levels: 
         co2 = _get("CO2")
         co = _get("CO")
         other = _get("Other")
-        factor = co2 - 0.7 * co - other
+        factor = co2 + 0.7 * co + other
         if abs(factor) <= 1e-12:
             continue
         runs = float(prod_levels.get(proc.name, 0.0))

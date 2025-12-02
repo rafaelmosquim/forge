@@ -19,3 +19,95 @@ profiles:
       FORGE_OUTPUT_LABEL: paper
     cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
 
+  reviewer:
+    desc: "Light reviewer run (simple picks, cached EFs)"
+    env:
+      FORGE_PAPER_PRODUCT_CONFIG: simple        # avoids portfolio blending
+      FORGE_PAPER_CACHE_DIR: results/cache_reviewer
+      FORGE_OUTPUT_LABEL: reviewer
+      FORGE_PAPER_CACHE: 1                      # optional; default on
+    cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
+
+  aluminum:
+    desc: "CLI aluminum baseline runs (primary, all countries)"
+    env:
+      PYTHONPATH: src
+      FORGE_OUTPUT_LABEL: aluminum_cli
+    cmd:
+      - "python3"
+      - "-m"
+      - "forge.cli.steel_batch_cli"
+      - "run"
+      - "--spec"
+      - "configs/aluminum_cli_examples.yml"
+      - "--output"
+      - "results/aluminum_cli_summary.json"
+
+  aluminum_fgv:
+    desc: "FGV aluminum portfolio (26.5% rolled, 13.5% extruded, 60% casted)"
+    env:
+      PYTHONPATH: src
+      FORGE_OUTPUT_LABEL: aluminum_fgv
+    cmd:
+      - "python3"
+      - "-m"
+      - "forge.cli.steel_batch_cli"
+      - "run"
+      - "--spec"
+      - "configs/aluminum_fgv_portfolio.yml"
+      - "--output"
+      - "results/aluminum_fgv_summary.json"
+
+  mc-as-cast:
+    desc: "Monte Carlo (as-cast portfolio, BRA grid, 500 draws)"
+    env:
+      PYTHONPATH: src
+    cmd:
+      - "python3"
+      - "-m"
+      - "forge.scenarios.monte_carlo_tri"
+      - "--min"
+      - "datasets/steel/optimistic_low"
+      - "--mode"
+      - "datasets/steel/likely"
+      - "--max"
+      - "datasets/steel/pessimistic_high"
+      - "--base"
+      - "datasets/steel/likely"
+      - "--route"
+      - "BF-BOF"
+      - "--portfolio"
+      - "configs/as_cast_portfolio.yml"
+      - "--countries"
+      - "BRA"
+      - "--n"
+      - "1000"
+      - "--out"
+      - "results/mc_as_cast"
+
+  mc-finished:
+    desc: "Monte Carlo (finished portfolio, BRA grid, 500 draws)"
+    env:
+      PYTHONPATH: src
+    cmd:
+      - "python3"
+      - "-m"
+      - "forge.scenarios.monte_carlo_tri"
+      - "--min"
+      - "datasets/steel/optimistic_low"
+      - "--mode"
+      - "datasets/steel/likely"
+      - "--max"
+      - "datasets/steel/pessimistic_high"
+      - "--base"
+      - "datasets/steel/likely"
+      - "--route"
+      - "BF-BOF"
+      - "--portfolio"
+      - "configs/finished_steel_portfolio.yml"
+      - "--countries"
+      - "BRA"
+      - "--n"
+      - "500"
+      - "--out"
+      - "results/mc_finished"

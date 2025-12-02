@@ -114,7 +114,7 @@ final demand to determine production levels per process. Given production
 levels, energy intensities, and carrier shares, it builds per-process energy
 balances. This makes the model fully integrated, which allows changes in parameters (ie Blast Furnace energy intensity) to propagate both upstream and downstream. Another feature is that FORGE models process gas recovery in coke making, blast furnace and basic oxygen furncace, in line with the real world practices. A gas-routing module implements process-gas recovery, routing between direct use and electricity, and blended emission factors for gas and internal electricity. Finally, emissions are computed using energy and direct emissions, applying blended emission factors where relevant.
 
-Aluminum implementation does not share the same intricacies of steel, and is shown here as a proof of concept of FORGE's flexibility to model other sectors. The aluminum dataset includes primary and remelt routes, downstream alloying and finishing, and direct process emissions. It does not have process gas recovery or routing, nor alternative data-sets for different scenarios (likely/optimistic/pessimistic).
+The aluminum implementation now mirrors the original Excel model and runs through the same FORGE stack as steel: primary and remelt routes, downstream alloying, rolling/extrusion/ingot casting, finishing, and direct process emissions. Aluminum is therefore a first-class, fully supported sector (currently distributed with the baseline dataset), not a lightweight demonstration.
 
 \section{High-level Architecture}
 
@@ -929,11 +929,11 @@ Outputs include \texttt{mc\_summary.csv} and optional histogram/ECDF PNGs.
 
 \subsection{Aluminum specifics}
 
-Aluminum uses the same core but different descriptors and datasets:
+Aluminum now mirrors the original Excel baseline and runs through the same pipeline as steel, using sector-specific descriptors and data:
 \begin{itemize}
   \item \textbf{Routes and stages} are defined in
-        \texttt{datasets/aluminum/baseline/sector.yml}, with stages for
-        primary, remelt, and finished aluminum.
+        \texttt{datasets/aluminum/baseline/sector.yml}, with stage definitions for
+        primary, remelt, and finished aluminum (the UI defaults to the finished product menu).
   \item \textbf{Downstream alloying and finishing} are described via recipes
         for:
     \begin{itemize}

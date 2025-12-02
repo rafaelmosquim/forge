@@ -1,7 +1,7 @@
 # Fdb version 4
-["pdflatex"] 1764351758.91348 "/home/rafael-mosquim/personal/code/forge/paper/forge_paper.tex" "forge_paper.pdf" "forge_paper" 1764351760.42273 0
+["pdflatex"] 1764701529.48204 "/home/rafael-mosquim/personal/code/forge/paper/forge_paper.tex" "forge_paper.pdf" "forge_paper" 1764701530.789 2
   "/etc/texmf/web2c/texmf.cnf" 1762859737.76856 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/rafael-mosquim/personal/code/forge/paper/forge_paper.tex" 1764351758.73047 49272 00590eedf54ce06c33c2c99a10f553f5 ""
+  "/home/rafael-mosquim/personal/code/forge/paper/forge_paper.tex" 1764700796.01032 50154 9289a1831d7f9c01b8de915720857d73 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/jknappen/ec/tcrm1000.tfm" 1136768653 1536 e07581a4bb3136ece9eeb4c3ffab8233 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm" 1246382020 1004 54797486969f23fa377b128694d548df ""
@@ -100,11 +100,11 @@
   "/usr/share/texmf/web2c/texmf.cnf" 1707919699 40399 f2c302f7d2af602abb742093540a5834 ""
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1762862675.32548 5472669 54eaf61a88b6b7896ebd0dac973cb29c ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1762862783 8213235 b6d2ec311aeab9770ca528fcd0f77afd ""
-  "figs/mc-cast.png" 1764350624.36555 53719 9adb5328b5a08b25307912acd179a13a ""
-  "figs/process_map.png" 1761602654 291531 0df41a22e202b813818a199a053c5489 ""
-  "forge_paper.aux" 1764351760.33632 5787 d520b282e9381db93b7c0468a07d76e4 "pdflatex"
-  "forge_paper.spl" 1764351759.20731 0 d41d8cd98f00b204e9800998ecf8427e "pdflatex"
-  "forge_paper.tex" 1764351758.73047 49272 00590eedf54ce06c33c2c99a10f553f5 ""
+  "figs/mc-cast.png" 1764610533.3158 53719 9adb5328b5a08b25307912acd179a13a ""
+  "figs/process_map.png" 1764610533.33083 291531 0df41a22e202b813818a199a053c5489 ""
+  "forge_paper.aux" 1764701530.69025 5894 3ad426fb65e27743275d3c9e5cc8543f "pdflatex"
+  "forge_paper.spl" 1764701529.70324 0 d41d8cd98f00b204e9800998ecf8427e "pdflatex"
+  "forge_paper.tex" 1764700796.01032 50154 9289a1831d7f9c01b8de915720857d73 ""
   (generated)
   "forge_paper.aux"
   "forge_paper.log"

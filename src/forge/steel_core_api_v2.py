@@ -38,7 +38,7 @@ from forge.core.routing import STAGE_MATS
 from forge.core.runner import run_core_scenario
 from forge.core.gas import compute_inside_energy_reference_for_share
 from forge.scenarios.builder import build_core_scenario
-from forge.scenarios.transforms import apply_dri_mix, apply_charcoal_expansion
+from forge.scenarios.scenario_transforms import apply_dri_mix, apply_charcoal_expansion
 from forge.core.transforms import (
     apply_fuel_substitutions,
     apply_dict_overrides,

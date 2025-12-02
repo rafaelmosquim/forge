@@ -1,15 +1,7 @@
 sector_key: aluminum
 sector_name: Aluminum
 
-stage_menu: 
-  - key: primary
-    stage_id: primary
-    label: "Primary Aluminum"
-    description: "Primary aluminum production from bauxite ore and scrap."
-  - key: remelt
-    stage_id: remelt
-    label: "Remelt Aluminum"
-    description: "Remelting of aluminum scrap to produce secondary aluminum."
+stage_menu:
   - key: finished
     stage_id: finished
     label: "Finished Aluminum"

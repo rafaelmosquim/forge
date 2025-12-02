@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-Steel model batch runner CLI.
+Batch runner CLI for the model datasets (steel, aluminum, etc).
 
 This utility executes one or multiple scenarios through ``run_scenario`` without
 going through the Streamlit UI. Scenarios can be supplied directly on the command
 line or through a YAML/JSON spec that describes a batch. Typical workflow:
 
     python steel_batch_cli.py run --spec configs/batch.yml --output results.csv
+
+Point ``--data-dir`` at the desired sector bundle (e.g., ``datasets/aluminum/baseline``)
+and pick stage keys from that bundle's ``sector.yml``.
 
 Spec files can be either a list of runs or a mapping containing ``defaults`` and
 ``runs``. Each run entry supports:
@@ -37,6 +40,7 @@ import copy
 import csv
 import json
 import math
+import os
 import sys
 from collections import defaultdict
 from dataclasses import asdict, dataclass
@@ -60,7 +64,7 @@ from forge.steel_core_api_v2 import (
 )
 
 DEFAULT_DATA_DIR = Path("datasets/steel/likely")
-REPORTED_YIELD_FACTOR = 0.85  # Core outputs "raw" CO2; divide by 0.85 to gross up totals
+REPORTED_YIELD_FACTOR = 0.85  # Fallback when dataset yield is unavailable (steel)
 REPORTED_YIELD_DIVISOR = 1.0 / REPORTED_YIELD_FACTOR  # ≈1.17647×
 
 
@@ -96,6 +100,18 @@ def _coerce_jsonish(value: str) -> Any:
         return int(text)
     except ValueError:
         return text
+
+
+def _env_flag_truthy(var_name: str) -> bool:
+    try:
+        raw = os.environ.get(var_name, "")
+    except Exception:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _costs_enabled() -> bool:
+    return _env_flag_truthy("FORGE_ENABLE_COSTS")
 
 
 def _deep_merge(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
@@ -648,21 +664,37 @@ def _build_route_cfg(plan: RunPlan) -> RouteConfig:
         pre_select_soft=pre_select,
     )
 
+def _reported_yield_factor(meta: Dict[str, Any] | None, route_cfg: RouteConfig) -> float:
+    """
+    Determine the reporting yield divisor:
+    - Aluminum finished stage → 0.95 (requested rule)
+    - Otherwise use dataset finished_yield if present, else 0.85 fallback.
+    """
+    meta = meta or {}
+    sector = str(meta.get("sector_key") or "").strip().lower()
+    stage_key_lower = str(route_cfg.stage_key or "").strip().lower()
+    stage_role_lower = str(route_cfg.stage_role or "").strip().lower()
+    apply_yield = stage_key_lower.startswith("finish") or stage_role_lower == "finished"
+    if not apply_yield:
+        return 1.0
+    if sector == "aluminum":
+        return 0.95
+    try:
+        fyield_val = float(meta.get("finished_yield", REPORTED_YIELD_FACTOR))
+    except (TypeError, ValueError):
+        fyield_val = REPORTED_YIELD_FACTOR
+    return fyield_val if fyield_val > 0 else 1.0
+
 
 def _summarize_result(plan: RunPlan, route_cfg: RouteConfig, result) -> Dict[str, Any]:
     total = getattr(result, "total_co2e_kg", None)
-    demand_qty = _float_or(route_cfg.demand_qty, 0.0)
     raw_total = None
     total_with_yield = None
-    raw_ef = None
-    gross_ef = None
     if total is not None:
         try:
             raw_total = float(total)
-            total_with_yield = raw_total * REPORTED_YIELD_DIVISOR
-            if demand_qty > 0:
-                raw_ef = raw_total / demand_qty
-                gross_ef = total_with_yield / demand_qty
+            factor = _reported_yield_factor(getattr(result, "meta", {}) or {}, route_cfg)
+            total_with_yield = raw_total / factor if factor else raw_total
         except (TypeError, ValueError):
             raw_total = None
             total_with_yield = None
@@ -675,17 +707,12 @@ def _summarize_result(plan: RunPlan, route_cfg: RouteConfig, result) -> Dict[str
         "country_code": plan.country_code or "",
         "raw_co2e_kg": raw_total if raw_total is not None else None,
         "total_co2e_kg": total_with_yield if total_with_yield is not None else None,
-        "raw_ef_kg_per_unit": raw_ef,
-        "gross_ef_kg_per_unit": gross_ef,
     }
     if total is not None:
         try:
             total_val = float(total)
             summary["raw_co2e_kg"] = total_val
-            summary["total_co2e_kg"] = total_val * REPORTED_YIELD_DIVISOR
-            if demand_qty > 0:
-                summary["raw_ef_kg_per_unit"] = total_val / demand_qty
-                summary["gross_ef_kg_per_unit"] = (total_val * REPORTED_YIELD_DIVISOR) / demand_qty
+            summary["total_co2e_kg"] = total_with_yield if total_with_yield is not None else total_val
         except (TypeError, ValueError):
             pass
     return summary
@@ -727,19 +754,6 @@ def _log_payload(plan: RunPlan, route_cfg: RouteConfig, result_summary: Dict[str
     return payload
 
 
-def _write_lci_csv(df: Optional[pd.DataFrame], out_dir: Path, name: str) -> Optional[Path]:
-    if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-        return None
-    out_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", name)
-    path = out_dir / f"{safe_name}.csv"
-    try:
-        df.to_csv(path, index=False)
-        return path
-    except Exception:
-        return None
-
-
 def _compute_blend_result(
     blend: BlendPlan,
     record_map: Dict[str, RunRecord],
@@ -762,40 +776,6 @@ def _compute_blend_result(
             return addition
         return accumulator.add(addition, fill_value=0.0)
 
-    def _weight_lci(df: Optional[pd.DataFrame], weight: float) -> Optional[pd.DataFrame]:
-        if df is None or not isinstance(df, pd.DataFrame) or df.empty:
-            return None
-        lci = df.copy()
-        if 'Amount' not in lci.columns:
-            return None
-        try:
-            lci['Amount'] = pd.to_numeric(lci['Amount'], errors='coerce').fillna(0.0) * float(weight)
-        except Exception:
-            return None
-        return lci
-
-    def _accumulate_lci(acc: Optional[pd.DataFrame], add: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
-        if add is None:
-            return acc
-        if acc is None:
-            acc = add
-        else:
-            acc = pd.concat([acc, add], ignore_index=True)
-        # Group by non-numeric identity columns and sum Amount
-        keys = [
-            c for c in ['Process', 'Output', 'Flow', 'Input', 'Category', 'ValueUnit', 'Unit']
-            if c in acc.columns
-        ]
-        if not keys or 'Amount' not in acc.columns:
-            return acc
-        grouped = (
-            acc.groupby(keys, dropna=False, as_index=False)['Amount']
-               .sum()
-        )
-        # Reorder columns for consistency
-        cols = keys + ['Amount']
-        return grouped.loc[:, cols]
-
     components_payload = []
     weighted_routes: defaultdict[str, float] = defaultdict(float)
     weighted_levels: defaultdict[str, float] = defaultdict(float)
@@ -811,14 +791,15 @@ def _compute_blend_result(
         raise ValueError(f"Blend '{blend.name}' has non-positive total share ({total_share}).")
     demand_qty = 0.0
     total_co2e = 0.0
-    total_cost = 0.0
-    material_cost = 0.0
+    total_co2e_reported = 0.0
+    costs_enabled = _costs_enabled()
+    total_cost = 0.0 if costs_enabled else None
+    material_cost = 0.0 if costs_enabled else None
     cost_valid = True
     material_cost_valid = True
     energy_balance: Optional[pd.DataFrame] = None
     emissions_df: Optional[pd.DataFrame] = None
     balance_df: Optional[pd.DataFrame] = None
-    lci_df: Optional[pd.DataFrame] = None
 
     route_set = set()
     for component in blend.components:
@@ -829,19 +810,23 @@ def _compute_blend_result(
         if component_raw is None:
             raise ValueError(f"Blend '{blend.name}' component '{component.run_name}' missing total CO2e result.")
         total_co2e += weight * float(component_raw)
+        factor = _reported_yield_factor(getattr(record.result, "meta", {}) or {}, record.route_cfg)
+        component_reported = float(component_raw) / factor if factor else float(component_raw)
+        total_co2e_reported += weight * component_reported
         demand_qty += weight * float(record.route_cfg.demand_qty)
         if record.route_cfg.route_preset:
             route_set.add(record.route_cfg.route_preset)
-        comp_cost = getattr(record.result, "total_cost", None)
-        if comp_cost is None:
-            cost_valid = False
-        else:
-            total_cost += weight * float(comp_cost)
-        comp_material_cost = getattr(record.result, "material_cost", None)
-        if comp_material_cost is None:
-            material_cost_valid = False
-        else:
-            material_cost += weight * float(comp_material_cost)
+        if costs_enabled:
+            comp_cost = getattr(record.result, "total_cost", None)
+            if comp_cost is None:
+                cost_valid = False
+            else:
+                total_cost += weight * float(comp_cost)
+            comp_material_cost = getattr(record.result, "material_cost", None)
+            if comp_material_cost is None:
+                material_cost_valid = False
+            else:
+                material_cost += weight * float(comp_material_cost)
 
         contribution = _weight_numeric_frame(record.result.energy_balance, weight)
         energy_balance = _accumulate_numeric(energy_balance, contribution)
@@ -851,9 +836,6 @@ def _compute_blend_result(
 
         contribution = _weight_numeric_frame(record.result.balance_matrix, weight)
         balance_df = _accumulate_numeric(balance_df, contribution)
-
-        contribution_lci = _weight_lci(record.result.lci, weight)
-        lci_df = _accumulate_lci(lci_df, contribution_lci)
 
         for proc, flag in record.result.production_routes.items():
             try:
@@ -872,8 +854,7 @@ def _compute_blend_result(
             "normalized_share": weight,
             "input_share": component.share,
             "raw_co2e_kg": component_raw,
-            "total_co2e_kg": float(component_raw) * REPORTED_YIELD_DIVISOR if component_raw is not None else None,
-            "raw_ef_kg_per_unit": summary.get("raw_ef_kg_per_unit"),
+            "total_co2e_kg": component_reported if component_raw is not None else None,
             "gross_ef_kg_per_unit": summary.get("gross_ef_kg_per_unit"),
             "demand_qty": record.route_cfg.demand_qty,
         })
@@ -884,10 +865,9 @@ def _compute_blend_result(
         energy_balance=energy_balance if energy_balance is not None else pd.DataFrame(),
         emissions=emissions_df,
         total_co2e_kg=total_co2e,
-        total_cost=total_cost if cost_valid else None,
-        material_cost=material_cost if material_cost_valid else None,
+        total_cost=total_cost if (costs_enabled and cost_valid) else None,
+        material_cost=material_cost if (costs_enabled and material_cost_valid) else None,
         balance_matrix=balance_df,
-        lci=lci_df,
         meta={
             "blend": {
                 "name": blend.name,
@@ -902,16 +882,12 @@ def _compute_blend_result(
         "is_blend": True,
         "blend": True,
         "raw_co2e_kg": total_co2e,
-        "total_co2e_kg": total_co2e * REPORTED_YIELD_DIVISOR,
-        "raw_ef_kg_per_unit": (total_co2e / demand_qty) if demand_qty > 0 else None,
-        "gross_ef_kg_per_unit": (total_co2e * REPORTED_YIELD_DIVISOR / demand_qty) if demand_qty > 0 else None,
+        "total_co2e_kg": total_co2e_reported,
     }
     if route_set:
         summary["route_preset"] = route_set.pop() if len(route_set) == 1 else ",".join(sorted(route_set))
     if blend.notes:
         summary["notes"] = blend.notes
-    summary["raw_co2e_kg"] = total_co2e
-    summary["total_co2e_kg"] = total_co2e * REPORTED_YIELD_DIVISOR
     return summary, result
 
 
@@ -919,8 +895,6 @@ def _run_blends(
     blends: List[BlendPlan],
     records: List[RunRecord],
     log_dir_default: Optional[Path] = None,
-    write_lci: bool = False,
-    lci_dir: Optional[Path] = None,
 ) -> List[Dict[str, Any]]:
     if not blends:
         return []
@@ -945,11 +919,6 @@ def _run_blends(
                 print(f"  ↳ blend log written to {path_written}")
             except Exception as exc:
                 print(f"  ! failed to write blend log in {log_dir}: {exc}", file=sys.stderr)
-        if write_lci:
-            out_dir = lci_dir if lci_dir is not None else Path("results/lci").resolve()
-            path_written = _write_lci_csv(getattr(result, 'lci', None), out_dir, blend.name)
-            if path_written:
-                print(f"  ↳ blend LCI written to {path_written}")
     return summaries
 
 
@@ -958,8 +927,6 @@ def run_batch(
     show_meta: bool = False,
     log_dir_default: Optional[Path] = None,
     fail_fast: bool = False,
-    write_lci: bool = False,
-    lci_dir: Optional[Path] = None,
 ) -> Tuple[List[Dict[str, Any]], int, List[RunRecord]]:
     summaries: List[Dict[str, Any]] = []
     failures = 0
@@ -989,12 +956,6 @@ def run_batch(
                     print(f"  ↳ log written to {path_written}")
                 except Exception as exc:
                     print(f"  ! failed to write log in {log_dir}: {exc}", file=sys.stderr)
-            # Optionally write LCI CSV per run
-            if write_lci:
-                out_dir = lci_dir if lci_dir is not None else Path("results/lci").resolve()
-                path_written = _write_lci_csv(getattr(result, 'lci', None), out_dir, plan.name)
-                if path_written:
-                    print(f"  ↳ LCI written to {path_written}")
             records.append(RunRecord(plan=plan, route_cfg=route_cfg, result=result, summary=summary))
         except Exception as exc:
             failures += 1
@@ -1032,9 +993,6 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--name", type=str, help="Friendly name for a single run.")
     run_parser.add_argument("--countries", nargs="+", help="List of country codes to cycle through (overrides --country-code).")
     run_parser.add_argument("--fail-fast", action="store_true", help="Abort on first failure.")
-    run_parser.add_argument("--enable-lci", action="store_true", help="Enable LCI outputs (sets FORGE_ENABLE_LCI=1).")
-    run_parser.add_argument("--write-lci", action="store_true", help="Write LCI CSV for each run and blend.")
-    run_parser.add_argument("--lci-dir", type=str, default="results/lci", help="Directory for LCI CSV outputs (with --write-lci).")
     return parser
 
 
@@ -1044,10 +1002,6 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     if args.command != "run":
         parser.print_help()
         return 1
-    # Optionally enable LCI calculations explicitly for CLI runs
-    if getattr(args, "enable_lci", False):
-        import os as _os
-        _os.environ["FORGE_ENABLE_LCI"] = "1"
     cli_defaults = {}
     if args.data_dir:
         cli_defaults["data_dir"] = args.data_dir
@@ -1110,8 +1064,6 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             show_meta=args.show_meta,
             log_dir_default=log_dir_default,
             fail_fast=args.fail_fast,
-            write_lci=bool(getattr(args, 'write_lci', False)),
-            lci_dir=_resolve_path(args.lci_dir, Path.cwd()) if getattr(args, 'lci_dir', None) else None,
         )
     except Exception as exc:
         print(f"Execution aborted: {exc}", file=sys.stderr)
@@ -1123,8 +1075,6 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
                 blend_plans,
                 records,
                 log_dir_default=log_dir_default,
-                write_lci=bool(getattr(args, 'write_lci', False)),
-                lci_dir=_resolve_path(args.lci_dir, Path.cwd()) if getattr(args, 'lci_dir', None) else None,
             )
         except Exception as exc:
             print(f"Blend calculation failed: {exc}", file=sys.stderr)

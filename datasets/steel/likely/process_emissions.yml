@@ -61,6 +61,8 @@ processes:
   "Regular Steel": 0.00
   "Steel Refining (Low Alloy)": 2.24
   "Steel Refining (High Alloy)": 2.20
+  "Cast Iron Alloying (Low Alloy)": 2.24
+  "Cast Iron Alloying (High Alloy)": 2.20
   "Continuous Casting": 0.00
   "Ingot Casting": 0.00
   "Hot Rolling": 0.28

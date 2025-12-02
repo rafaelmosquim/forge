@@ -309,6 +309,9 @@ def _credit_enabled(scn: dict | None) -> bool:
 
 
 DEFAULT_PRODUCER_PRIORITY: Tuple[str, ...] = (
+    "Iron Foundry (Exit R)",
+    "Iron Foundry (Exit L)",
+    "Iron Foundry (Exit H)",
     "Continuous Casting (R)",
     "Hot Rolling",
     "Cold Rolling",

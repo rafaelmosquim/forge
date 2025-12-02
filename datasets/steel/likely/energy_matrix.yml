@@ -512,6 +512,33 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
+  "Iron Foundry (Exit R)":
+    Electricity: 0
+    FLF: 0
+    RLF: 0
+    Gas: 1
+    Wood: 0
+    Coal: 0
+    Charcoal: 0
+    Coke: 0
+  "Iron Foundry (Exit L)":
+    Electricity: 0
+    FLF: 0
+    RLF: 0
+    Gas: 1
+    Wood: 0
+    Coal: 0
+    Charcoal: 0
+    Coke: 0
+  "Iron Foundry (Exit H)":
+    Electricity: 0
+    FLF: 0
+    RLF: 0
+    Gas: 1
+    Wood: 0
+    Coal: 0
+    Charcoal: 0
+    Coke: 0
   "Electric Arc Furnace":
     Electricity: 0.77
     FLF: 0
@@ -549,6 +576,24 @@ processes:
     Charcoal: 0
     Coke: 0
   "Steel Refining (High Alloy)":
+    Electricity: 0.1
+    FLF: 0
+    RLF: 0
+    Gas: 0.9
+    Wood: 0
+    Coal: 0
+    Charcoal: 0
+    Coke: 0
+  "Cast Iron Alloying (Low Alloy)":
+    Electricity: 0.01
+    FLF: 0
+    RLF: 0
+    Gas: 0.99
+    Wood: 0
+    Coal: 0
+    Charcoal: 0
+    Coke: 0
+  "Cast Iron Alloying (High Alloy)":
     Electricity: 0.1
     FLF: 0
     RLF: 0

@@ -874,9 +874,13 @@ with tab_main:
         "Continuous Casting (R)": "Regular (R)",
         "Continuous Casting (L)": "Low-alloy (L)",
         "Continuous Casting (H)": "High-alloy (H)",
+        "Iron Foundry (Exit R)": "Regular (R)",
+        "Iron Foundry (Exit L)": "Low-alloy (L)",
+        "Iron Foundry (Exit H)": "High-alloy (H)",
     }
     LABEL_RENAMES = {
         "Cast Steel (IP1)": "Alloying (choose class)",
+        "Cast Iron (Exit)": "Alloying (choose class)",
         "Manufactured Feed (IP4)": "Shaping (IP4)",
     }
     STAGE_DISPLAY = {
@@ -927,6 +931,7 @@ with tab_main:
         if "Intermediate Process 3" in mat_name: return "IP3"
         if "Cold Raw Steel (IP2)" in mat_name: return "IP2"
         if "Raw Products" in mat_name: return "Raw"
+        if "Cast Iron" in mat_name: return "IP1"
         m = re.search(r"\(IP(\d)\)", mat_name)
         if m: return f"IP{m.group(1)}"
         if "Liquid" in mat_name: return "Liquid"

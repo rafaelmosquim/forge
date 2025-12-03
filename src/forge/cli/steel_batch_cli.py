@@ -55,13 +55,13 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from forge.steel_core_api_v2 import (
-    RouteConfig,
-    ScenarioInputs,
-    RunOutputs,
-    run_scenario,
-    write_run_log,
-)
+# Choose canonical stack for aluminum datasets, mover stack for steel
+def _api_for_data_dir(data_dir: Path | str):
+    return canonical_api if "aluminum" in str(data_dir).lower() else mover_api
+
+import forge.steel_core_api_v2 as mover_api
+import forge.canonical.steel_core_api_v2 as canonical_api
+from forge.steel_core_api_v2 import RunOutputs, write_run_log
 
 DEFAULT_DATA_DIR = Path("datasets/steel/likely")
 REPORTED_YIELD_FACTOR = 0.85  # Fallback when dataset yield is unavailable (steel)
@@ -647,7 +647,8 @@ def _single_run_plan(args: argparse.Namespace) -> RunPlan:
     )
 
 
-def _build_route_cfg(plan: RunPlan) -> RouteConfig:
+def _build_route_cfg(plan: RunPlan):
+    api = _api_for_data_dir(plan.data_dir)
     route = dict(plan.route or {})
     route_preset = route.get("route_preset", "auto")
     stage_key = route.get("stage_key", "Finished")
@@ -655,7 +656,7 @@ def _build_route_cfg(plan: RunPlan) -> RouteConfig:
     stage_role = route.get("stage_role")
     picks = dict(plan.picks_by_material or {})
     pre_select = dict(plan.pre_select_soft or {})
-    return RouteConfig(
+    return api.RouteConfig(
         route_preset=route_preset,
         stage_key=stage_key,
         stage_role=stage_role,
@@ -664,7 +665,7 @@ def _build_route_cfg(plan: RunPlan) -> RouteConfig:
         pre_select_soft=pre_select,
     )
 
-def _reported_yield_factor(meta: Dict[str, Any] | None, route_cfg: RouteConfig) -> float:
+def _reported_yield_factor(meta: Dict[str, Any] | None, route_cfg) -> float:
     """
     Determine the reporting yield divisor:
     - Aluminum finished stage → 0.95 (requested rule)
@@ -686,7 +687,7 @@ def _reported_yield_factor(meta: Dict[str, Any] | None, route_cfg: RouteConfig) 
     return fyield_val if fyield_val > 0 else 1.0
 
 
-def _summarize_result(plan: RunPlan, route_cfg: RouteConfig, result) -> Dict[str, Any]:
+def _summarize_result(plan: RunPlan, route_cfg, result) -> Dict[str, Any]:
     total = getattr(result, "total_co2e_kg", None)
     raw_total = None
     total_with_yield = None
@@ -932,15 +933,16 @@ def run_batch(
     failures = 0
     records: List[RunRecord] = []
     for plan in plans:
+        api = _api_for_data_dir(plan.data_dir)
         route_cfg = _build_route_cfg(plan)
         scenario_payload = copy.deepcopy(plan.scenario)
-        scn_inputs = ScenarioInputs(
+        scn_inputs = api.ScenarioInputs(
             country_code=plan.country_code,
             scenario=scenario_payload,
             route=route_cfg,
         )
         try:
-            result = run_scenario(str(plan.data_dir), scn_inputs)
+            result = api.run_scenario(str(plan.data_dir), scn_inputs)
             summary = _summarize_result(plan, route_cfg, result)
             summaries.append(summary)
             raw = summary.get("raw_co2e_kg")

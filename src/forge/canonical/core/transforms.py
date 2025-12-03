@@ -5,11 +5,8 @@ entire legacy module.
 """
 from __future__ import annotations
 
-import logging
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, Optional
-
-logger = logging.getLogger(__name__)
+from typing import Dict, Iterable, Optional
 
 
 def apply_fuel_substitutions(
@@ -82,88 +79,66 @@ def apply_recipe_overrides(
     return list(by_name.values())
 
 
-def adjust_blast_furnace_intensity(energy_int, energy_shares, params):
-    """Scale BF intensity and store base/adjusted in params.
+__all__ = [
+    'apply_fuel_substitutions',
+    'apply_dict_overrides',
+    'apply_recipe_overrides',
+    'apply_energy_int_efficiency_scaling',
+    'apply_energy_int_floor',
+]
 
-    Top-gas available = adjusted_intensity – base_intensity.
+
+def apply_energy_int_efficiency_scaling(energy_int: Dict[str, float], scenario: Dict[str, object]) -> None:
+    """Apply uniform and scheduled efficiency scaling to energy intensities.
+
+    Recognized keys in `scenario` (all optional):
+      - energy_int_factor: float multiplier applied to all numeric intensities
+      - energy_int_schedule: mapping with one or more of:
+            rate_pct_per_year | annual_pct | rate_pct | rate
+            baseline_year (default 2023)
+            target_year   (default 2050)
+            max_year      (default 2050)
+            years         (directly specify years)
+
+    Non-numeric entries and zeros are left untouched.
     """
-    pg = getattr(params, 'process_gas', 0.0)
-    if 'Blast Furnace' not in energy_int:
-        return
-
-    base = float(energy_int['Blast Furnace'])
-    params.bf_base_intensity = base
-
-    shares = energy_shares.get('Blast Furnace', {}) or {}
-    carriers = ['Gas', 'Coal', 'Coke', 'Charcoal']
-    S = sum(float(shares.get(c, 0.0) or 0.0) for c in carriers)
-    denom = max(1e-9, 1 - float(pg) * S)
-
-    adj = base / denom
-    energy_int['Blast Furnace'] = adj
-    params.bf_adj_intensity = adj
-    logger.info("Adjusted BF intensity: %0.2f -> %0.2f MJ/t steel (recovering %0.1f%% of carriers)", base, adj, float(pg)*100)
-
-
-def adjust_process_gas_intensity(proc_name, param_key, energy_int, energy_shares, params):
-    pg = getattr(params, param_key, 0.0)
-    if proc_name not in energy_int or float(pg) <= 0:
-        return
-    base = float(energy_int[proc_name])
-    safe = proc_name.replace(' ', '_').lower()
-    setattr(params, f"{safe}_base_intensity", base)
-
-    shares = energy_shares.get(proc_name, {}) or {}
-    S = sum(float(shares.get(c, 0.0) or 0.0) for c in ['Gas', 'Coal', 'Coke', 'Charcoal'])
-    denom = max(1e-9, 1 - float(pg) * S)
-    adj = base / denom
-    energy_int[proc_name] = adj
-    setattr(params, f"{safe}_adj_intensity", adj)
-    logger.info("Adjusted %s: %0.2f -> %0.2f MJ/run", proc_name, base, adj)
-
-
-def apply_energy_int_efficiency_scaling(energy_int: Dict[str, float], scenario: Dict[str, Any]) -> None:
-    """Apply uniform + scheduled efficiency scaling to energy intensities."""
     if not isinstance(energy_int, dict) or not isinstance(scenario, dict):
         return
 
     try:
-        factor = float(scenario.get("energy_int_factor", 1.0))
+        factor = float(scenario.get('energy_int_factor', 1.0))
     except Exception:
         factor = 1.0
 
-    sched = scenario.get("energy_int_schedule") or scenario.get("efficiency_schedule")
+    sched = scenario.get('energy_int_schedule') or scenario.get('efficiency_schedule')
     if isinstance(sched, dict):
         try:
-            rate = sched.get("rate_pct_per_year", sched.get("annual_pct", sched.get("rate_pct", sched.get("rate"))))
+            rate = sched.get('rate_pct_per_year', sched.get('annual_pct', sched.get('rate_pct', sched.get('rate'))))
             rate = float(rate) if rate is not None else None
         except Exception:
             rate = None
-
         if rate is not None:
-            years_raw = sched.get("years")
             years = None
             try:
-                years = int(years_raw) if years_raw is not None else None
+                y_raw = sched.get('years')
+                years = int(y_raw) if y_raw is not None else None
             except Exception:
                 years = None
-
             if years is None:
                 try:
-                    baseline = int(sched.get("baseline_year", 2023))
+                    baseline = int(sched.get('baseline_year', 2023))
                 except Exception:
                     baseline = 2023
                 try:
-                    tgt = int(sched.get("target_year", 2050))
+                    tgt = int(sched.get('target_year', 2050))
                 except Exception:
                     tgt = 2050
                 try:
-                    cap = int(sched.get("max_year", 2050))
+                    cap = int(sched.get('max_year', 2050))
                 except Exception:
                     cap = 2050
                 tgt = min(tgt, cap)
                 years = max(0, tgt - baseline)
-
             annual = max(0.0, 1.0 - float(rate) / 100.0)
             factor *= (annual ** int(years))
 
@@ -180,11 +155,16 @@ def apply_energy_int_efficiency_scaling(energy_int: Dict[str, float], scenario: 
         energy_int[k] = val * factor
 
 
-def apply_energy_int_floor(energy_int: Dict[str, float], scenario: Dict[str, Any]) -> None:
-    """Apply per-process minimum intensity floors after schedule scaling."""
+def apply_energy_int_floor(energy_int: Dict[str, float], scenario: Dict[str, object]) -> None:
+    """Apply per-process minimum intensity floors after schedule scaling.
+
+    Scenario may include::
+        energy_int_floor: { "Blast Furnace": 11.0, ... }
+    which enforces energy_int[proc] = max(floor, current) for numeric entries.
+    """
     if not isinstance(energy_int, dict) or not isinstance(scenario, dict):
         return
-    floors = scenario.get("energy_int_floor")
+    floors = scenario.get('energy_int_floor')
     if not isinstance(floors, dict):
         return
     for k, v in floors.items():
@@ -197,14 +177,3 @@ def apply_energy_int_floor(energy_int: Dict[str, float], scenario: Dict[str, Any
         except Exception:
             cur = 0.0
         energy_int[k] = max(cur, floor_val)
-
-
-__all__ = [
-    'apply_fuel_substitutions',
-    'apply_dict_overrides',
-    'apply_recipe_overrides',
-    'adjust_blast_furnace_intensity',
-    'adjust_process_gas_intensity',
-    'apply_energy_int_efficiency_scaling',
-    'apply_energy_int_floor',
-]

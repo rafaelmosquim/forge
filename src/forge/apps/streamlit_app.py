@@ -40,13 +40,9 @@ if str(ROOT_DIR) not in sys.path:
 
 
 # --- Core wrappers (no duplicate math here) ---
-from forge.steel_core_api_v2 import (
-    RouteConfig,
-    ScenarioInputs,
-    run_scenario,
-    write_run_log,  # for simple JSON logging
-    _apply_process_gas_metadata,
-)
+import forge.steel_core_api_v2 as mover_api
+import forge.canonical.steel_core_api_v2 as canonical_api
+from forge.steel_core_api_v2 import _apply_process_gas_metadata
 
 from forge.core.models import Process
 from forge.core.io import (
@@ -77,6 +73,14 @@ from forge.descriptor import (
     match_route_in_name,
     resolve_feed_mode,
 )
+
+
+def _api_for_data_root(data_root: str):
+    """Choose canonical stack for aluminum, mover stack for steel."""
+    root_lower = str(data_root or "").lower()
+    if "aluminum" in root_lower:
+        return canonical_api
+    return mover_api
 
 st.set_page_config(
     page_title="Steel Model – Routes & Treatments",
@@ -1304,7 +1308,8 @@ if not IS_PAPER:
                     scn_dict.setdefault("emission_factors", {})["Electricity"] = float(x)
                     country_override = None  # force use of override
 
-                route_cfg = RouteConfig(
+                api = _api_for_data_root(DATA_ROOT)
+                route_cfg = api.RouteConfig(
                     route_preset=snap["route_preset"],
                     stage_key=snap["stage_key"],
                     stage_role=snap.get("stage_role"),
@@ -1427,7 +1432,8 @@ if not IS_PAPER:
                 scn_dict.setdefault("emission_factors", {})["Electricity"] = grid_ef
                 country_override = None
 
-                route_cfg = RouteConfig(
+                api = _api_for_data_root(DATA_ROOT)
+                route_cfg = api.RouteConfig(
                     route_preset=snap["route_preset"],
                     stage_key=snap["stage_key"],
                     stage_role=snap.get("stage_role"),
@@ -1435,14 +1441,14 @@ if not IS_PAPER:
                     picks_by_material=deepcopy(snap["picks_by_material"]),
                     pre_select_soft=deepcopy(snap["pre_select_soft"]),
                 )
-                scn_inputs = ScenarioInputs(
+                scn_inputs = api.ScenarioInputs(
                     country_code=country_override,
                     scenario=scn_dict,
                     route=route_cfg,
                 )
 
                 try:
-                    out_i = run_scenario(DATA_ROOT, scn_inputs)
+                    out_i = api.run_scenario(DATA_ROOT, scn_inputs)
                     total_i  = getattr(out_i, "total_co2e_kg", None)
                     energy_i = getattr(out_i, "energy_balance", None)
 
@@ -1736,7 +1742,8 @@ if run_now:
                 'electricity_fraction': 1.0 - direct_use_fraction
             }
             
-            route_cfg = RouteConfig(
+            api = _api_for_data_root(DATA_ROOT)
+            route_cfg = api.RouteConfig(
                 route_preset=route,
                 stage_key=stage_key,
                 stage_role=stage_role,
@@ -1744,12 +1751,12 @@ if run_now:
                 picks_by_material=dict(st.session_state.picks_by_material),
                 pre_select_soft=pre_select_soft,
             )
-            scn = ScenarioInputs(
+            scn = api.ScenarioInputs(
                 country_code=(country_code or None),
                 scenario=scenario,
                 route=route_cfg,
             )
-            out = run_scenario(DATA_ROOT, scn)
+            out = api.run_scenario(DATA_ROOT, scn)
             
         # ---- Map core outputs (after the spinner) ----
         production_routes = getattr(out, "production_routes", None)

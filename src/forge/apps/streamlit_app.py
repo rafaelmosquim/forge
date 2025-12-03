@@ -124,10 +124,10 @@ SECTOR_CONFIG = {
     },
     "Aluminum": {
         "datasets": {
-            "Baseline": "datasets/aluminum/baseline",
+            "Baseline": "vendor/features-p-gas/aluminum/baseline",
         },
         "default_dataset": "Baseline",
-        "preferred_scenario": "primary-al.yml",
+        "preferred_scenario": "scenarios/primary-al.yml",
     },
 }
 

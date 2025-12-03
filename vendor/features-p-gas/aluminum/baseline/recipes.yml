@@ -1,0 +1,370 @@
+- process: Bauxite Mining
+  inputs: {}
+  outputs: 
+    Bauxite: 1.0
+
+- process: Scrap Purchase
+  inputs: {}
+  outputs: 
+    Scrap: 1.0
+
+- process: Pitch Production
+  inputs: {}
+  outputs:
+    Pitch: 1.0
+
+- process: Coke Production
+  inputs: {}
+  outputs:
+    Coke: 1.0    
+
+- process: Caustic Soda Production
+  inputs: {}
+  outputs:
+    NaOH: 1.0
+
+- process: Anode Production (Prebaked)
+  inputs:
+    Coke: 0.6750
+    Pitch: 0.1460
+  outputs:
+    Carbon Anode Prebaked: 1.0    
+
+- process: Anode Production (Paste)
+  inputs:
+    Coke: 0.7017
+    Pitch: 0.3059
+  outputs:
+    Carbon Anode Paste: 1.0    
+
+- process: Cryolite Production (HF)
+  inputs:
+    Alumina: 0.2480 
+    HF: 0.5840
+    NaOH: 0.5830 # accounting for NaOH recovered in Precipitation 
+  outputs: 
+    Cryolite (HF): 1.0    
+
+- process: Cryolite Production (H2SiF6)
+  inputs:
+    Alumina: 0.2534
+    H2SiF6: 0.7154 
+    NaOH: 0.5962 # accounting for NaOH recovered in Precipitation 
+  outputs: 
+    Cryolite (H2SiF6): 1.0
+
+- process: Cryolite Blending
+  inputs:
+    Cryolite (HF): 0.75
+    Cryolite (H2SiF6): 0.25
+  outputs:
+    Cryolite: 1.0       
+
+- process: Aluminum Fluoride Production
+  inputs:
+    HF: 0.7143 
+    Alumina: 0.6071 
+  outputs:
+    AlF3: 1.0
+
+- process: Bauxite Processing
+  inputs:
+    Bauxite: 1.2345 # material losses
+  outputs:
+    Alumina Trihydrate: 1.0
+
+- process: Digestion
+  inputs:
+    Alumina Trihydrate: 0.8415
+    NaOH: 0.3853
+  outputs:
+    NaAlO2: 1.0
+
+- process: Precipitation
+  inputs:
+    NaAlO2: 1.5128 
+  outputs:
+    AlOH3: 1.0
+    NaOHp: 0.5128
+
+- process: Calcination  
+  inputs:
+    AlOH3: 1.53
+  outputs:
+    Alumina: 1.0
+
+- process: Electrolysis (prebaked)
+  inputs:
+    Coke: 0.0036
+    Pitch: 0.0019
+    Alumina: 1.8970
+    Cryolite: 0.0016
+    Carbon Anode Prebaked: 0.4750
+    AlF3: 0.0210 
+  outputs:
+    Primary Liquid Aluminum (prebaked): 1.0
+    CO2: 1.4965
+    CO: 0.0917
+    Other: 0.4284
+
+- process: Electrolysis (Soderberg)
+  inputs:
+    Coke: 0.0036
+    Pitch: 0.0019
+    Alumina: 2.1050
+    Cryolite: 0.0016
+    Carbon Anode Paste: 0.5150
+    AlF3: 0.0207
+  outputs:
+    Primary Liquid Aluminum (Soderberg): 1.0
+    CO2: 1.4965
+    CO: 0.0917
+    Other: 1.1330
+
+- process: Primary Aluminum
+  inputs:
+    Primary Liquid Aluminum (prebaked): 0.674
+    Primary Liquid Aluminum (Soderberg): 0.326
+  outputs:
+    Primary Aluminum: 1.0  
+
+- process: Scrap Melting and Processing
+  inputs:
+    Scrap: 1.0
+  outputs:
+    Recycled Aluminum: 1.0 
+
+- process: Primary Ingot Melting
+  inputs:
+    Primary Aluminum: 1.0
+  outputs:
+    Primary Ingot Aluminum: 1.0      
+
+- process: Remelt Blending
+  inputs:
+    Primary Ingot Aluminum: 0.582
+    Recycled Aluminum: 0.418
+  outputs:
+    Remelt Blend: 1.0  
+
+- process: Al Alloy Series 1
+  inputs:
+    Remelt Blend: 1.0
+  outputs:
+    Al Alloy Series 1: 1.0
+
+- process: Al Alloy Series 5
+  inputs:
+    Remelt Blend: 0.967
+    Si: 0.003
+    Fe: 0.004
+    Mn: 0.001
+    Mg: 0.022
+    Cu: 0.001
+    Ni: 0.000
+    Ti: 0.000
+    Cr: 0.002
+    Zn: 0.001
+  outputs:
+    Al Alloy Series 5: 1.0  
+
+- process: Al Alloy Series 6
+  inputs:
+    Remelt Blend: 0.973
+    Si: 0.007
+    Fe: 0.005
+    Mn: 0.004
+    Mg: 0.006
+    Cu: 0.001
+    Ni: 0.0
+    Ti: 0.0
+    Cr: 0.003
+    Zn: 0.002
+  outputs:
+    Al Alloy Series 6: 1.0
+
+- process: Al Alloy Series 7  
+  inputs:
+    Remelt Blend: 0.902
+    Si: 0.004
+    Fe: 0.005
+    Mn: 0.003
+    Mg: 0.021
+    Cu: 0.012
+    Ni: 0.0
+    Ti: 0.0
+    Cr: 0.002
+    Zn: 0.051
+  outputs:
+    Al Alloy Series 7: 1.0
+
+- process: Al Casting Alloy 3
+  inputs:
+    Remelt Blend: 0.884
+    Si: 0.094
+    Fe: 0.003
+    Mn: 0.001
+    Mg: 0.006
+    Cu: 0.003
+    Ni: 0.006
+    Ti: 0.001
+    Cr: 0.000
+    Zn: 0.002
+  outputs:
+    Al Casting Alloy 3: 1.0              
+
+- process: Al Casting Alloy 4
+  inputs:
+    Remelt Blend: 0.847
+    Si: 0.120
+    Fe: 0.013
+    Mn: 0.004
+    Mg: 0.010
+    Cu: 0.005
+    Ni: 0.000
+    Ti: 0.000
+    Cr: 0.000
+    Zn: 0.000
+  outputs:
+    Al Casting Alloy 4: 1.0 
+
+- process: Metallurgical Aluminum from Series 1
+  inputs:
+    Al Alloy Series 1: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0
+
+- process: Metallurgical Aluminum from Series 5
+  inputs:
+    Al Alloy Series 5: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0
+
+- process: Metallurgical Aluminum from Series 6
+  inputs:
+    Al Alloy Series 6: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0    
+
+- process: Metallurgical Aluminum from Series 7
+  inputs:
+    Al Alloy Series 7: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0    
+
+- process: Metallurgical Aluminum from Casting Alloy 3
+  inputs:
+    Al Casting Alloy 3: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0    
+
+  outputs:
+    Metallurgical Aluminum: 1.0    
+
+- process: Metallurgical Aluminum from Casting Alloy 4
+  inputs:
+    Al Casting Alloy 4: 1.0
+  outputs:
+    Metallurgical Aluminum: 1.0    
+
+- process: Ingot Melting and CC
+  inputs:
+    Metallurgical Aluminum: 1.0
+  outputs:
+    Casted Aluminum: 1.0
+
+- process: Hot and Cold Rolling
+  inputs:
+    Casted Aluminum: 1.0
+  outputs:
+    Rolled Aluminum: 1.0   
+
+- process: Extrusion
+  inputs:
+    Casted Aluminum: 1.0
+  outputs:
+    Extruded Aluminum: 1.0
+
+- process: Metallurgical Aluminum Ingot Casting
+  inputs:
+    Metallurgical Aluminum: 1.0
+  outputs:
+    Aluminum Ingot Casting: 1.0
+
+- process: Casting
+  inputs:
+    Aluminum Ingot Casting: 1.0
+  outputs:
+    Casted Aluminum (ingot): 1.0   
+
+- process: Raw Aluminum (rolled)
+  inputs:
+    Rolled Aluminum: 1.0
+  outputs:
+    Basic Aluminum Products: 1.0     
+
+- process: Raw Aluminum (extrusion)
+  inputs:
+    Extruded Aluminum: 1.0
+  outputs:
+    Basic Aluminum Products: 1.0    
+
+- process: Raw Aluminum (ingot)
+  inputs:
+    Casted Aluminum (ingot): 1.0
+  outputs:
+    Basic Aluminum Products: 1.0        
+
+- process: Direct use of Basic Aluminum Products
+  inputs:
+    Basic Aluminum Products: 1.0
+  outputs:
+    Manufactured Aluminum Products: 1.0    
+
+- process: Stamping
+  inputs:
+    Basic Aluminum Products: 1.0
+  outputs:
+    Manufactured Aluminum Products: 1.0      
+
+- process: Drilling
+  inputs:
+    Basic Aluminum Products: 1.0
+  outputs:
+    Manufactured Aluminum Products: 1.0    
+
+- process: Milling
+  inputs:
+    Basic Aluminum Products: 1.0
+  outputs:
+    Manufactured Aluminum Products: 1.0
+
+- process: Turning
+  inputs:
+    Basic Aluminum Products: 1.0
+  outputs:
+    Manufactured Aluminum Products: 1.0
+
+- process: Welding
+  inputs:
+    Basic Aluminum Products: 1.0
+  outputs:
+    Manufactured Aluminum Products: 1.0    
+
+- process: No Coating
+  inputs:
+    Manufactured Aluminum Products: 1.0
+  outputs:
+    Finished Aluminum Products: 1.0
+
+- process: Powder Coating
+  inputs:
+    Manufactured Aluminum Products: 1.0
+  outputs:
+    Finished Aluminum Products: 1.0 
+
+- process: Liquid Painting
+  inputs:
+    Manufactured Aluminum Products: 1.0
+  outputs:
+    Finished Aluminum Products: 1.0        

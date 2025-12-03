@@ -1,0 +1,144 @@
+sector_key: aluminum
+sector_name: Aluminum
+
+stage_menu:
+  - key: finished
+    stage_id: finished
+    label: "Finished Aluminum"
+    description: "Finished aluminum products after downstream processing and coating."
+
+stages:
+  primary:
+    material: "Primary Aluminum"
+  remelt:
+    material: "Remelt Blend"
+  finished:
+    material: "Finished Aluminum Products"
+
+routes:
+  - id: Primary
+    label: "Primary Aluminum"
+    aliases: ["Primary", "Aluminum"]
+    enable:
+      - Bauxite Mining
+      - Scrap Purchase
+      - Pitch Production
+      - Coke Production
+      - Caustic Soda Production
+      - Anode Production (Prebaked)
+      - Anode Production (Paste)
+      - Cryolite Production (HF)
+      - Cryolite Production (H2SiF6)
+      - Aluminum Fluoride Production
+      - Bauxite Processing
+      - Digestion
+      - Precipitation
+      - Calcination
+      - Electrolysis (prebaked)
+      - Electrolysis (Soderberg)
+      - Scrap Melting and Processing
+      - Primary Ingot Melting
+      - Remelt Blending
+      - Primary Aluminum    
+      - Al Alloy Series 1
+      - Al Alloy Series 5
+      - Al Alloy Series 6
+      - Al Alloy Series 7
+      - Al Casting Alloy 3
+      - Al Casting Alloy 4
+      - Metallurgical Aluminum from Series 1
+      - Metallurgical Aluminum from Series 5
+      - Metallurgical Aluminum from Series 6
+      - Metallurgical Aluminum from Series 7
+      - Metallurgical Aluminum from Casting Alloy 3
+      - Metallurgical Aluminum from Casting Alloy 4
+      - Ingot Melting and CC
+      - Hot and Cold Rolling
+      - Extrusion
+      - Metallurgical Aluminum Ingot Casting
+      - Casting
+      - Raw Aluminum (extrusion)
+      - Raw Aluminum (ingot)
+      - Direct use of Basic Aluminum Products
+      - Stamping
+      - Drilling
+      - Milling
+      - Turning
+      - Welding
+      - No Coating
+      - Powder Coating
+      - Liquid Painting
+  - id: Secondary
+    label: "Secondary Aluminum"
+    aliases: ["Secondary", "Remelt", "Secondary Aluminum"]
+    disable:
+      - Bauxite Mining
+      - Pitch Production
+      - Coke Production
+      - Caustic Soda Production
+      - Anode Production (Prebaked)
+      - Anode Production (Paste)
+      - Cryolite Production (HF)
+      - Cryolite Production (H2SiF6)
+      - Aluminum Fluoride Production
+      - Bauxite Processing
+      - Digestion
+      - Precipitation
+      - Calcination
+      - Electrolysis (prebaked)
+      - Electrolysis (Soderberg)
+      - Primary Aluminum
+      - Primary Ingot Melting
+    enable:
+      - Scrap Purchase
+      - Scrap Melting and Processing
+      - Remelt Blending
+      - Al Alloy Series 1
+      - Al Alloy Series 5
+      - Al Alloy Series 6
+      - Al Alloy Series 7
+      - Al Casting Alloy 3
+      - Al Casting Alloy 4
+      - Metallurgical Aluminum from Series 1
+      - Metallurgical Aluminum from Series 5
+      - Metallurgical Aluminum from Series 6
+      - Metallurgical Aluminum from Series 7
+      - Metallurgical Aluminum from Casting Alloy 3
+      - Metallurgical Aluminum from Casting Alloy 4
+      - Ingot Melting and CC
+      - Hot and Cold Rolling
+      - Extrusion
+      - Metallurgical Aluminum Ingot Casting
+      - Casting
+      - Raw Aluminum (extrusion)
+      - Raw Aluminum (ingot)
+      - Direct use of Basic Aluminum Products
+      - Stamping
+      - Drilling
+      - Milling
+      - Turning
+      - Welding
+      - No Coating
+      - Powder Coating
+      - Liquid Painting
+
+process_roles:
+  Bauxite Mining: [upstream]
+  Cryolite Production (HF): [conversion]
+  Aluminum Fluoride Production: [conversion]
+  Electrolysis (prebaked): [primary]
+  Electrolysis (Soderberg): [primary]
+  Primary Aluminum: [downstream]
+
+costing:
+  external_purchase_rows:
+    - "External Inputs"
+
+gas:
+  process_gas_carrier: "Process Gas"
+  natural_gas_carrier: "Gas"
+  utility_process: "Utility Plant"
+  reference_stage_id: Finished
+  default_direct_use_fraction: 0.0
+balance_fallback_materials:
+  - "Electricity"

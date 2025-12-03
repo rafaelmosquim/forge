@@ -1,0 +1,397 @@
+Bauxite Mining: 
+  Coke: 0.0
+  Fuel Oil: 0.195 
+  Diesel: 0.015
+  Gas: 0
+  Coal: 0
+  Electricity: 0.693
+  LPG: 0.097
+  Biomass: 0.0
+
+Scrap Purchase: 
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.0
+  LPG: 0.0
+  Biomass: 0.0
+
+Pitch Production:
+  Coke: 0.0
+  Fuel Oil: 0.297
+  Diesel: 0.0
+  Gas: 0.037
+  Coal: 0
+  Electricity: 0.666
+  LPG: 0.0
+  Biomass: 0.0
+
+Coke Production:
+  Coke: 0.0
+  Fuel Oil: 0.297
+  Diesel: 0.0
+  Gas: 0.037
+  Coal: 0.0
+  Electricity: 0.666
+  LPG: 0.0
+  Biomass: 0.0
+
+Caustic Soda Production:
+  Coke: 0.0
+  Fuel Oil: 0.535
+  Diesel: 0.0
+  Gas: 0.035
+  Coal: 0.37
+  Electricity: 0.06
+  LPG: 0.0
+  Biomass: 0.0
+
+Anode Production (Prebaked):
+  Coke: 0.0
+  Fuel Oil: 0.297
+  Diesel: 0.0
+  Gas: 0.037
+  Coal: 0.0
+  Electricity: 0.666
+  LPG: 0.0
+  Biomass: 0.0  
+
+Anode Production (Paste):
+  Coke: 0.0
+  Fuel Oil: 0.297
+  Diesel: 0.0
+  Gas: 0.037
+  Coal: 0.0
+  Electricity: 0.666
+  LPG: 0.0
+  Biomass: 0.0  
+
+Cryolite Production (HF):
+  Coke: 0.0
+  Fuel Oil: 0.297
+  Diesel: 0.0
+  Gas: 0.037
+  Coal: 0.0
+  Electricity: 0.666
+  LPG: 0.0
+  Biomass: 0.0 
+
+Cryolite Production (H2SiF6):
+  Coke: 0.0
+  Fuel Oil: 0.297
+  Diesel: 0.0
+  Gas: 0.037
+  Coal: 0.0
+  Electricity: 0.666
+  LPG: 0.0
+  Biomass: 0.0  
+
+Aluminum Fluoride Production:
+  Coke: 0.0
+  Fuel Oil: 0.297
+  Diesel: 0.0
+  Gas: 0.037
+  Coal: 0.0
+  Electricity: 0.666
+  LPG: 0.0
+  Biomass: 0.0  
+
+Bauxite Processing:
+  Coke: 0.0
+  Fuel Oil: 0.535
+  Diesel: 0.0
+  Gas: 0.035
+  Coal: 0.37
+  Electricity: 0.06
+  LPG: 0.0
+  Biomass: 0.0  
+
+Digestion:
+  Coke: 0.0
+  Fuel Oil: 0.535
+  Diesel: 0.0
+  Gas: 0.035
+  Coal: 0.37
+  Electricity: 0.06
+  LPG: 0.0
+  Biomass: 0.0
+
+Precipitation:
+  Coke: 0.0
+  Fuel Oil: 0.535
+  Diesel: 0.0
+  Gas: 0.035
+  Coal: 0.37
+  Electricity: 0.06
+  LPG: 0.0
+  Biomass: 0.0
+
+Calcination:
+  Coke: 0.0
+  Fuel Oil: 0.535
+  Diesel: 0.0
+  Gas: 0.035
+  Coal: 0.37
+  Electricity: 0.06
+  LPG: 0.0
+  Biomass: 0.0
+
+Electrolysis (prebaked):
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 1.0
+  LPG: 0.0
+  Biomass: 0.0
+
+Electrolysis (Soderberg):
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 1.0
+  LPG: 0.0
+  Biomass: 0.0
+
+Scrap Melting and Processing:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0   
+
+Primary Ingot Melting:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0  
+
+Al Alloy Series 1:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0  
+
+
+Al Alloy Series 5:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0  
+
+Al Alloy Series 6:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0
+
+Al Alloy Series 7:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0
+
+Al Casting Alloy 3:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0
+
+Al Casting Alloy 4:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0
+
+Ingot Melting and CC:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0
+
+Hot and Cold Rolling:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0
+
+Extrusion:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.004
+  Gas: 0.0
+  Coal: 0.0
+  Electricity: 0.560
+  LPG: 0.436
+  Biomass: 0.0
+
+Metallurgical Aluminum Ingot Casting:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+Casting:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+Direct use of Basic Aluminum Products:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+Stamping:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+Drilling:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+Milling:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+Turning:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+Welding:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+No Coating:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+Powder Coating:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+Liquid Painting:
+  Coke: 0.0
+  Fuel Oil: 0.0
+  Diesel: 0.0
+  Gas: 0.730
+  Coal: 0.0
+  Electricity: 0.110
+  LPG: 0.160
+  Biomass: 0.0
+
+Metallurgical Aluminum from Series 1:
+  Electricity: 0.0
+Metallurgical Aluminum from Series 5:
+  Electricity: 0.0
+Metallurgical Aluminum from Series 6:
+  Electricity: 0.0
+Metallurgical Aluminum from Series 7:
+  Electricity: 0.0
+Metallurgical Aluminum from Casting Alloy 3:
+  Electricity: 0.0
+Metallurgical Aluminum from Casting Alloy 4:
+  Electricity: 0.0
+Raw Aluminum (extrusion):
+  Electricity: 0.0
+Raw Aluminum (ingot):
+  Electricity: 0.0

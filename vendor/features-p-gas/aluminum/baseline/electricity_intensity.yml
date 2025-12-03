@@ -1,0 +1,25 @@
+electricity_intensity:
+- code: BRA
+  intensity: 38.50
+- code: BRA (low-carbon)
+  intensity: 20.14
+- code: BRA (high-carbon)
+  intensity: 55.56  
+- code: CHN
+  intensity: 155.43
+- code: DEU
+  intensity: 95.59
+- code: IND
+  intensity: 196.76
+- code: JPN
+  intensity: 133.98
+- code: RUS
+  intensity: 124.78
+- code: KOR
+  intensity: 115.08
+- code: USA
+  intensity: 106.54
+- code: IRN
+  intensity: 178.33
+- code: TUR
+  intensity: 103.55

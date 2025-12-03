@@ -17,6 +17,6 @@ __all__ = [
     'load_sector_descriptor', 'StageMenuItem', 'SectorDescriptor', 'RoutePreset',
     # scenario resolver helpers
     'build_stage_material_map', 'resolve_stage_material', 'reference_stage_for_gas',
+    'reference_stage_for_electricity',
     'match_route', 'match_route_in_name', 'build_route_mask_for_descriptor', 'resolve_feed_mode',
 ]
-

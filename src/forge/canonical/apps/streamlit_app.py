@@ -38,48 +38,45 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-# Force sector when set (used by portal wrapper)
-_forced_sector = os.environ.get("FORGE_FORCE_SECTOR", "").strip().title()
-
 
 # --- Core wrappers (no duplicate math here) ---
-import forge.steel_core_api_v2 as mover_api
-from forge.steel_core_api_v2 import _apply_process_gas_metadata
+from forge.canonical.steel_core_api_v2 import (
+    RouteConfig,
+    ScenarioInputs,
+    run_scenario,
+    write_run_log,  # for simple JSON logging
+    _apply_process_gas_metadata,
+)
 
-from forge.core.models import Process
-from forge.core.io import (
+from forge.canonical.core.models import Process
+from forge.canonical.core.io import (
     load_data_from_yaml,
     load_parameters,
     load_recipes_from_yaml,
     load_market_config,
     load_electricity_intensity,
 )
-from forge.core.transforms import (
+from forge.canonical.core.transforms import (
     apply_fuel_substitutions,
     apply_dict_overrides,
     apply_recipe_overrides,
 )
-from forge.core.viz import (
+from forge.canonical.core.viz import (
     make_mass_sankey,
     make_energy_sankey,
     make_energy_to_process_sankey,
     make_hybrid_sankey,
 )
-from forge.core.routing import STAGE_MATS, build_route_mask, enforce_eaf_feed
+from forge.canonical.core.routing import STAGE_MATS, build_route_mask, enforce_eaf_feed
 
-from forge.descriptor import load_sector_descriptor, StageMenuItem
-from forge.descriptor import (
+from forge.canonical.descriptor import load_sector_descriptor, StageMenuItem
+from forge.canonical.descriptor import (
     build_route_mask_for_descriptor,
     build_stage_material_map,
     match_route,
     match_route_in_name,
     resolve_feed_mode,
 )
-
-
-def _api_for_data_root(data_root: str):
-    """Always use mover API for this steel-only UI."""
-    return mover_api
 
 st.set_page_config(
     page_title="Steel Model – Routes & Treatments",
@@ -89,7 +86,7 @@ st.set_page_config(
 
 APP_PROFILE = os.getenv("APP_PROFILE", "dev").lower()
 IS_PAPER = (APP_PROFILE == "paper")
-DEFAULT_DATA_ROOT = "datasets/steel/likely"
+DEFAULT_DATA_ROOT = "vendor/features-p-gas/aluminum/baseline"
 DATA_ROOT = st.session_state.get("DATA_ROOT", DEFAULT_DATA_ROOT)
 
 
@@ -110,16 +107,14 @@ def _costs_enabled() -> bool:
         return False
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
+_forced_sector = os.environ.get("FORGE_FORCE_SECTOR", "").strip().title()
 SECTOR_CONFIG = {
-    "Steel": {
+    "Aluminum": {
         "datasets": {
-            "Likely": "datasets/steel/likely",
-            "Optimistic (Low)": "datasets/steel/optimistic_low",
-            "Pessimistic (High)": "datasets/steel/pessimistic_high",
-            "Usiminas": "datasets/steel/usiminas",
+            "Baseline": "vendor/features-p-gas/aluminum/baseline",
         },
-        "default_dataset": "Likely",
-        "preferred_scenario": "BF_BOF_coal.yml",
+        "default_dataset": "Baseline",
+        "preferred_scenario": "scenarios/primary-al.yml",
     },
 }
 
@@ -453,7 +448,7 @@ def _load_for_picks(
 
     # Apply optional uniform/scheduled efficiency improvements to intensities BEFORE adjustments
     try:
-        from forge.steel_core_api_v2 import _apply_energy_int_efficiency_scaling, _apply_energy_int_floor
+        from forge.canonical.steel_core_api_v2 import _apply_energy_int_efficiency_scaling, _apply_energy_int_floor
         _apply_energy_int_efficiency_scaling(energy_int, scenario)
         _apply_energy_int_floor(energy_int, scenario)
     except Exception:
@@ -934,7 +929,17 @@ with tab_main:
         # Descriptor-driven mapping first
         try:
             if mat_name in descriptor_stage_map:
-                return descriptor_stage_map[mat_name]
+                sid = descriptor_stage_map[mat_name]
+                if not sid:
+                    return sid
+                sid_lower = str(sid).lower()
+                if sid_lower in {"ip1", "ip2", "ip3", "ip4"}:
+                    return sid_upper if (sid_upper := str(sid).upper()) else sid
+                if sid_lower == "finished":
+                    return "Finished"
+                if sid_lower == "remelt":
+                    return "Remelt"
+                return str(sid)
         except Exception:
             pass
         # Aluminum: explicit downstream buckets so UI columns stay ordered
@@ -948,7 +953,7 @@ with tab_main:
                 return "Aluminum Basic"
             if "manufactured aluminum" in name:
                 return "Aluminum Manufactured"
-            if "finished aluminum" in name:
+            if "finished aluminum" in name or "finished" in name:
                 return "Aluminum Finished"
             return "Aluminum Downstream"
         if mat_name in UPSTREAM_MATS:
@@ -970,6 +975,19 @@ with tab_main:
         groups.pop("IP1", None)   # no Alloying column for crude steel
     for mat, options in ambiguous:
         groups[_stage_label_for(mat)].append((mat, options))
+
+    # Steel fallback: ensure alloying options appear even if not ambiguous
+    if SECTOR_KEY == "Steel" and not stage_is_as_cast and not groups.get("IP1"):
+        try:
+            prod_idx = build_producers_index(recipes_for_ui)
+            opts = [
+                r.name for r in prod_idx.get("Cast Steel (IP1)", [])
+                if pre_mask.get(r.name, 1) > 0 and pre_select.get(r.name, 1) > 0
+            ]
+            if opts:
+                groups["IP1"].append(("Cast Steel (IP1)", opts))
+        except Exception:
+            pass
     # If no descriptor labels and everything fell into one bucket for Aluminum, split heuristically
     if SECTOR_KEY == "Aluminum" and not descriptor_stage_labels:
         if len(groups) <= 1:
@@ -1044,9 +1062,11 @@ with tab_main:
             "Aluminum Manufactured",
             "Aluminum Finished",
             "Aluminum Downstream",
-            "Finished",
         ]
         stage_layout = [s for s in base_order if groups.get(s)]
+        # If finished picks are present but bucketed under generic "Finished", append it
+        if groups.get("Finished") and "Finished" not in stage_layout:
+            stage_layout.append("Finished")
         if not stage_layout and groups:
             stage_layout = list(groups.keys())
         if not stage_layout:
@@ -1303,8 +1323,7 @@ if not IS_PAPER:
                     scn_dict.setdefault("emission_factors", {})["Electricity"] = float(x)
                     country_override = None  # force use of override
 
-                api = _api_for_data_root(DATA_ROOT)
-                route_cfg = api.RouteConfig(
+                route_cfg = RouteConfig(
                     route_preset=snap["route_preset"],
                     stage_key=snap["stage_key"],
                     stage_role=snap.get("stage_role"),
@@ -1427,8 +1446,7 @@ if not IS_PAPER:
                 scn_dict.setdefault("emission_factors", {})["Electricity"] = grid_ef
                 country_override = None
 
-                api = _api_for_data_root(DATA_ROOT)
-                route_cfg = api.RouteConfig(
+                route_cfg = RouteConfig(
                     route_preset=snap["route_preset"],
                     stage_key=snap["stage_key"],
                     stage_role=snap.get("stage_role"),
@@ -1436,14 +1454,14 @@ if not IS_PAPER:
                     picks_by_material=deepcopy(snap["picks_by_material"]),
                     pre_select_soft=deepcopy(snap["pre_select_soft"]),
                 )
-                scn_inputs = api.ScenarioInputs(
+                scn_inputs = ScenarioInputs(
                     country_code=country_override,
                     scenario=scn_dict,
                     route=route_cfg,
                 )
 
                 try:
-                    out_i = api.run_scenario(DATA_ROOT, scn_inputs)
+                    out_i = run_scenario(DATA_ROOT, scn_inputs)
                     total_i  = getattr(out_i, "total_co2e_kg", None)
                     energy_i = getattr(out_i, "energy_balance", None)
 
@@ -1737,8 +1755,7 @@ if run_now:
                 'electricity_fraction': 1.0 - direct_use_fraction
             }
             
-            api = _api_for_data_root(DATA_ROOT)
-            route_cfg = api.RouteConfig(
+            route_cfg = RouteConfig(
                 route_preset=route,
                 stage_key=stage_key,
                 stage_role=stage_role,
@@ -1746,12 +1763,12 @@ if run_now:
                 picks_by_material=dict(st.session_state.picks_by_material),
                 pre_select_soft=pre_select_soft,
             )
-            scn = api.ScenarioInputs(
+            scn = ScenarioInputs(
                 country_code=(country_code or None),
                 scenario=scenario,
                 route=route_cfg,
             )
-            out = api.run_scenario(DATA_ROOT, scn)
+            out = run_scenario(DATA_ROOT, scn)
             
         # ---- Map core outputs (after the spinner) ----
         production_routes = getattr(out, "production_routes", None)

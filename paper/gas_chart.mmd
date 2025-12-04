@@ -1,0 +1,13 @@
+flowchart BT
+    RAW["Coal purchase"] --> COQ["Coke plant"]
+    COQ -- Coke --> BF["Blast Furnace"]
+    COQ -- COG --> UE["Internal power plant"]
+    BF -- "BFG" --> UE
+    BOF -- "BOFG" --> UE
+    UE -- Internal electricity --> BF & COQ
+    GRD["Grid"] -- Electricity (purchase) --> COQ & BF & BOF
+    PET["Gas purchase"] --> COQ & BF
+    linkStyle 2 stroke:#D50000,fill:none
+    linkStyle 3 stroke:#D50000,fill:none
+    linkStyle 4 stroke:#2962FF,fill:none
+    linkStyle 5 stroke:#2962FF,fill:none

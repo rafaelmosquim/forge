@@ -173,6 +173,11 @@ INPUT ./figs/process_map.png
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmitt10.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmbx7.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmbx5.tfm
+INPUT ./figs/gas_recovery.png
+INPUT ./figs/gas_recovery.png
+INPUT ./figs/gas_recovery.png
+INPUT ./figs/gas_recovery.png
+INPUT ./figs/gas_recovery.png
 INPUT ./figs/mc-cast.png
 INPUT ./figs/mc-cast.png
 INPUT ./figs/mc-cast.png

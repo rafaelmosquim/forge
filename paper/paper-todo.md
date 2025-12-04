@@ -72,8 +72,8 @@ Need explicit evidence that the method works in practice:
     - Changes process‑level balances.
     - Changes plant totals.
     - Changes an aggregate metric (e.g., tCO₂e/t steel at Finished).
-- [ ] **Aluminum proof‑of‑concept**:
-  - One short example showing that aluminum can be modeled with the same descriptor + YAML stack (even if no gas routing).
+- [ ] **Aluminum sector demonstration**:
+  - One short example showing that aluminum runs through the same descriptor + YAML stack and core pipeline as steel, highlighting that it is a fully integrated sector with a current baseline dataset (min/max variants still to come).
 - [ ] Add a small **“Results / Demonstration”** section tying the above into 1–2 figures/tables.
 
 ### 3.4 Related work and comparisons
@@ -94,7 +94,7 @@ Need explicit evidence that the method works in practice:
 
 - [ ] Add 1–2 sentence “why this matters” intros/outros to dense method sections (material balance, gas routing, emissions) to anchor the reader.
 - [ ] Clean up informal phrases (“starting point”, “will be explained later”) and unify tense (present, assertive).
-- [ ] Tighten aluminum section to explicitly frame it as a **sector extensibility demonstration**, not a full case study.
+- [ ] Tighten aluminum section to clearly describe it as a fully integrated second sector with a somewhat narrower process scope and only a baseline dataset (minimum and maximum datasets as future work), rather than as a mere proof-of-concept.
 
 ### 3.6 Figures and examples
 

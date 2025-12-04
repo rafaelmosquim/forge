@@ -105,25 +105,32 @@ These design choices make FORGE suitable for academic studies, policy
 sensitivity analysis, and plant-level ``what-if'' scenarios, while remaining
 extensible to other sectors.
 
-This document sketches the main architecture and---most importantly---the data
-pipeline from YAML input files to emissions outputs. The goal is to serve as a
-starting point for a full academic paper.
+This document presents the main architecture and---most importantly---the data
+pipeline from YAML input files to emissions outputs, as the basis of a full
+methods paper.
 
 At its core, FORGE implements a material balance solver that walks upstream from
 final demand to determine production levels per process. Given production
 levels, energy intensities, and carrier shares, it builds per-process energy
 balances. This makes the model fully integrated, which allows changes in parameters (ie Blast Furnace energy intensity) to propagate both upstream and downstream. Another feature is that FORGE models process gas recovery in coke making, blast furnace and basic oxygen furncace, in line with the real world practices. A gas-routing module implements process-gas recovery, routing between direct use and electricity, and blended emission factors for gas and internal electricity. Finally, emissions are computed using energy and direct emissions, applying blended emission factors where relevant.
 
-The aluminum implementation now mirrors the original Excel model and runs through the same FORGE stack as steel: primary and remelt routes, downstream alloying, rolling/extrusion/ingot casting, finishing, and direct process emissions. Aluminum is therefore a first-class, fully supported sector (currently distributed with the baseline dataset), not a lightweight demonstration.
+The aluminum implementation now mirrors the original Excel model and runs through the same FORGE stack as steel: primary and remelt routes, downstream alloying, rolling/extrusion/ingot casting, finishing, and direct process emissions. Aluminum is therefore a first-class, fully integrated sector in FORGE; its process chain is somewhat shorter than steel’s and it is currently distributed with a single baseline dataset (minimum and maximum variants are planned).
 
 \section{High-level Architecture}
 
-\subsection{Plant Overview}
+\subsection{Steel Plant Overview}
 
 \begin{figure}
       \centering
-      \includegraphics[width=0.9\textwidth]{process_map.png}
-      \caption{Overview of the plant layout and process flow}
+      \includegraphics[width=0.9\textwidth]{steel_process.png}
+      \caption{Overview of the plant layout and process flow. Source: Own authors.}
+\end{figure}
+
+\subsection{Aluminum plant Overview}
+\begin{figure}
+      \centering
+      \includegraphics[width=0.9\textwidth]{aluminum_process.png}
+      \caption{Overview of the aluminum production process flow. Source: Own authors.}
 \end{figure}
 
 \subsection{Core engine (\texttt{forge.core})}
@@ -960,7 +967,8 @@ Uncertainty in FORGE enters primarily through energy intensities, carrier
 shares, emission factors, and selected process parameters. For steel, the
 repository provides three dataset variants (\texttt{optimistic\_low},
 \texttt{likely}, \texttt{pessimistic\_high}) with consistent YAML schemas;
-aluminum currently has a single baseline dataset.
+aluminum currently has a single baseline dataset (minimum and maximum variants
+are forthcoming).
 
 In the Streamlit interface, users can:
 \begin{itemize}
@@ -993,8 +1001,9 @@ Validation in the steel case is currently focused on:
         smoothly to parameter perturbations rather than relying on tuned
         point estimates.
 \end{itemize}
-Aluminum validation is more limited and currently serves mainly as a proof of
-concept for extending the framework to other sectors.
+Aluminum validation is more limited, reflecting both the sector’s narrower
+process scope and the current single baseline dataset, but it exercises the
+same pipeline end-to-end and provides a fully integrated second sector.
 
 \section{Usage}
 

@@ -2,7 +2,7 @@
 
 PY ?= python3
 
-.PHONY: help list finished paper run parallel mc-as-cast mc-finished
+.PHONY: help list finished paper run parallel fgv mc-as-cast mc-finished
 
 help:
 	@echo "Targets:"
@@ -11,6 +11,7 @@ help:
 	@echo "  paper           - run paper portfolio"
 	@echo "  run PROFILE=... - run a named profile from configs/run_profiles.yml"
 	@echo "  parallel        - run 'finished' and 'paper' in parallel"
+	@echo "  fgv             - run FGV regular portfolio (3 BR grid mixes, parallel)"
 	@echo "  mc-as-cast      - example Monte Carlo (as-cast, ALL countries)"
 	@echo "  mc-finished     - example Monte Carlo (finished portfolio, ALL countries)"
 	@echo "  docker-build    - build Docker image (tag: forge:paper)"
@@ -33,6 +34,12 @@ run:
 
 parallel:
 	$(PY) scripts/run_profiles.py finished paper --parallel
+
+fgv:
+	$(PY) scripts/run_profiles.py \
+		fgv_regular_br fgv_regular_br_low fgv_regular_br_high \
+		fgv_high_br fgv_high_br_low fgv_high_br_high \
+		--parallel
 
 engine-smoke:
 	$(PY) -m forge.cli.engine_cli --data datasets/steel/likely --route BF-BOF --stage Finished --country BRA --demand 1000 --lci --out results/engine_demo

@@ -19,3 +19,68 @@ profiles:
       FORGE_OUTPUT_LABEL: paper
     cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
 
+  fgv_regular_br:
+    desc: "FGV regular portfolio • BRA grid EF"
+    env:
+      FORGE_PAPER_PRODUCT_CONFIG: portfolio
+      FORGE_PAPER_PORTFOLIO_SPEC: configs/fgv_regular.yml
+      FORGE_PAPER_PORTFOLIO_BLEND: finished_portfolio
+      FORGE_PAPER_CACHE_DIR: results/cache_fgv_regular_br
+      FORGE_OUTPUT_LABEL: fgv_regular_br
+      FORGE_PAPER_COUNTRY_CODE: "BRA"
+    cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
+
+  fgv_regular_br_low:
+    desc: "FGV regular portfolio • BRA (low-carbon) grid EF"
+    env:
+      FORGE_PAPER_PRODUCT_CONFIG: portfolio
+      FORGE_PAPER_PORTFOLIO_SPEC: configs/fgv_regular.yml
+      FORGE_PAPER_PORTFOLIO_BLEND: finished_portfolio
+      FORGE_PAPER_CACHE_DIR: results/cache_fgv_regular_br_low
+      FORGE_OUTPUT_LABEL: fgv_regular_br_low
+      FORGE_PAPER_COUNTRY_CODE: "BRA (low-carbon)"
+    cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
+
+  fgv_regular_br_high:
+    desc: "FGV regular portfolio • BRA (high-carbon) grid EF"
+    env:
+      FORGE_PAPER_PRODUCT_CONFIG: portfolio
+      FORGE_PAPER_PORTFOLIO_SPEC: configs/fgv_regular.yml
+      FORGE_PAPER_PORTFOLIO_BLEND: finished_portfolio
+      FORGE_PAPER_CACHE_DIR: results/cache_fgv_regular_br_high
+      FORGE_OUTPUT_LABEL: fgv_regular_br_high
+      FORGE_PAPER_COUNTRY_CODE: "BRA (high-carbon)"
+    cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
+
+  fgv_high_br:
+    desc: "FGV high-alloy portfolio • BRA grid EF"
+    env:
+      FORGE_PAPER_PRODUCT_CONFIG: portfolio
+      FORGE_PAPER_PORTFOLIO_SPEC: configs/fgv_high.yml
+      FORGE_PAPER_PORTFOLIO_BLEND: finished_portfolio
+      FORGE_PAPER_CACHE_DIR: results/cache_fgv_high_br
+      FORGE_OUTPUT_LABEL: fgv_high_br
+      FORGE_PAPER_COUNTRY_CODE: "BRA"
+    cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
+
+  fgv_high_br_low:
+    desc: "FGV high-alloy portfolio • BRA (low-carbon) grid EF"
+    env:
+      FORGE_PAPER_PRODUCT_CONFIG: portfolio
+      FORGE_PAPER_PORTFOLIO_SPEC: configs/fgv_high.yml
+      FORGE_PAPER_PORTFOLIO_BLEND: finished_portfolio
+      FORGE_PAPER_CACHE_DIR: results/cache_fgv_high_br_low
+      FORGE_OUTPUT_LABEL: fgv_high_br_low
+      FORGE_PAPER_COUNTRY_CODE: "BRA (low-carbon)"
+    cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]
+
+  fgv_high_br_high:
+    desc: "FGV high-alloy portfolio • BRA (high-carbon) grid EF"
+    env:
+      FORGE_PAPER_PRODUCT_CONFIG: portfolio
+      FORGE_PAPER_PORTFOLIO_SPEC: configs/fgv_high.yml
+      FORGE_PAPER_PORTFOLIO_BLEND: finished_portfolio
+      FORGE_PAPER_CACHE_DIR: results/cache_fgv_high_br_high
+      FORGE_OUTPUT_LABEL: fgv_high_br_high
+      FORGE_PAPER_COUNTRY_CODE: "BRA (high-carbon)"
+    cmd: ["python3", "src/forge/scenarios/paper_scenarios.py"]

@@ -1,0 +1,46 @@
+defaults:
+  route:
+    route_preset: BF-BOF
+    stage_key: Finished
+    demand_qty: 1000
+  country_code: BR
+  scenario:
+    gas_routing:
+      direct_use_fraction: 0.5
+      electricity_fraction: 0.5
+  picks_by_material:
+    Nitrogen: Nitrogen Production
+    Oxygen: Oxygen Production
+    Dolomite: Dolomite Production
+    Burnt Lime: Burnt Lime Production
+    Finished Products: No Coating
+
+runs:
+  - name: highalloy_hot_bf
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+
+  - name: highalloy_cold_bf
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (L)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Bypass CR→IP3  # forces the Cold Rolling leg
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+
+blends:
+  - name: finished_portfolio
+    notes: >
+      80% Hot Rolled; 20% Hot/Cold Rolled High-Alloy Steel from BF-BOF route.
+    components:
+      - run: highalloy_hot_bf
+        share: 0.80   # high-alloy (1.0) × hot (0.76) × no CR (0.8) ~ 0.61
+        label: High-alloy HR only
+      - run: highalloy_cold_bf
+        share: 0.20   # high-alloy (1.0) × hot (0.76) × CR (0.2) ~ 0.15
+        label: High-alloy HR + CR
+

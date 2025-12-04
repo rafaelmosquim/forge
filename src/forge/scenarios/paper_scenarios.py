@@ -82,6 +82,15 @@ FINAL_PICKS = {
     "Finished Products": "No Coating",
 }
 
+# Optional: force a specific grid electricity EF country code across all runs.
+# When set, this uses the electricity_intensity.yml mapping in DATA_DIR to
+# override the Electricity emission factor for every scenario.
+_PAPER_COUNTRY_CODE = (_os.getenv("FORGE_PAPER_COUNTRY_CODE", "") or "").strip()
+if _PAPER_COUNTRY_CODE:
+    _PAPER_COUNTRY_CODE = _PAPER_COUNTRY_CODE.upper()
+else:
+    _PAPER_COUNTRY_CODE = None
+
 # Toggle between simple product picks vs. portfolio basket
 # - simple: uses FINAL_PICKS (stamping/no coating)
 # - portfolio: blends EF across a portfolio spec (see configs/*finished_steel_portfolio*.yml)
@@ -195,7 +204,7 @@ def _ef_core_cached(route: str, config: str, year: int, base_year: int, annual_i
         picks_by_material=dict(FINAL_PICKS),
         pre_select_soft={},
     )
-    si = ScenarioInputs(country_code=None, scenario=scn, route=rc)
+    si = ScenarioInputs(country_code=_PAPER_COUNTRY_CODE, scenario=scn, route=rc)
     out = run_scenario(DATA_DIR, si)
     raw = float(getattr(out, "total_co2e_kg", 0.0) or 0.0)
     return raw / 1000.0
@@ -309,7 +318,7 @@ def _ef_core_run_with_picks(route: str, config: str, year: int, base_year: int, 
         picks_by_material=dict(picks or {}),
         pre_select_soft={},
     )
-    si = ScenarioInputs(country_code=None, scenario=scn, route=rc)
+    si = ScenarioInputs(country_code=_PAPER_COUNTRY_CODE, scenario=scn, route=rc)
     out = run_scenario(DATA_DIR, si)
     raw = float(getattr(out, "total_co2e_kg", 0.0) or 0.0)
     return raw / 1000.0
@@ -405,14 +414,51 @@ def _compute_portfolio_ef(route: str, config: str, year: int, base_year: int, an
     return ef
 
 
-# Load BF fleet data (example); provide a CI-safe fallback
-try:
-    bf_fleet = pd.read_csv(
-        "datasets/steel/plants.csv", sep=";", encoding="utf-8"
+def _load_bf_fleet() -> pd.DataFrame:
+    """Load BF fleet data used for capacity transitions.
+
+    Priority:
+      1) FORGE_PAPER_PLANTS_CSV (explicit path, any location)
+      2) datasets/steel/plants.csv (relative to DATA_DIR parent)
+      3) Minimal toy fallback (clearly logged) for CI/demo only.
+    """
+    # 1) Explicit override
+    env_path = (_os.getenv("FORGE_PAPER_PLANTS_CSV", "") or "").strip()
+    candidates = []
+    if env_path:
+        candidates.append(_Path(env_path))
+    # 2) Default relative locations relative to DATA_DIR
+    base_dir = _Path(DATA_DIR).resolve()
+    # Prefer plants.csv inside the configured DATA_DIR (e.g. datasets/steel/likely/plants.csv)
+    candidates.append(base_dir / "plants.csv")
+    # Backwards-compatible location next to DATA_DIR (e.g. datasets/steel/plants.csv)
+    candidates.append(base_dir.parent / "plants.csv")
+
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            df = pd.read_csv(path, sep=";", encoding="utf-8-sig")
+        except Exception as e:
+            print(f"[fleet] failed to read {path}: {e}")
+            continue
+        required = {"Fuel", "Capacity", "EOL", "Relining"}
+        missing = required.difference(df.columns)
+        if missing:
+            print(f"[fleet] {path} is missing columns {sorted(missing)}; ignoring this file.")
+            continue
+        df["Capacity"] = pd.to_numeric(df["Capacity"], errors="coerce")
+        print(f"[fleet] loaded BF fleet from {path} (rows={len(df)})")
+        return df
+
+    # 3) Fallback: tiny synthetic fleet (for CI / smoke tests).
+    print(
+        "[fleet] WARNING: using built-in toy BF fleet "
+        "(100 coal / 20 charcoal, single EOL/Relining); "
+        "set FORGE_PAPER_PLANTS_CSV or provide datasets/steel/plants.csv "
+        "to drive a realistic capacity schedule."
     )
-    bf_fleet["Capacity"] = pd.to_numeric(bf_fleet["Capacity"], errors="coerce")
-except FileNotFoundError:
-    bf_fleet = pd.DataFrame(
+    return pd.DataFrame(
         {
             "Fuel": ["coal", "charcoal"],
             "Capacity": [100.0, 20.0],
@@ -420,6 +466,32 @@ except FileNotFoundError:
             "Relining": [2030, 2030],
         }
     )
+
+
+bf_fleet = _load_bf_fleet()
+
+_EF_LOG: Dict[Tuple[str, str, int, int, float, str, str], float] = {}
+
+
+def _log_emission_factor(route: str, config: str, year: int, base_year: int, annual_improvement: float, ef: float) -> None:
+    """Record unique EF lookups for later inspection."""
+    try:
+        key = (
+            str(route),
+            str(config),
+            int(year),
+            int(base_year),
+            float(annual_improvement),
+            _PAPER_COUNTRY_CODE or "",
+            PRODUCT_CONFIG,
+        )
+        if key in _EF_LOG:
+            return
+        _EF_LOG[key] = float(ef)
+    except Exception:
+        # Debug helpers must never break the main run
+        return
+
 
 def get_emission_factor(route, config, year, base_year=2025, annual_improvement=0.0):
     """EF lookup (tCO2/t) computed entirely in core, including annual improvements.
@@ -433,8 +505,11 @@ def get_emission_factor(route, config, year, base_year=2025, annual_improvement=
     by = int(base_year)
     imp = float(annual_improvement)
     if PRODUCT_CONFIG == 'portfolio':
-        return _compute_portfolio_ef(route_s, config_s, y, by, imp)
-    return _ef_core_cached_disk(route_s, config_s, y, by, imp)
+        ef = _compute_portfolio_ef(route_s, config_s, y, by, imp)
+    else:
+        ef = _ef_core_cached_disk(route_s, config_s, y, by, imp)
+    _log_emission_factor(route_s, config_s, y, by, imp, ef)
+    return ef
 
 # ============================================
 # 2. PARAMETER SWEEP CONFIGURATION
@@ -724,7 +799,71 @@ def _write_aggregate_ef_table(df: pd.DataFrame) -> None:
     except Exception as e:
         print(f"[table] failed to write aggregate EF: {e}")
 
+def _write_timeseries_table(df: pd.DataFrame) -> None:
+    """Dump full scenario × year timeseries to CSV for inspection."""
+    try:
+        base_dir = _os.getenv('FORGE_TABLE_DIR', 'results/tables')
+        out_dir = _Path(base_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / 'scenario_timeseries.csv'
+        cols = [
+            'scenario',
+            'Year',
+            'Scenario',
+            'BF_Coal_Capacity',
+            'BF_Charcoal_Capacity',
+            'DRI_Capacity',
+            'Total_Emissions',
+            'Emissions_Intensity',
+            'Total_Capacity',
+            'utilization_rate',
+            'annual_improvement',
+            'charcoal_expansion',
+            'dri_mix',
+        ]
+        cols = [c for c in cols if c in df.columns]
+        df.to_csv(out_path, columns=cols, index=False)
+        print(f"[table] scenario timeseries written to {out_path}")
+    except Exception as e:
+        print(f"[table] failed to write scenario timeseries: {e}")
+
+
+def _write_ef_lookup_table() -> None:
+    """Write the unique EF lookup table (per route/config/year/improvement) to CSV."""
+    if not _EF_LOG:
+        return
+    try:
+        base_dir = _os.getenv('FORGE_TABLE_DIR', 'results/tables')
+        out_dir = _Path(base_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / 'ef_lookup.csv'
+        rows = []
+        for key, ef in sorted(
+            _EF_LOG.items(),
+            key=lambda kv: (kv[0][0], kv[0][1], kv[0][2], kv[0][4]),
+        ):
+            route, config, year, base_year, imp, country, product_config = key
+            rows.append(
+                {
+                    'route': route,
+                    'config': config,
+                    'year': year,
+                    'base_year': base_year,
+                    'annual_improvement': imp,
+                    'country_code': country or None,
+                    'product_config': product_config,
+                    'ef_tco2_per_t': ef,
+                }
+            )
+        pd.DataFrame(rows).to_csv(out_path, index=False)
+        print(f"[table] EF lookup written to {out_path}")
+    except Exception as e:
+        print(f"[table] failed to write EF lookup: {e}")
+
+
 _write_aggregate_ef_table(combined_df)
+_write_timeseries_table(combined_df)
+_write_ef_lookup_table()
 
 plt.figure(figsize=(12, 7))
 

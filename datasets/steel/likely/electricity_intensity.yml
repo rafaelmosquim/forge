@@ -1,6 +1,10 @@
 electricity_intensity:
 - code: BRA
   intensity: 38.50
+- code: BRA (low-carbon)
+  intensity: 26.68
+- code: BRA (high-carbon)
+  intensity: 51.48 
 - code: CHN
   intensity: 155.43
 - code: DEU

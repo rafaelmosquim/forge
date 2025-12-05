@@ -1079,6 +1079,19 @@ basic histograms/ECDF plots of emission factors.
 
 \section{Model Results}
 
+\subsection{Validation at the crude-steel boundary}
+
+To validate FORGE against published ranges, we run each core steel route (BF--BOF, DRI--EAF, EAF--scrap) at the crude-steel boundary using the Likely dataset and Brazil grid electricity. Concretely, we call the live engine via \texttt{make validation-table}, which invokes \texttt{forge.steel\_core\_api\_v2.run\_scenario} for each route with \texttt{datasets/steel/likely}, \texttt{country=BRA}, demand of \SI{1000}{\kilogram} at the \texttt{Cast} stage (``Validation (as-cast)''). The resulting route-level emission factors are written to \texttt{results/validation\_routes\_bra.tex} and included below.
+
+\begin{table}[H]
+  \centering
+  \caption{Route-level emission factors from FORGE at the crude-steel (as-cast) boundary, Likely dataset, Brazil grid electricity. Values shown are FORGE results only; comparison with Worldsteel and other benchmarks is discussed in the text.}
+  \input{../results/validation_routes_bra.tex}
+  \label{tab:validation_bra}
+\end{table}
+
+\subsection{Monte Carlo illustration}
+
 Monte Carlo for the as-cast configuration, for Brazil, using mininum, likely and maximum datasets, shows the following results:
 
 \begin{figure}
@@ -1086,6 +1099,12 @@ Monte Carlo for the as-cast configuration, for Brazil, using mininum, likely and
       \includegraphics[width=0.9\textwidth]{mc-cast.png}
       \caption{Monte Carlo Simulation for cast steel in Brazil}
 \end{figure}
+
+\subsection{Paper portfolio scenarios}
+
+Beyond single-route validation, FORGE includes a small scenario driver for sector-wide portfolio analysis. The \texttt{make paper} target runs \texttt{src/forge/scenarios/paper\_scenarios.py} with a ``paper'' portfolio specification (\texttt{configs/paper\_portfolio.yml}) and portfolio product configuration (\texttt{FORGE\_PAPER\_PRODUCT\_CONFIG=portfolio}). Internally, the script calls \texttt{run\_scenario} repeatedly across a grid of assumptions (utilization, annual efficiency improvement, charcoal expansion, DRI mixes) and aggregates emission intensities over time.
+
+When invoked via \texttt{make paper}, output paths are configured automatically so that all figures are written under \texttt{results/paper/figs/} (e.g.\ \texttt{paper\_fig\_01.png}, \texttt{paper\_fig\_02.png}, \dots) and an aggregate emission-intensity table is written to \texttt{results/paper/tables/aggregate\_ef.csv}. The scenario results and figures used in this section of the paper are taken directly from those files; rerunning \texttt{make paper} regenerates them from the live FORGE model.
 
 
 

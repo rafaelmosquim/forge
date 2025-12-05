@@ -2,7 +2,7 @@
 
 PY ?= python3
 
-.PHONY: help list finished paper aluminum aluminum_fgv mc-as-cast mc-finished run parallel
+.PHONY: help list finished paper aluminum aluminum_fgv mc-as-cast mc-finished run parallel validation-table
 
 help:
 	@echo "Targets:"
@@ -20,6 +20,7 @@ help:
 	@echo "  docker-paper    - run 'paper' profile inside Docker"
 	@echo "  engine-smoke    - quick engine CLI run (BF-BOF, Finished, 1000 kg)"
 	@echo "  reproduce-validation - Likely/BRA Validation (as-cast) reproducible run"
+	@echo "  validation-table - generate LaTeX table for Validation/BRA across all steel routes"
 
 list:
 	$(PY) scripts/run_profiles.py --list
@@ -61,6 +62,9 @@ mc-as-cast:
 
 mc-finished:
 	$(PY) scripts/run_profiles.py mc-finished
+
+validation-table:
+	PYTHONPATH=src $(PY) scripts/generate_validation_table.py --routes BF-BOF,DRI-EAF,EAF-Scrap --stage Cast
 
 # --- Docker helpers ---
 docker-build:

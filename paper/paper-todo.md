@@ -74,7 +74,8 @@ Need explicit evidence that the method works in practice:
     - Changes an aggregate metric (e.g., tCO₂e/t steel at Finished).
 - [ ] **Aluminum sector demonstration**:
   - One short example showing that aluminum runs through the same descriptor + YAML stack and core pipeline as steel, highlighting that it is a fully integrated sector with a current baseline dataset (min/max variants still to come).
-- [ ] Add a small **“Results / Demonstration”** section tying the above into 1–2 figures/tables.
+- [x] Add a small **“Results / Demonstration”** section tying the above into 1–2 figures/tables.
+  - \section{Model Results} now exists in `forge_paper.tex` with a crude‑steel validation table (driven by `make validation-table`) and a Monte Carlo illustration; still need to add explicit reference values (e.g., Worldsteel) and a propagation example.
 
 ### 3.4 Related work and comparisons
 
@@ -94,7 +95,8 @@ Need explicit evidence that the method works in practice:
 
 - [ ] Add 1–2 sentence “why this matters” intros/outros to dense method sections (material balance, gas routing, emissions) to anchor the reader.
 - [ ] Clean up informal phrases (“starting point”, “will be explained later”) and unify tense (present, assertive).
-- [ ] Tighten aluminum section to clearly describe it as a fully integrated second sector with a somewhat narrower process scope and only a baseline dataset (minimum and maximum datasets as future work), rather than as a mere proof-of-concept.
+- [x] Tighten aluminum section to clearly describe it as a fully integrated second sector with a somewhat narrower process scope and only a baseline dataset (minimum and maximum datasets as future work), rather than as a mere proof-of-concept.
+  - Aluminum section in `forge_paper.tex` now describes aluminum as a fully integrated sector with a shorter process chain and a single baseline dataset (min/max variants planned).
 
 ### 3.6 Figures and examples
 
@@ -115,8 +117,9 @@ Plan at least:
   - Repository URL and versioning (tag for the paper).
   - How to set up environment (venv + `requirements.txt`).
   - How to regenerate key results:
-    - `make finished`, `make paper`, `make aluminum`, `make mc-as-cast`, `make mc-finished`.
+    - `make finished`, `make paper`, `make aluminum`, `make mc-as-cast`, `make mc-finished`, `make validation-table`.
   - Note on tests (`pytest`) and regression checks.
+  - Many of these pieces already exist scattered across the current text (Makefile targets, usage section, validation/tests paragraph); what is missing is a compact, explicit “Software and reproducibility” subsection that summarizes them in one place.
 
 ## 4. Later / nice-to-have
 

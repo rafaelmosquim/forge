@@ -437,19 +437,27 @@ def _load_bf_fleet() -> pd.DataFrame:
     for path in candidates:
         if not path.is_file():
             continue
-        try:
-            df = pd.read_csv(path, sep=";", encoding="utf-8-sig")
-        except Exception as e:
-            print(f"[fleet] failed to read {path}: {e}")
-            continue
+        parsed = None
         required = {"Fuel", "Capacity", "EOL", "Relining"}
-        missing = required.difference(df.columns)
-        if missing:
-            print(f"[fleet] {path} is missing columns {sorted(missing)}; ignoring this file.")
+        for sep in (";", ","):
+            try:
+                df = pd.read_csv(path, sep=sep, encoding="utf-8-sig")
+            except Exception:
+                df = None
+            if df is None:
+                continue
+            missing = required.difference(df.columns)
+            if missing:
+                # try next separator before giving up
+                continue
+            parsed = df
+            break
+        if parsed is None:
+            print(f"[fleet] {path} could not be parsed with ',' or ';' (missing required columns {sorted(required)}).")
             continue
-        df["Capacity"] = pd.to_numeric(df["Capacity"], errors="coerce")
-        print(f"[fleet] loaded BF fleet from {path} (rows={len(df)})")
-        return df
+        parsed["Capacity"] = pd.to_numeric(parsed["Capacity"], errors="coerce")
+        print(f"[fleet] loaded BF fleet from {path} (rows={len(parsed)})")
+        return parsed
 
     # 3) Fallback: tiny synthetic fleet (for CI / smoke tests).
     print(
@@ -516,15 +524,13 @@ def get_emission_factor(route, config, year, base_year=2025, annual_improvement=
 # ============================================
 
 param_grid = {
-    'scenario': ['business_as_usual', 'conservative', 'aggressive'],
-    'utilization_rate': [0.65, 0.80, 1],
-    'annual_improvement': [0.0, 0.01, 0.02],
-    'charcoal_expansion': [None, {2030: 3000, 2035: 3000, 2040: 3000, 2045: 3000}],
+    'scenario': ['conservative'],
+    'utilization_rate': [0.80],
+    'annual_improvement': [0.01],
+    'charcoal_expansion': [None],
     'dri_mix': [
         {2030: {"Natural Gas": 1.0}, 
          2040: {"Natural Gas": 0.7, "Biomethane-100": 0.1, "Green H2": 0.2}},
-        {2030: {"Natural Gas": 0.7, "Biomethane-100": 0.1, "Green H2": 0.2}, 
-         2040: {"Natural Gas": 0.4, "Biomethane-100": 0.2, "Green H2": 0.4}}
     ]
 }
 
@@ -861,9 +867,120 @@ def _write_ef_lookup_table() -> None:
         print(f"[table] failed to write EF lookup: {e}")
 
 
+def _load_electricity_intensity_map() -> dict:
+    """Load electricity intensity map (code -> gCO2/kWh) from the dataset."""
+    path = _Path(DATA_DIR) / "electricity_intensity.yml"
+    mapping = {}
+    try:
+        import yaml as _yaml
+        with path.open("r", encoding="utf-8") as fh:
+            payload = _yaml.safe_load(fh) or {}
+        entries = payload.get("electricity_intensity", payload)
+        if isinstance(entries, list):
+            for row in entries:
+                if not isinstance(row, dict):
+                    continue
+                code = str(row.get("code") or row.get("country") or "").strip()
+                val = row.get("intensity")
+                if code and val is not None:
+                    mapping[code.upper()] = float(val)
+        elif isinstance(entries, dict):
+            for code, val in entries.items():
+                try:
+                    mapping[str(code).upper()] = float(val)
+                except Exception:
+                    continue
+    except Exception:
+        return {}
+    return mapping
+
+
+def _write_fgv_summary() -> None:
+    """Aggregate EF per FGV run (regular + high-alloy) into results/fgv/summary.csv."""
+    label = (_os.getenv("FORGE_OUTPUT_LABEL", "") or "").strip()
+    if not label or not label.lower().startswith("fgv"):
+        return
+
+    summary_root = _Path("results") / "fgv"
+    summary_root.mkdir(parents=True, exist_ok=True)
+
+    # Collect all ef_lookup.csv under results/fgv/*/tables/
+    ef_files = list(summary_root.glob("*/tables/ef_lookup.csv"))
+    if not ef_files:
+        # Fallback: at least include current run if paths differ
+        table_dir = _Path(_os.getenv("FORGE_TABLE_DIR", "results/tables"))
+        ef_path = table_dir / "ef_lookup.csv"
+        if ef_path.exists():
+            ef_files.append(ef_path)
+
+    if not ef_files:
+        return
+
+    elec_map = _load_electricity_intensity_map()
+    all_rows = []
+
+    for ef_path in ef_files:
+        try:
+            df = pd.read_csv(ef_path)
+        except Exception as e:
+            print(f"[fgv] failed to read {ef_path}: {e}")
+            continue
+        if df.empty:
+            continue
+
+        base_year = None
+        if "base_year" in df.columns and df["base_year"].notna().any():
+            base_year = int(df["base_year"].dropna().min())
+        if base_year is None and "year" in df.columns:
+            base_year = int(df["year"].min())
+
+        years_of_interest = set()
+        if base_year is not None:
+            years_of_interest.add(base_year)
+        years_of_interest.add(2035)
+
+        subset = df[df["year"].isin(years_of_interest)].copy()
+        if subset.empty:
+            subset = df.copy()
+
+        label_from_path = ef_path.parent.parent.name  # results/fgv/<label>/tables/ef_lookup.csv
+        subset["output_label"] = label_from_path
+        subset["electricity_code"] = subset.get("country_code") if "country_code" in subset.columns else None
+        subset["electricity_ef_gco2_per_kwh"] = subset["electricity_code"].map(
+            lambda c: elec_map.get(str(c).upper()) if isinstance(c, str) else None
+        )
+
+        cols = [
+            "electricity_code",
+            "electricity_ef_gco2_per_kwh",
+            "output_label",
+            "route",
+            "config",
+            "year",
+            "ef_tco2_per_t",
+        ]
+        subset = subset[[c for c in cols if c in subset.columns]]
+        all_rows.append(subset)
+
+    if not all_rows:
+        return
+
+    summary_path = summary_root / "summary.csv"
+    try:
+        summary_df = pd.concat(all_rows, ignore_index=True)
+        summary_df = summary_df.drop_duplicates(
+            subset=["electricity_code", "output_label", "route", "config", "year"],
+            keep="last",
+        ).sort_values(["electricity_code", "output_label", "route", "config", "year"])
+        summary_df.to_csv(summary_path, index=False)
+        print(f"[fgv] summary updated at {summary_path}")
+    except Exception as e:
+        print(f"[fgv] failed to write summary: {e}")
+
 _write_aggregate_ef_table(combined_df)
 _write_timeseries_table(combined_df)
 _write_ef_lookup_table()
+_write_fgv_summary()
 
 plt.figure(figsize=(12, 7))
 

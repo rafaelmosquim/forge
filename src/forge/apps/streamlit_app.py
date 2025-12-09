@@ -785,8 +785,9 @@ with tab_main:
         for k in ("cc_choice_radio", "cr_toggle"):
             if k in st.session_state:
                 del st.session_state[k]
-    
+
     # Stage-specific forced picks
+    ip3_auto_choice = None
     forced_pre_select = {}
     
     # 1) Lock CRUDE STEEL to Regular (R) and remove any lingering post-CC picks
@@ -804,18 +805,15 @@ with tab_main:
             "Burnt Lime": "Burnt Lime from market",
             "Coke":       "Coke Production",
         })
-    # 2) For Steel-mill steel / Finished, propagate Post-CC choice AND force the IP3 bridge
+    # 2) For Steel-mill steel / Finished, propagate Post-CC choice
     if enable_post_cc:
         # HR vs Rod/bar path after CC
         if cc_choice_val:
             forced_pre_select["Raw Products (types)"] = cc_choice_val
-    
-        # Also pin the IP3 bypass so the flow continues beyond CC
-        if stage_is_after_cr or stage_is_finished:
-            forced_pre_select["Intermediate Process 3"] = (
-                "Bypass CR→IP3" if (cc_choice_val == "Hot Rolling" and cr_toggle_val)
-                else "Bypass Raw→IP3"
-            )
+        ip3_auto_choice = (
+            "Bypass CR→IP3" if (cc_choice_val == "Hot Rolling" and cr_toggle_val)
+            else "Bypass Raw→IP3"
+        )
             
     
     # Disable conflicting upstream cores for defaulting (soft)
@@ -854,6 +852,16 @@ with tab_main:
     if "picks_by_material" not in st.session_state:
         st.session_state.picks_by_material = {}
     st.session_state.picks_by_material.update(forced_pre_select)
+
+    # Default IP3 choice follows the Post-CC controls but remains user-editable
+    if ip3_auto_choice:
+        ip3_token = f"{DATA_ROOT}::{route}::{stage_key}::{cc_choice_val}::{bool(cr_toggle_val)}"
+        existing_ip3 = st.session_state.picks_by_material.get("Intermediate Process 3")
+        if (st.session_state.get("_ip3_default_token") != ip3_token) and (
+            (existing_ip3 is None) or (isinstance(existing_ip3, str) and existing_ip3.startswith("Bypass "))
+        ):
+            st.session_state.picks_by_material["Intermediate Process 3"] = ip3_auto_choice
+        st.session_state["_ip3_default_token"] = ip3_token
     
     # Merge and compute ambiguity
     pre_select = {**pre_select_soft, **forced_pre_select}
@@ -886,6 +894,7 @@ with tab_main:
     STAGE_DISPLAY = {
         "IP1": "Alloying",
         "Raw": "Post-CC",
+        "IP3": "Thermal treatments (IP3)",
         "IP4": "Shaping (off-site)",
         "Finished": "Finishing (off-site)"
     }
@@ -943,9 +952,21 @@ with tab_main:
         groups.pop("IP1", None)   # no Alloying column for crude steel
     for mat, options in ambiguous:
         groups[_stage_label_for(mat)].append((mat, options))
+
+    # Guard against stale IP3 picks when datasets/stages change
+    ip3_entry = next(
+        ((mat, opts) for (mat, opts) in groups.get("IP3", []) if mat == "Intermediate Process 3"),
+        None,
+    )
+    if ip3_entry:
+        _, ip3_opts = ip3_entry
+        current_ip3 = st.session_state.picks_by_material.get("Intermediate Process 3")
+        if current_ip3 not in ip3_opts:
+            fallback_ip3 = ip3_auto_choice if (ip3_auto_choice in ip3_opts) else ip3_opts[0]
+            st.session_state.picks_by_material["Intermediate Process 3"] = fallback_ip3
     
     # Desired left→right column order
-    primary_order = ["IP1", "Raw", "IP4", "Finished"]
+    primary_order = ["IP1", "Raw", "IP3", "IP4", "Finished"]
     
            
     # --- Downstream header + "Process Map" button, same font as Upstream
@@ -984,6 +1005,7 @@ with tab_main:
 
         
     cols = st.columns(len(primary_order))
+    col_ip1, col_raw, col_ip3, col_ip4, col_finished = cols
     
     def _use_selectbox(options: list[str]) -> bool:
         return (len(options) > 5) or (max(len(o) for o in options) > 28)
@@ -1029,9 +1051,9 @@ with tab_main:
     # 1) Alloying (IP1)
     #'_render_group("IP1", cols[0])' if False else None  # placeholder to avoid accidental edits
     if not stage_is_as_cast:
-        _render_group("IP1", cols[0])
+        _render_group("IP1", col_ip1)
     
-    with cols[1]:
+    with col_raw:
         if enable_post_cc:
             st.markdown("**After Continuous Casting**")
             cc_choice_widget = st.radio(
@@ -1051,12 +1073,14 @@ with tab_main:
             else:
                 st.session_state["cr_toggle"] = False
 
+    # 2) Thermal/coating (IP3)
+    _render_group("IP3", col_ip3)
     
     # 3) Shaping (IP4)
-    _render_group("IP4", cols[2])
+    _render_group("IP4", col_ip4)
     
     # 4) Finished
-    _render_group("Finished", cols[3])
+    _render_group("Finished", col_finished)
 
     # --- Upstream picks, no title line ---
     st.subheader("Upstream choices", help="Model considers Scopes 1+2 only; upstream purchases excludes emissions from this process.")

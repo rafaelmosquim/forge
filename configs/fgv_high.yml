@@ -15,32 +15,190 @@ defaults:
     Burnt Lime: Burnt Lime Production
     Finished Products: No Coating
 
+
 runs:
-  - name: highalloy_hot_bf
+  # Hot rolling (no CR) branch
+  - name: highalloy_hot_bf_bypass
     picks_by_material:
       Liquid Steel: Steel Refining (High Alloy)
-      Cast Steel (IP1): Continuous Casting (L)
+      Cast Steel (IP1): Continuous Casting (H)
       Raw Products (types): Hot Rolling
       Intermediate Process 3: Bypass Raw→IP3
       Manufactured Feed (IP4): Direct use of Basic Steel Products
-
-  - name: highalloy_cold_bf
+  - name: highalloy_hot_bf_thermal
     picks_by_material:
       Liquid Steel: Steel Refining (High Alloy)
-      Cast Steel (IP1): Continuous Casting (L)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Steel Thermal Treatment
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+  - name: highalloy_hot_bf_hotdip
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Hot Dip Metal Coating
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+  - name: highalloy_hot_bf_electro
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Electrolytic Metal Coating
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+
+  # Hot rolling + CR branch
+  - name: highalloy_cold_bf_bypass
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
       Raw Products (types): Hot Rolling
       Intermediate Process 3: Bypass CR→IP3  # forces the Cold Rolling leg
       Manufactured Feed (IP4): Direct use of Basic Steel Products
+  - name: highalloy_cold_bf_thermal
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Steel Thermal Treatment (CR)
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+  - name: highalloy_cold_bf_hotdip
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Hot Dip Metal Coating (CR)
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+  - name: highalloy_cold_bf_electro
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Hot Rolling
+      Intermediate Process 3: Electrolytic Metal Coating (CR)
+      Manufactured Feed (IP4): Direct use of Basic Steel Products
+
+  # Rod/bar branch — stamping / machining
+  - name: highalloy_rod_bf_stamp_bypass
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Machining
+  - name: highalloy_rod_bf_stamp_thermal
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Steel Thermal Treatment
+      Manufactured Feed (IP4): Machining
+  - name: highalloy_rod_bf_stamp_hotdip
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Hot Dip Metal Coating
+      Manufactured Feed (IP4): Machining
+  - name: highalloy_rod_bf_stamp_electro
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Electrolytic Metal Coating
+      Manufactured Feed (IP4): Machining
+
+  # Rod/bar branch — extrusion/conformation
+  - name: highalloy_rod_bf_ext_bypass
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Bypass Raw→IP3
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+  - name: highalloy_rod_bf_ext_thermal
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Steel Thermal Treatment
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+  - name: highalloy_rod_bf_ext_hotdip
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Hot Dip Metal Coating
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+  - name: highalloy_rod_bf_ext_electro
+    picks_by_material:
+      Liquid Steel: Steel Refining (High Alloy)
+      Cast Steel (IP1): Continuous Casting (H)
+      Raw Products (types): Rod/bar/section Mill
+      Intermediate Process 3: Electrolytic Metal Coating
+      Manufactured Feed (IP4): Casting/Extrusion/Conformation
+
+
 
 blends:
   - name: finished_portfolio
     notes: >
-      80% Hot Rolled; 20% Hot/Cold Rolled High-Alloy Steel from BF-BOF route.
+      Apply thermal treatments on the downstream (IP3) slice:
+      30% Steel Thermal Treatment, 23% Hot Dip Metal Coating, 3% Electrolytic Metal Coating,
+      44% bypass/no treatment. 20% of total steel goes through Cold Rolling (not 20% of the hot slice).
+      Shares below preserve the long/flat split with that correction.
     components:
-      - run: highalloy_hot_bf
-        share: 0.80   # high-alloy (1.0) × hot (0.76) × no CR (0.8) ~ 0.61
-        label: High-alloy HR only
-      - run: highalloy_cold_bf
-        share: 0.20   # high-alloy (1.0) × hot (0.76) × CR (0.2) ~ 0.15
-        label: High-alloy HR + CR
+      # Hot rolling (no CR) — base share 0.630
+      - run: highalloy_hot_bf_bypass
+        share: 0.27720
+        label: HR only — bypass IP3
+      - run: highalloy_hot_bf_thermal
+        share: 0.18900
+        label: HR only — thermal treatment
+      - run: highalloy_hot_bf_hotdip
+        share: 0.14490
+        label: HR only — hot dip
+      - run: highalloy_hot_bf_electro
+        share: 0.01890
+        label: HR only — electrolytic
 
+      # Hot rolling + CR — base share 0.200 (20% of total steel)
+      - run: highalloy_cold_bf_bypass
+        share: 0.08800
+        label: HR+CR — bypass IP3
+      - run: highalloy_cold_bf_thermal
+        share: 0.06000
+        label: HR+CR — thermal treatment
+      - run: highalloy_cold_bf_hotdip
+        share: 0.04600
+        label: HR+CR — hot dip
+      - run: highalloy_cold_bf_electro
+        share: 0.00600
+        label: HR+CR — electrolytic
+
+      # Rod/bar → machining — base share 0.1666
+      - run: highalloy_rod_bf_stamp_bypass
+        share: 0.073304
+        label: Rod/bar machining — bypass IP3
+      - run: highalloy_rod_bf_stamp_thermal
+        share: 0.049980
+        label: Rod/bar machining — thermal treatment
+      - run: highalloy_rod_bf_stamp_hotdip
+        share: 0.038318
+        label: Rod/bar machining — hot dip
+      - run: highalloy_rod_bf_stamp_electro
+        share: 0.004998
+        label: Rod/bar machining — electrolytic
+
+      # Rod/bar → extrusion/conformation — base share 0.0034
+      - run: highalloy_rod_bf_ext_bypass
+        share: 0.001496
+        label: Rod/bar extrusion — bypass IP3
+      - run: highalloy_rod_bf_ext_thermal
+        share: 0.001020
+        label: Rod/bar extrusion — thermal treatment
+      - run: highalloy_rod_bf_ext_hotdip
+        share: 0.000782
+        label: Rod/bar extrusion — hot dip
+      - run: highalloy_rod_bf_ext_electro
+        share: 0.000102
+        label: Rod/bar extrusion — electrolytic

@@ -45,7 +45,10 @@ def configure_output_roots() -> None:
         else:
             label = "simple"
 
-    base = Path("results") / label
+    # FGV runs are grouped under results/fgv/<label>; others stay at results/<label>
+    if label.lower().startswith("fgv"):
+        base = Path("results") / "fgv" / label
+    else:
+        base = Path("results") / label
     os.environ["FORGE_FIG_DIR"] = str(base / "figs")
     os.environ["FORGE_TABLE_DIR"] = str(base / "tables")
-

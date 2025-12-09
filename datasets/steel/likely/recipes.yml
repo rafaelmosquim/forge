@@ -513,7 +513,7 @@
 # IP3 producers FROM RAW (no CR)
 # -------------------------
 - process: Steel Thermal Treatment
-  inputs:  { Raw Products (types): 1.0 }
+  inputs:  { Raw Products (types): 1.0, Nitrogen: 0.075}
   outputs: { Intermediate Process 3: 1.0 }
 
 - process: Hot Dip Metal Coating

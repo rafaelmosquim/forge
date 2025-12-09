@@ -872,6 +872,33 @@ with tab_main:
     # Don't render UI for materials we already forced above
     if forced_pre_select:
         ambiguous = [(m, opts) for (m, opts) in ambiguous if m not in forced_pre_select]
+
+    # Restrict IP3 options based on the Cold Rolling toggle:
+    # - Thermal/coating treatments should only appear for steel that goes through Cold Rolling.
+    # - When Cold Rolling is not applied, hide those treatments and keep only the raw bypass.
+    if enable_post_cc:
+        apply_cr = (cc_choice_val == "Hot Rolling" and cr_toggle_val)
+        filtered_ambiguous: List[Tuple[str, List[str]]] = []
+        for mat, options in ambiguous:
+            if mat == "Intermediate Process 3":
+                if apply_cr:
+                    # After Cold Rolling: only show CR-specific IP3 producers plus bypass CR.
+                    cr_only = {
+                        "Steel Thermal Treatment (CR)",
+                        "Hot Dip Metal Coating (CR)",
+                        "Electrolytic Metal Coating (CR)",
+                        "Bypass CR→IP3",
+                    }
+                    new_opts = [opt for opt in options if opt in cr_only]
+                else:
+                    # No Cold Rolling: expose only the raw bypass, hiding thermal/coating options.
+                    new_opts = [opt for opt in options if opt == "Bypass Raw→IP3"]
+                if new_opts:
+                    filtered_ambiguous.append((mat, new_opts))
+                # If no options remain for IP3, drop it entirely.
+            else:
+                filtered_ambiguous.append((mat, options))
+        ambiguous = filtered_ambiguous
     
     # -----------------------------
     # Route & treatment choices (display + layout)
@@ -1074,7 +1101,8 @@ with tab_main:
                 st.session_state["cr_toggle"] = False
 
     # 2) Thermal/coating (IP3)
-    _render_group("IP3", col_ip3)
+    if enable_post_cc and (cc_choice_val == "Hot Rolling" and cr_toggle_val):
+        _render_group("IP3", col_ip3)
     
     # 3) Shaping (IP4)
     _render_group("IP4", col_ip4)

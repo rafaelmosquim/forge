@@ -143,28 +143,21 @@ blends:
     notes: >
       Apply routing as follows: 83% of post-casting steel goes to Hot Rolling
       and 17% to Rod/bar; 90% of the Hot Rolling tonnage proceeds to Cold Rolling.
-      Of the Cold Rolling output, one third goes to Steel Thermal Treatment and
-      the remaining two thirds go to coatings (88% Hot Dip, 12% Electrolytic).
-      Shares below preserve the long/flat split with that correction.
+      All thermal and coating treatments are applied only to steel that goes
+      through Cold Rolling; steel bypassing Cold Rolling and all rod/bar products
+      receive no downstream thermal treatment. Of the Cold Rolling output, one
+      third goes to Steel Thermal Treatment and the remaining two thirds go to
+      coatings (88% Hot Dip, 12% Electrolytic). This results in six products:
+      four flat (HR only, HR+CR+Thermal, HR+CR+Hot Dip, HR+CR+Electrolytic) and
+      two long (machining and extrusion, both without treatment).
     components:
-      # Hot rolling (no CR) — base share 0.083
+      # Flat products
+      # Hot rolling (no CR, no IP3 treatment) — share 0.083
       - run: regular_hot_bf_bypass
-        share: 0.03652
-        label: HR only — bypass IP3
-      - run: regular_hot_bf_thermal
-        share: 0.02490
-        label: HR only — thermal treatment
-      - run: regular_hot_bf_hotdip
-        share: 0.01909
-        label: HR only — hot dip
-      - run: regular_hot_bf_electro
-        share: 0.00249
-        label: HR only — electrolytic
+        share: 0.08300
+        label: HR only — no treatment
 
-      # Hot rolling + CR — base share 0.747
-      - run: regular_cold_bf_bypass
-        share: 0.00000
-        label: HR+CR — bypass IP3
+      # Hot rolling + CR — share 0.747, all treated
       - run: regular_cold_bf_thermal
         share: 0.24900
         label: HR+CR — thermal treatment
@@ -175,30 +168,13 @@ blends:
         share: 0.05976
         label: HR+CR — electrolytic
 
-      # Rod/bar → machining — base share 0.1666
+      # Long products (rod/bar), no IP3 treatment
+      # Rod/bar → machining — share 0.1666
       - run: regular_rod_bf_stamp_bypass
-        share: 0.073304
+        share: 0.16660
         label: Rod/bar machining — bypass IP3
-      - run: regular_rod_bf_stamp_thermal
-        share: 0.049980
-        label: Rod/bar machining — thermal treatment
-      - run: regular_rod_bf_stamp_hotdip
-        share: 0.038318
-        label: Rod/bar machining — hot dip
-      - run: regular_rod_bf_stamp_electro
-        share: 0.004998
-        label: Rod/bar machining — electrolytic
 
-      # Rod/bar → extrusion/conformation — base share 0.0034
+      # Rod/bar → extrusion/conformation — share 0.0034
       - run: regular_rod_bf_ext_bypass
-        share: 0.001496
+        share: 0.00340
         label: Rod/bar extrusion — bypass IP3
-      - run: regular_rod_bf_ext_thermal
-        share: 0.001020
-        label: Rod/bar extrusion — thermal treatment
-      - run: regular_rod_bf_ext_hotdip
-        share: 0.000782
-        label: Rod/bar extrusion — hot dip
-      - run: regular_rod_bf_ext_electro
-        share: 0.000102
-        label: Rod/bar extrusion — electrolytic

@@ -41,6 +41,7 @@ fgv:
 		fgv_high_br fgv_high_br_low fgv_high_br_high \
 		--parallel
 	$(PY) scripts/fgv_eaf_snapshot.py
+	$(PY) scripts/fgv_ef_summary.py
 
 engine-smoke:
 	$(PY) -m forge.cli.engine_cli --data datasets/steel/likely --route BF-BOF --stage Finished --country BRA --demand 1000 --lci --out results/engine_demo

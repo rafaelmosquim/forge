@@ -98,8 +98,8 @@ def _load_electricity_map() -> Dict[str, float]:
     return mapping
 
 
-def _blend_runs(spec: dict) -> Tuple[List[Tuple[float, dict, dict]], float, str]:
-    """Return list of (share, picks, scenario_defaults), demand_qty, stage_key."""
+def _blend_components(spec: dict) -> Tuple[List[Tuple[str, float, dict, dict]], float, str]:
+    """Return list of (run_name, share, picks, scenario_defaults), demand_qty, stage_key."""
     defaults = spec.get("defaults") or {}
     default_route = defaults.get("route") or {}
     demand_qty = float(default_route.get("demand_qty") or DEMAND_FALLBACK)
@@ -119,7 +119,7 @@ def _blend_runs(spec: dict) -> Tuple[List[Tuple[float, dict, dict]], float, str]
         blend = blends[0]
     components = blend.get("components", []) if blend else []
 
-    items: List[Tuple[float, dict, dict]] = []
+    items: List[Tuple[str, float, dict, dict]] = []
     for comp in components:
         try:
             share = float(comp.get("share", 0.0) or 0.0)
@@ -130,6 +130,15 @@ def _blend_runs(spec: dict) -> Tuple[List[Tuple[float, dict, dict]], float, str]
             continue
         picks = _merge(default_picks, run_map[run_name])
         scn = dict(default_scenario)
+        items.append((run_name, share, picks, scn))
+    return items, demand_qty, stage_key
+
+
+def _blend_runs(spec: dict) -> Tuple[List[Tuple[float, dict, dict]], float, str]:
+    """Return list of (share, picks, scenario_defaults), demand_qty, stage_key."""
+    components, demand_qty, stage_key = _blend_components(spec)
+    items: List[Tuple[float, dict, dict]] = []
+    for _run_name, share, picks, scn in components:
         items.append((share, picks, scn))
     return items, demand_qty, stage_key
 
@@ -162,6 +171,51 @@ def _compute_ef_for_portfolio(spec_path: Path, country_code: str) -> float:
         ef_total += share * ef_kg_per_t
     # Convert to tCO2/t (per user request) after blending
     return ef_total / 1000.0
+
+
+def _compute_efs_for_products(spec_path: Path, country_code: str) -> List[dict]:
+    """Compute EF (tCO2/t) for each individual product (blend component)."""
+    spec = _load_yaml(spec_path)
+    components, demand_qty, stage_key = _blend_components(spec)
+    if not components:
+        raise RuntimeError(f"No blend components found in {spec_path}")
+
+    denom = max(1e-9, demand_qty / 1000.0)  # convert demand kg → tonnes
+    code_norm = _norm_code(country_code)
+    rows: List[dict] = []
+
+    for run_name, _share, picks, scenario_defaults in components:
+        rc = RouteConfig(
+            route_preset=ROUTE,
+            stage_key=stage_key,
+            stage_role=None,
+            demand_qty=float(demand_qty),
+            picks_by_material=dict(picks or {}),
+            pre_select_soft={},
+        )
+        si = ScenarioInputs(
+            country_code=code_norm,
+            scenario=dict(scenario_defaults or {}),
+            route=rc,
+        )
+        out = run_scenario(str(DATA_DIR), si)
+        total_kg = float(getattr(out, "total_co2e_kg", 0.0) or 0.0)
+        ef_kg_per_t = total_kg / denom  # kg CO2 per tonne product
+        ef_tco2_per_t = ef_kg_per_t / 1000.0
+        rows.append(
+            {
+                "route": ROUTE,
+                "config": CONFIG,
+                "year": YEAR,
+                "base_year": BASE_YEAR,
+                "annual_improvement": ANNUAL_IMPROVEMENT,
+                "country_code": code_norm,
+                # Tag each row with the underlying run name for traceability
+                "product_config": f"run:{run_name}",
+                "ef_tco2_per_t": ef_tco2_per_t,
+            }
+        )
+    return rows
 
 
 def _write_ef_lookup(label: str, rows: List[dict]) -> None:
@@ -242,7 +296,8 @@ def main() -> None:
     for spec in specs:
         ef = _compute_ef_for_portfolio(spec.spec_path, spec.country_code)
         code_norm = _norm_code(spec.country_code)
-        ef_row = {
+        # Portfolio-level EF (blended)
+        portfolio_row = {
             "route": ROUTE,
             "config": CONFIG,
             "year": YEAR,
@@ -252,7 +307,9 @@ def main() -> None:
             "product_config": "portfolio",
             "ef_tco2_per_t": ef,
         }
-        _write_ef_lookup(spec.label, [ef_row])
+        # Per-product EFs for each blend component (all for 2025 baseline)
+        product_rows = _compute_efs_for_products(spec.spec_path, spec.country_code)
+        _write_ef_lookup(spec.label, [portfolio_row, *product_rows])
 
         summary_entries.append(
             {

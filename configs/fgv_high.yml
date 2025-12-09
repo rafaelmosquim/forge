@@ -142,37 +142,38 @@ runs:
 blends:
   - name: finished_portfolio
     notes: >
-      Apply thermal treatments on the downstream (IP3) slice:
-      30% Steel Thermal Treatment, 23% Hot Dip Metal Coating, 3% Electrolytic Metal Coating,
-      44% bypass/no treatment. 20% of total steel goes through Cold Rolling (not 20% of the hot slice).
+      Apply routing as follows: 83% of post-casting steel goes to Hot Rolling
+      and 17% to Rod/bar; 90% of the Hot Rolling tonnage proceeds to Cold Rolling.
+      Of the Cold Rolling output, one third goes to Steel Thermal Treatment and
+      the remaining two thirds go to coatings (88% Hot Dip, 12% Electrolytic).
       Shares below preserve the long/flat split with that correction.
     components:
-      # Hot rolling (no CR) — base share 0.630
+      # Hot rolling (no CR) — base share 0.083
       - run: highalloy_hot_bf_bypass
-        share: 0.27720
+        share: 0.03652
         label: HR only — bypass IP3
       - run: highalloy_hot_bf_thermal
-        share: 0.18900
+        share: 0.02490
         label: HR only — thermal treatment
       - run: highalloy_hot_bf_hotdip
-        share: 0.14490
+        share: 0.01909
         label: HR only — hot dip
       - run: highalloy_hot_bf_electro
-        share: 0.01890
+        share: 0.00249
         label: HR only — electrolytic
 
-      # Hot rolling + CR — base share 0.200 (20% of total steel)
+      # Hot rolling + CR — base share 0.747
       - run: highalloy_cold_bf_bypass
-        share: 0.08800
+        share: 0.00000
         label: HR+CR — bypass IP3
       - run: highalloy_cold_bf_thermal
-        share: 0.06000
+        share: 0.24900
         label: HR+CR — thermal treatment
       - run: highalloy_cold_bf_hotdip
-        share: 0.04600
+        share: 0.43824
         label: HR+CR — hot dip
       - run: highalloy_cold_bf_electro
-        share: 0.00600
+        share: 0.05976
         label: HR+CR — electrolytic
 
       # Rod/bar → machining — base share 0.1666

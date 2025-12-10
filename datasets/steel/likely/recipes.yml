@@ -525,18 +525,22 @@
   outputs: { Intermediate Process 3: 1.0 }
 
 # -------------------------
-# IP3 producers FROM IP2 (after CR)
+# IP3 producers FROM IP2 (after CR) — coating then optional thermal
 # -------------------------
-- process: Steel Thermal Treatment (CR)
-  inputs:  { Cold Raw Steel (IP2): 1.0 }
-  outputs: { Intermediate Process 3: 1.0 }
-
 - process: Hot Dip Metal Coating (CR)
   inputs:  { Cold Raw Steel (IP2): 1.0 }
-  outputs: { Intermediate Process 3: 1.0 }
+  outputs: { Coated Steel (CR): 1.0 }
 
 - process: Electrolytic Metal Coating (CR)
   inputs:  { Cold Raw Steel (IP2): 1.0 }
+  outputs: { Coated Steel (CR): 1.0 }
+
+- process: Bypass Coated→IP3 (CR)
+  inputs:  { Coated Steel (CR): 1.0 }
+  outputs: { Intermediate Process 3: 1.0 }
+
+- process: Steel Thermal Treatment (CR coated)
+  inputs:  { Coated Steel (CR): 1.0 }
   outputs: { Intermediate Process 3: 1.0 }
 
 # -------------------------

@@ -72,8 +72,12 @@ processes:
   "Cold Rolling": 1.1
   "Rod/bar/section Mill": 3.0
   "Steel Thermal Treatment": 2.0
+  "Steel Thermal Treatment (CR coated)": 2.0
   "Hot Dip Metal Coating": 2.5
+  "Hot Dip Metal Coating (CR)": 2.5
   "Electrolytic Metal Coating": 4.60
+  "Electrolytic Metal Coating (CR)": 4.60
+  "Bypass Coated→IP3 (CR)": ~
   "Direct use of Basic Steel Products": ~
   "Casting/Extrusion/Conformation": 1.0
   "Stamping/calendering/lamination": 1.84

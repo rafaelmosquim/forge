@@ -656,7 +656,25 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
+  "Steel Thermal Treatment (CR coated)":
+    Electricity: 0.2
+    FLF: 0
+    RLF: 0
+    Gas: 0.8
+    Wood: 0
+    Coal: 0
+    Charcoal: 0
+    Coke: 0
   "Hot Dip Metal Coating":
+    Electricity: 0.2
+    FLF: 0
+    RLF: 0
+    Gas: 0.8
+    Wood: 0
+    Coal: 0
+    Charcoal: 0
+    Coke: 0
+  "Hot Dip Metal Coating (CR)":
     Electricity: 0.2
     FLF: 0
     RLF: 0
@@ -674,6 +692,24 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
+  "Electrolytic Metal Coating (CR)":
+    Electricity: 0.2
+    FLF: 0
+    RLF: 0
+    Gas: 0.8
+    Wood: 0
+    Coal: 0
+    Charcoal: 0
+    Coke: 0
+  "Bypass Coated→IP3 (CR)":
+    Electricity: ~
+    FLF: ~
+    RLF: ~
+    Gas: ~
+    Wood: ~
+    Coal: ~
+    Charcoal: ~
+    Coke: ~
   "Direct use of Basic Steel Products":
     Electricity: ~
     FLF: ~

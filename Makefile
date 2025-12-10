@@ -38,8 +38,7 @@ parallel:
 fgv:
 	$(PY) scripts/run_profiles.py \
 		fgv_regular_br fgv_regular_br_low fgv_regular_br_high \
-		fgv_high_br fgv_high_br_low fgv_high_br_high \
-		--parallel
+		fgv_high_br fgv_high_br_low fgv_high_br_high
 	$(PY) scripts/fgv_eaf_snapshot.py
 	$(PY) scripts/fgv_ef_summary.py
 

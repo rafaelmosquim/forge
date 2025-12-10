@@ -47,33 +47,37 @@ runs:
       Manufactured Feed (IP4): Direct use of Basic Steel Products
 
   # Hot rolling + CR branch
-  - name: regular_cold_bf_bypass
+  - name: regular_cold_bf_hotdip_bypass
     picks_by_material:
       Liquid Steel: Regular Steel
       Cast Steel (IP1): Continuous Casting (R)
       Raw Products (types): Hot Rolling
-      Intermediate Process 3: Bypass CR→IP3  # forces the Cold Rolling leg
+      Coated Steel (CR): Hot Dip Metal Coating (CR)
+      Intermediate Process 3: Bypass Coated→IP3 (CR)
       Manufactured Feed (IP4): Direct use of Basic Steel Products
-  - name: regular_cold_bf_thermal
+  - name: regular_cold_bf_hotdip_thermal
     picks_by_material:
       Liquid Steel: Regular Steel
       Cast Steel (IP1): Continuous Casting (R)
       Raw Products (types): Hot Rolling
-      Intermediate Process 3: Steel Thermal Treatment (CR)
+      Coated Steel (CR): Hot Dip Metal Coating (CR)
+      Intermediate Process 3: Steel Thermal Treatment (CR coated)
       Manufactured Feed (IP4): Direct use of Basic Steel Products
-  - name: regular_cold_bf_hotdip
+  - name: regular_cold_bf_electro_bypass
     picks_by_material:
       Liquid Steel: Regular Steel
       Cast Steel (IP1): Continuous Casting (R)
       Raw Products (types): Hot Rolling
-      Intermediate Process 3: Hot Dip Metal Coating (CR)
+      Coated Steel (CR): Electrolytic Metal Coating (CR)
+      Intermediate Process 3: Bypass Coated→IP3 (CR)
       Manufactured Feed (IP4): Direct use of Basic Steel Products
-  - name: regular_cold_bf_electro
+  - name: regular_cold_bf_electro_thermal
     picks_by_material:
       Liquid Steel: Regular Steel
       Cast Steel (IP1): Continuous Casting (R)
       Raw Products (types): Hot Rolling
-      Intermediate Process 3: Electrolytic Metal Coating (CR)
+      Coated Steel (CR): Electrolytic Metal Coating (CR)
+      Intermediate Process 3: Steel Thermal Treatment (CR coated)
       Manufactured Feed (IP4): Direct use of Basic Steel Products
 
   # Rod/bar branch — stamping / machining
@@ -145,11 +149,12 @@ blends:
       and 17% to Rod/bar; 90% of the Hot Rolling tonnage proceeds to Cold Rolling.
       All thermal and coating treatments are applied only to steel that goes
       through Cold Rolling; steel bypassing Cold Rolling and all rod/bar products
-      receive no downstream thermal treatment. Of the Cold Rolling output, one
-      third goes to Steel Thermal Treatment and the remaining two thirds go to
-      coatings (88% Hot Dip, 12% Electrolytic). This results in six products:
-      four flat (HR only, HR+CR+Thermal, HR+CR+Hot Dip, HR+CR+Electrolytic) and
-      two long (machining and extrusion, both without treatment).
+      receive no downstream thermal treatment. Of the Cold Rolling output, 88%
+      goes to Hot Dip Metal Coating and 12% to Electrolytic Metal Coating; from
+      each coated stream, 33.3% proceeds to Steel Thermal Treatment and 66.6%
+      bypasses into IP4. This yields six products: four flat (HR only; HR+CR with
+      Hot Dip bypass; HR+CR with Hot Dip + Thermal; HR+CR with Electrolytic bypass
+      or Thermal) and two long (machining and extrusion, both without treatment).
     components:
       # Flat products
       # Hot rolling (no CR, no IP3 treatment) — share 0.083
@@ -157,16 +162,19 @@ blends:
         share: 0.08300
         label: HR only — no treatment
 
-      # Hot rolling + CR — share 0.747, all treated
-      - run: regular_cold_bf_thermal
-        share: 0.24900
-        label: HR+CR — thermal treatment
-      - run: regular_cold_bf_hotdip
+      # Hot rolling + CR — share 0.747, coated then optional thermal
+      - run: regular_cold_bf_hotdip_bypass
         share: 0.43824
-        label: HR+CR — hot dip
-      - run: regular_cold_bf_electro
+        label: HR+CR — hot dip (no thermal)
+      - run: regular_cold_bf_hotdip_thermal
+        share: 0.21912
+        label: HR+CR — hot dip + thermal
+      - run: regular_cold_bf_electro_bypass
         share: 0.05976
-        label: HR+CR — electrolytic
+        label: HR+CR — electrolytic (no thermal)
+      - run: regular_cold_bf_electro_thermal
+        share: 0.02988
+        label: HR+CR — electrolytic + thermal
 
       # Long products (rod/bar), no IP3 treatment
       # Rod/bar → machining — share 0.1666

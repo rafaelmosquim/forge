@@ -778,11 +778,15 @@ with tab_main:
     if enable_post_cc:
         cc_choice_val = st.session_state.get("cc_choice_radio", "Hot Rolling")
         cr_toggle_val = st.session_state.get("cr_toggle", False)
+        cr_coating_choice = st.session_state.get("cr_coating_choice", "Hot Dip Metal Coating (CR)")
+        cr_thermal_toggle = st.session_state.get("cr_thermal_toggle", False)
     else:
         cc_choice_val = None
         cr_toggle_val = False
+        cr_coating_choice = None
+        cr_thermal_toggle = False
         # Clean up stray state so radios/checkboxes don't leak into crude steel
-        for k in ("cc_choice_radio", "cr_toggle"):
+        for k in ("cc_choice_radio", "cr_toggle", "cr_coating_choice", "cr_thermal_toggle"):
             if k in st.session_state:
                 del st.session_state[k]
 
@@ -810,10 +814,15 @@ with tab_main:
         # HR vs Rod/bar path after CC
         if cc_choice_val:
             forced_pre_select["Raw Products (types)"] = cc_choice_val
-        ip3_auto_choice = (
-            "Bypass CR→IP3" if (cc_choice_val == "Hot Rolling" and cr_toggle_val)
-            else "Bypass Raw→IP3"
-        )
+        apply_cr = (cc_choice_val == "Hot Rolling" and cr_toggle_val)
+        if apply_cr:
+            # Force coating choice and post-coating thermal toggle
+            forced_pre_select["Coated Steel (CR)"] = cr_coating_choice
+            forced_pre_select["Intermediate Process 3"] = (
+                "Steel Thermal Treatment (CR coated)" if cr_thermal_toggle else "Bypass Coated→IP3 (CR)"
+            )
+        else:
+            ip3_auto_choice = "Bypass Raw→IP3"
             
     
     # Disable conflicting upstream cores for defaulting (soft)
@@ -873,29 +882,34 @@ with tab_main:
     if forced_pre_select:
         ambiguous = [(m, opts) for (m, opts) in ambiguous if m not in forced_pre_select]
 
-    # Restrict IP3 options based on the Cold Rolling toggle:
-    # - Thermal/coating treatments should only appear for steel that goes through Cold Rolling.
-    # - When Cold Rolling is not applied, hide those treatments and keep only the raw bypass.
+    # Restrict IP3 / coating options based on the Cold Rolling toggle:
+    # - When CR is on: show only CR coating + post-coating thermal/bypass.
+    # - When CR is off: hide CR options and expose only the raw bypass.
     if enable_post_cc:
         apply_cr = (cc_choice_val == "Hot Rolling" and cr_toggle_val)
         filtered_ambiguous: List[Tuple[str, List[str]]] = []
         for mat, options in ambiguous:
             if mat == "Intermediate Process 3":
                 if apply_cr:
-                    # After Cold Rolling: only show CR-specific IP3 producers plus bypass CR.
                     cr_only = {
-                        "Steel Thermal Treatment (CR)",
-                        "Hot Dip Metal Coating (CR)",
-                        "Electrolytic Metal Coating (CR)",
-                        "Bypass CR→IP3",
+                        "Steel Thermal Treatment (CR coated)",
+                        "Bypass Coated→IP3 (CR)",
                     }
                     new_opts = [opt for opt in options if opt in cr_only]
                 else:
-                    # No Cold Rolling: expose only the raw bypass, hiding thermal/coating options.
                     new_opts = [opt for opt in options if opt == "Bypass Raw→IP3"]
                 if new_opts:
                     filtered_ambiguous.append((mat, new_opts))
-                # If no options remain for IP3, drop it entirely.
+            elif mat == "Coated Steel (CR)":
+                if apply_cr:
+                    new_opts = [
+                        opt for opt in options
+                        if opt in {"Hot Dip Metal Coating (CR)", "Electrolytic Metal Coating (CR)"}
+                    ]
+                else:
+                    new_opts = []
+                if new_opts:
+                    filtered_ambiguous.append((mat, new_opts))
             else:
                 filtered_ambiguous.append((mat, options))
         ambiguous = filtered_ambiguous
@@ -921,7 +935,7 @@ with tab_main:
     STAGE_DISPLAY = {
         "IP1": "Alloying",
         "Raw": "Post-CC",
-        "IP3": "Thermal treatments (IP3)",
+        "IP3": "Thermal/coating (IP3)",
         "IP4": "Shaping (off-site)",
         "Finished": "Finishing (off-site)"
     }
@@ -965,6 +979,7 @@ with tab_main:
         if "Finished" in mat_name: return "Finished"
         if "Manufactured Feed (IP4)" in mat_name: return "IP4"
         if "Intermediate Process 3" in mat_name: return "IP3"
+        if "Coated Steel (CR)" in mat_name: return "IP3"
         if "Cold Raw Steel (IP2)" in mat_name: return "IP2"
         if "Raw Products" in mat_name: return "Raw"
         if "Cast Iron" in mat_name: return "IP1"
@@ -1100,10 +1115,24 @@ with tab_main:
             else:
                 st.session_state["cr_toggle"] = False
 
-    # 2) Thermal/coating (IP3)
-    if enable_post_cc and (cc_choice_val == "Hot Rolling" and cr_toggle_val):
-        _render_group("IP3", col_ip3)
-    
+    # 2) Thermal/coating (IP3) + coating selector
+    with col_ip3:
+        if enable_post_cc and (cc_choice_val == "Hot Rolling" and st.session_state.get("cr_toggle", False)):
+            st.radio(
+                "Coating (after cold rolling)",
+                ["Hot Dip Metal Coating (CR)", "Electrolytic Metal Coating (CR)"],
+                index = 0 if st.session_state.get("cr_coating_choice", "Hot Dip Metal Coating (CR)") == "Hot Dip Metal Coating (CR)" else 1,
+                key = "cr_coating_choice",
+                horizontal = True,
+            )
+            st.checkbox(
+                "Apply Steel Thermal Treatment after coating",
+                value = st.session_state.get("cr_thermal_toggle", False),
+                key = "cr_thermal_toggle",
+            )
+            _render_group("IP3", st.container())
+        # If CR is off, IP3 stays hidden (as before)
+
     # 3) Shaping (IP4)
     _render_group("IP4", col_ip4)
     

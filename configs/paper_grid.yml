@@ -13,7 +13,7 @@ grid:
   utilization_rate: [80]
   intensity_improvement: [1]     # % per year efficiency improvement
   charcoal_expansion: [Expansion]
-  dri_mix: [Blue]
+  dri_mix: [Blue, Green]
   base_demand: 1000                    # demand at 100% utilization
 
 # Policies driving how the grid maps to model inputs
@@ -29,9 +29,9 @@ grid_policies:
     Blue:
       2030: { Gas: 1.0 }
       2040: { Gas: 0.70, Biomethane: 0.10, "Green hydrogen": 0.20 }
-    #Green:
-      #2030: { Gas: 0.70, Biomethane: 0.10, "Green hydrogen": 0.20 }
-      #2040: { Gas: 0.40, Biomethane: 0.20, "Green hydrogen": 0.40 }
+    Green:
+      2030: { Gas: 0.70, Biomethane: 0.10, "Green hydrogen": 0.20 }
+      2040: { Gas: 0.40, Biomethane: 0.20, "Green hydrogen": 0.40 }
 
   # Optional: fraction of BF solid fossil fuels replaced by Charcoal
   # Provide values in 0..1 (or 0..100) for known years; nearest <= year is used
@@ -40,4 +40,3 @@ grid_policies:
   #   2035: 0.15
   #   2040: 0.30
   #   2045: 0.45
-

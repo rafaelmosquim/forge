@@ -531,6 +531,8 @@ param_grid = {
     'dri_mix': [
         {2030: {"Natural Gas": 1.0}, 
          2040: {"Natural Gas": 0.7, "Biomethane-100": 0.1, "Green H2": 0.2}},
+        {2030: {"Natural Gas": 0.7, "Biomethane-100": 0.1, "Green H2": 0.2},
+         2040: {"Natural Gas": 0.4, "Biomethane-100": 0.2, "Green H2": 0.4}},
     ]
 }
 

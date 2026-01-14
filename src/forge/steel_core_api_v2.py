@@ -44,14 +44,17 @@ from forge.core.compute import (
     calculate_internal_electricity,
     calculate_lci,
     adjust_energy_balance,
-    analyze_energy_costs,
-    analyze_material_costs,
     apply_fuel_substitutions,
     apply_dict_overrides,
     apply_recipe_overrides,
     compute_inside_elec_reference_for_share,
     compute_inside_gas_reference_for_share,
     apply_gas_routing_and_credits,
+)
+from forge.core.costs import (
+    analyze_energy_costs,
+    analyze_material_costs,
+    compute_capex_costs,
 )
 from forge.core.engine import (
     calculate_balance_matrix,
@@ -273,6 +276,11 @@ class RunOutputs:
     total_co2e_kg: Optional[float]
     total_cost: Optional[float] = None
     material_cost: Optional[float] = None
+    uvc: Optional[float] = None
+    capex_total: Optional[float] = None
+    capex_payment: Optional[float] = None
+    relining_payment: Optional[float] = None
+    oem_cost: Optional[float] = None
     balance_matrix: Optional[pd.DataFrame] = None   # ← add this line
     lci: Optional[pd.DataFrame] = None
     meta: Dict[str, Any] = field(default_factory=dict)
@@ -306,6 +314,8 @@ def _credit_enabled(scn: dict | None) -> bool:
             return v.strip().lower() not in {"false", "0", "no", "off"}
         return bool(v)
     return True
+
+
 
 
 DEFAULT_PRODUCER_PRIORITY: Tuple[str, ...] = (
@@ -814,23 +824,54 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
                 return v
             except Exception:
                 return 0.0
-        fractions = {str(k): _as_frac(v) for k, v in plan.items()}
-        # Rebuild shares derived from baseline Gas
-        gas_left = base_gas
-        ordered = []
-        for carrier in ('Gas', 'Biomethane', 'Green hydrogen'):
-            f = float(fractions.get(carrier, 0.0) or 0.0)
-            if carrier == 'Gas':
-                new_val = base_gas * f
-                es['Gas'] = new_val
-                gas_left = max(0.0, base_gas - new_val)
-            else:
-                add_val = base_gas * f
-                if add_val > 0:
-                    es[carrier] = es.get(carrier, 0.0) + add_val
-            ordered.append((carrier, f))
-        # If plan doesn't sum to 1, leave remaining gas as-is
-        # (i.e., keep existing es['Gas'] value which already captures the 'Gas' fraction)
+        def _norm_key(name: str) -> str:
+            key = str(name or "").strip().lower()
+            mapping = {
+                "gas": "Gas",
+                "natural gas": "Gas",
+                "ng": "Gas",
+                "biomethane": "Biomethane",
+                "biomethane-100": "Biomethane",
+                "green hydrogen": "Green hydrogen",
+                "green h2": "Green hydrogen",
+                "h2e": "Green hydrogen",
+                "gray hydrogen": "Gray hydrogen",
+                "grey hydrogen": "Gray hydrogen",
+                "gray h2": "Gray hydrogen",
+                "grey h2": "Gray hydrogen",
+                "h2m": "Gray hydrogen",
+            }
+            return mapping.get(key, str(name))
+
+        fractions = {}
+        for k, v in plan.items():
+            fractions[_norm_key(k)] = _as_frac(v)
+
+        def _apply_mix_to_shares(shares: Dict[str, float]) -> None:
+            try:
+                base = float(shares.get('Gas', 0.0) or 0.0)
+            except Exception:
+                base = 0.0
+            if base <= 0:
+                return
+            # Rebuild shares derived from baseline Gas
+            for carrier in ('Gas', 'Biomethane', 'Green hydrogen', 'Gray hydrogen'):
+                f = float(fractions.get(carrier, 0.0) or 0.0)
+                if carrier == 'Gas':
+                    shares['Gas'] = base * f
+                else:
+                    add_val = base * f
+                    if add_val > 0:
+                        shares[carrier] = shares.get(carrier, 0.0) + add_val
+            # If plan doesn't sum to 1, remaining gas stays in Gas share
+
+        mix_scope = str(scenario.get('dri_mix_scope', 'process')).strip().lower()
+        if mix_scope in {'all', 'all_gas', 'full', 'global', 'system'}:
+            for proc_name, proc_shares in energy_shares.items():
+                if isinstance(proc_shares, dict):
+                    _apply_mix_to_shares(proc_shares)
+        else:
+            _apply_mix_to_shares(es)
 
     def _apply_charcoal_expansion(energy_shares: Dict[str, Dict[str, float]], scenario: Dict[str, Any]) -> None:
         mode = (scenario.get('charcoal_expansion') or '').strip().lower()
@@ -1042,6 +1083,11 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
             total_co2e_kg=None,
             total_cost=None,
             material_cost=None,
+            uvc=None,
+            capex_total=None,
+            capex_payment=None,
+            relining_payment=None,
+            oem_cost=None,
             balance_matrix=pd.DataFrame(),
             meta={"error": "Material balance failed"},
         )
@@ -1261,6 +1307,30 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         traceback.print_exc()
         material_cost = 0.0  # Default to 0 instead of None    
 
+    capex_total = None
+    capex_payment = None
+    relining_payment = None
+    oem_cost = None
+    try:
+        capex_cfg = load_data_from_yaml(os.path.join(base, 'capex.yml')) or {}
+        capex_vals = compute_capex_costs(capex_cfg, route_preset, production_routes)
+        capex_total = capex_vals.get('capex_total')
+        capex_payment = capex_vals.get('capex_payment')
+        relining_payment = capex_vals.get('relining_payment')
+        oem_cost = capex_vals.get('oem_cost')
+    except Exception:
+        capex_total = None
+        capex_payment = None
+        relining_payment = None
+        oem_cost = None
+
+    uvc = None
+    try:
+        if total_cost is not None and material_cost is not None:
+            uvc = (float(total_cost) + float(material_cost)) / 0.8
+    except Exception:
+        uvc = None
+
     meta = {
         "route_preset": route_preset,
         "stage_key": stage_key,
@@ -1279,6 +1349,10 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "fallback_materials": list(fallback_materials),
         "prefer_internal_processes": prefer_internal_map,
         "external_purchase_rows": external_purchase_rows,
+        "capex_total": capex_total,
+        "capex_payment": capex_payment,
+        "relining_payment": relining_payment,
+        "oem_cost": oem_cost,
         # NEW: Gas routing information with plant-level logic (from gas_meta)
         "total_process_gas_MJ": gas_meta.get('total_process_gas_MJ', 0.0),
         "gas_coke_MJ": gas_meta.get('gas_coke_MJ', 0.0),
@@ -1807,6 +1881,11 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         total_co2e_kg=total_co2,
         total_cost=total_cost,
         material_cost=material_cost,
+        uvc=uvc,
+        capex_total=capex_total,
+        capex_payment=capex_payment,
+        relining_payment=relining_payment,
+        oem_cost=oem_cost,
         balance_matrix=balance_matrix,
         lci=lci_df,
         meta=meta,

@@ -1,0 +1,31 @@
+capex:
+  BF-BOF:
+    600
+  DRI-EAF:
+    300
+  EAF-scrap:
+    250
+  Conformation:
+    300  
+lifespan:
+  BF-BOF:
+    50
+  DRI-EAF:
+    25
+  EAF-scrap:
+    25
+relining: 
+  BF-BOF:
+    20
+  DRI-EAF:
+    10
+  EAF-scrap:
+    10    
+oem_rate:
+  BF-BOF:
+    0.10
+  DRI-EAF:
+    0.08
+  EAF-scrap:
+    0.08    
+interest_rate: 0.06        

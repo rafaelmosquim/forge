@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul 28 10:05:01 2025
-
-@author: rafae
-"""
-
-# -*- coding: utf-8 -*-
-"""
 Created on Fri Jul 25 10:34:03 2025
 
 @author: rafae
@@ -16,6 +9,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.cm as cm
 import seaborn as sns
+import yaml
 from itertools import product
 from tqdm import tqdm  # Progress bar
 import matplotlib.pyplot as plt
@@ -162,12 +156,24 @@ def _scenario_for_dri_config(config: str) -> Dict[str, Any]:
                 }
             },
         }
+    def _mix_gray(gas=0.0, bio=0.0, h2_gray=0.0):
+        return {
+            "dri_mix": "Custom",
+            "dri_mix_definitions": {
+                "Custom": {
+                    2030: {"Gas": gas, "Biomethane": bio, "Gray hydrogen": h2_gray},
+                    2040: {"Gas": gas, "Biomethane": bio, "Gray hydrogen": h2_gray},
+                }
+            },
+        }
     if name in {"natural gas", "gas", "ng"}:
         return _mix(gas=1.0, bio=0.0, h2=0.0)
     if name in {"biomethane-100", "biomethane"}:
         return _mix(gas=0.0, bio=1.0, h2=0.0)
     if name in {"green h2", "green hydrogen", "h2"}:
         return _mix(gas=0.0, bio=0.0, h2=1.0)
+    if name in {"gray h2", "grey h2", "gray hydrogen", "grey hydrogen"}:
+        return _mix_gray(gas=0.0, bio=0.0, h2_gray=1.0)
     return _mix(gas=1.0, bio=0.0, h2=0.0)
 
 @lru_cache(maxsize=2048)
@@ -260,7 +266,7 @@ def _ef_core_cached_disk(route: str, config: str, year: int, base_year: int, ann
 
     Controlled by FORGE_PAPER_CACHE env (defaults on). Set FORGE_PAPER_CACHE=0 to disable.
     """
-    use_cache = _os.getenv('FORGE_PAPER_CACHE', '1').strip() not in {'0', 'false', 'off'}
+    use_cache = _os.getenv('FORGE_PAPER_CACHE', '0').strip() not in {'0', 'false', 'off'}
     if not use_cache:
         return _ef_core_cached(route, config, year, base_year, annual_improvement)
     key = _make_ef_key(route, config, year, base_year, annual_improvement, None)
@@ -414,6 +420,216 @@ def _compute_portfolio_ef(route: str, config: str, year: int, base_year: int, an
     return ef
 
 
+def _portfolio_blend_parts() -> Tuple[Optional[list[Tuple[float, Dict[str, str]]]], Dict[str, Any]]:
+    """Load portfolio blend picks + scenario defaults for cost calculations."""
+    if PRODUCT_CONFIG != 'portfolio':
+        return None, {}
+    import yaml as _yaml
+    spec_path = _portfolio_spec_for_route("BF-BOF")
+    if not spec_path:
+        return None, {}
+    try:
+        with open(spec_path, 'r', encoding='utf-8') as fh:
+            spec = _yaml.safe_load(fh) or {}
+    except Exception:
+        return None, {}
+    defaults = spec.get('defaults') or {}
+    defaults_picks = (defaults.get('picks_by_material') or {})
+    scenario_defaults = defaults.get('scenario') or {}
+    runs = spec.get('runs') or []
+    run_map = {r.get('name'): (r.get('picks_by_material') or {}) for r in runs if isinstance(r, dict)}
+    blends = spec.get('blends') or []
+    blend = None
+    if PORTFOLIO_BLEND_OVERRIDE:
+        for b in blends:
+            if isinstance(b, dict) and str(b.get('name','')).strip() == PORTFOLIO_BLEND_OVERRIDE:
+                blend = b
+                break
+    if blend is None:
+        for b in blends:
+            if isinstance(b, dict):
+                blend = b
+                break
+    if not blend:
+        return None, scenario_defaults
+    comps = blend.get('components') or []
+    if not comps:
+        return None, scenario_defaults
+    total_share = 0.0
+    parts: list[Tuple[float, Dict[str, str]]] = []
+    for comp in comps:
+        try:
+            run_name = comp.get('run')
+            share = float(comp.get('share', 0.0) or 0.0)
+        except Exception:
+            continue
+        picks_run = run_map.get(run_name, {})
+        picks_merged = dict(defaults_picks)
+        picks_merged.update(picks_run)
+        parts.append((share, picks_merged))
+        total_share += max(0.0, share)
+    if total_share <= 0.0:
+        return None, scenario_defaults
+    return parts, scenario_defaults
+
+
+def _cost_components_for_route(
+    route: str,
+    config: str,
+    picks: Dict[str, str],
+    scenario_defaults: Optional[Dict[str, Any]] = None,
+    scenario_overrides: Optional[Dict[str, Any]] = None,
+) -> Tuple[float, float, float, float, float]:
+    """Return (uvc, capex_payment_total, oem_cost, total_cost, emission_factor)."""
+    base_defaults = _route_defaults_scenario(route, config)
+    if route.upper().startswith("BF"):
+        scn = _scenario_for_bf_config(config)
+    elif route.upper().startswith("DRI"):
+        scn = _scenario_for_dri_config(config)
+    else:
+        scn = {}
+    if base_defaults:
+        scn = _merge_scenarios(base_defaults, scn)
+    if scenario_defaults:
+        scn = _merge_scenarios(scn, scenario_defaults)
+    if scenario_overrides:
+        scn = _merge_scenarios(scn, scenario_overrides)
+    rc = RouteConfig(
+        route_preset=route,
+        stage_key="Finished",
+        stage_role=None,
+        demand_qty=1000.0,
+        picks_by_material=dict(picks or {}),
+        pre_select_soft={},
+    )
+    si = ScenarioInputs(country_code=_PAPER_COUNTRY_CODE, scenario=scn, route=rc)
+    out = run_scenario(DATA_DIR, si)
+    demand_qty = float(rc.demand_qty or 0.0)
+    total_co2e = float(getattr(out, "total_co2e_kg", float("nan")) or float("nan"))
+    ef = total_co2e / demand_qty if demand_qty > 0 else float("nan")
+    uvc = float(getattr(out, "uvc", float("nan")) or float("nan"))
+    capex_payment = getattr(out, "capex_payment", None)
+    if capex_payment is None:
+        capex_payment_val = float("nan")
+    else:
+        capex_payment_val = float(capex_payment)
+    relining_payment = getattr(out, "relining_payment", None)
+    relining_val = float(relining_payment) if relining_payment is not None else 0.0
+    capex_total_payment = (
+        capex_payment_val + relining_val
+        if not np.isnan(capex_payment_val)
+        else float("nan")
+    )
+    oem_cost = float(getattr(out, "oem_cost", float("nan")) or float("nan"))
+    if np.isnan(uvc) or np.isnan(capex_total_payment) or np.isnan(oem_cost):
+        total_cost = float("nan")
+    else:
+        total_cost = uvc + capex_total_payment + oem_cost
+    return uvc, capex_total_payment, oem_cost, total_cost, ef
+
+
+def _write_cost_breakdown_table() -> None:
+    parts, scenario_defaults = _portfolio_blend_parts()
+    if not parts:
+        parts = [(1.0, dict(FINAL_PICKS))]
+        scenario_defaults = {}
+    total_share = sum(max(0.0, share) for share, _ in parts) or 1.0
+
+    route_specs = [
+        {"route": "BF-BOF", "config": "Coke", "label": "BF-BOF", "scope": "base"},
+        {"route": "BF-BOF", "config": "Charcoal", "label": "BF-BOF (charcoal)", "scope": "base"},
+        {"route": "DRI-EAF", "config": "Natural Gas", "label": "DRI-EAF (NG)", "scope": "base"},
+        {"route": "EAF-Scrap", "config": "Scrap", "label": "EAF-scrap", "scope": "base"},
+        {
+            "route": "DRI-EAF",
+            "config": "Biomethane-100",
+            "label": "DRI-EAF (biomethane)",
+            "scope": "DRI-only",
+            "overrides": {"dri_mix_scope": "process"},
+        },
+        {
+            "route": "DRI-EAF",
+            "config": "Biomethane-100",
+            "label": "DRI-EAF (biomethane)",
+            "scope": "full-gas",
+            "overrides": {"dri_mix_scope": "all_gas"},
+        },
+        {
+            "route": "DRI-EAF",
+            "config": "Green H2",
+            "label": "DRI-EAF (green H2)",
+            "scope": "DRI-only",
+            "overrides": {"dri_mix_scope": "process"},
+        },
+        {
+            "route": "DRI-EAF",
+            "config": "Green H2",
+            "label": "DRI-EAF (green H2)",
+            "scope": "full-gas",
+            "overrides": {"dri_mix_scope": "all_gas"},
+        },
+        {
+            "route": "DRI-EAF",
+            "config": "Gray H2",
+            "label": "DRI-EAF (gray H2)",
+            "scope": "DRI-only",
+            "overrides": {"dri_mix_scope": "process"},
+        },
+        {
+            "route": "DRI-EAF",
+            "config": "Gray H2",
+            "label": "DRI-EAF (gray H2)",
+            "scope": "full-gas",
+            "overrides": {"dri_mix_scope": "all_gas"},
+        },
+    ]
+
+    rows = []
+    for spec in route_specs:
+        uvc_total = 0.0
+        capex_total = 0.0
+        oem_total = 0.0
+        ef_total = 0.0
+        valid = True
+        for share, picks in parts:
+            w = max(0.0, share) / total_share
+            uvc, capex_payment, oem, _, ef = _cost_components_for_route(
+                spec["route"],
+                spec["config"],
+                picks,
+                scenario_defaults,
+                spec.get("overrides"),
+            )
+            if np.isnan(uvc) or np.isnan(capex_payment) or np.isnan(oem) or np.isnan(ef):
+                valid = False
+                break
+            uvc_total += w * uvc
+            capex_total += w * capex_payment
+            oem_total += w * oem
+            ef_total += w * ef
+        total_cost = uvc_total + capex_total + oem_total if valid else float("nan")
+        rows.append({
+            "route": spec["label"],
+            "scope": spec.get("scope", "base"),
+            "config": spec.get("config"),
+            "emission_factor": ef_total if valid else float("nan"),
+            "uvc": uvc_total if valid else float("nan"),
+            "capex_payment": capex_total if valid else float("nan"),
+            "oem_cost": oem_total if valid else float("nan"),
+            "total_cost": total_cost,
+        })
+
+    try:
+        base_dir = _os.getenv('FORGE_TABLE_DIR', 'results/tables')
+        out_dir = _Path(base_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / 'cost_breakdown.csv'
+        pd.DataFrame(rows).to_csv(out_path, index=False)
+        print(f"[table] cost breakdown written to {out_path}")
+    except Exception as e:
+        print(f"[table] failed to write cost breakdown: {e}")
+
+
 def _load_bf_fleet() -> pd.DataFrame:
     """Load BF fleet data used for capacity transitions.
 
@@ -519,22 +735,214 @@ def get_emission_factor(route, config, year, base_year=2025, annual_improvement=
     _log_emission_factor(route_s, config_s, y, by, imp, ef)
     return ef
 
+# Emit cost breakdown table once per run
+_write_cost_breakdown_table()
+
 # ============================================
 # 2. PARAMETER SWEEP CONFIGURATION
 # ============================================
 
-param_grid = {
-    'scenario': ['conservative'],
-    'utilization_rate': [0.80],
-    'annual_improvement': [0.01],
-    'charcoal_expansion': [None],
-    'dri_mix': [
-        {2030: {"Natural Gas": 1.0}, 
-         2040: {"Natural Gas": 0.7, "Biomethane-100": 0.1, "Green H2": 0.2}},
-        {2030: {"Natural Gas": 0.7, "Biomethane-100": 0.1, "Green H2": 0.2},
-         2040: {"Natural Gas": 0.4, "Biomethane-100": 0.2, "Green H2": 0.4}},
-    ]
+def _load_paper_grid_config() -> Dict[str, Any]:
+    cfg_path = _os.getenv("FORGE_PAPER_CONFIG", "configs/paper_grid.yml")
+    path = _Path(cfg_path)
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            payload = yaml.safe_load(fh) or {}
+        if isinstance(payload, dict):
+            return payload
+    except FileNotFoundError:
+        print(f"[config] {cfg_path} not found; using defaults.")
+    except Exception as exc:
+        print(f"[config] failed to read {cfg_path}: {exc}; using defaults.")
+    return {}
+
+
+def _as_list(value, fallback):
+    if value is None:
+        return list(fallback)
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def _normalize_scenario(name: Any) -> str:
+    key = str(name or "").strip().lower()
+    key = key.replace(" ", "_").replace("-", "_")
+    mapping = {
+        "bau": "business_as_usual",
+        "business_as_usual": "business_as_usual",
+        "businessasusual": "business_as_usual",
+        "conservative": "conservative",
+        "aggressive": "aggressive",
+    }
+    return mapping.get(key, key or "conservative")
+
+
+def _is_expansion_mode(value: Any) -> bool:
+    return str(value or "").strip().lower() in {"expansion", "expand", "true", "yes", "1"}
+
+
+def _normalize_capacity_schedule(raw: Any) -> Optional[Dict[int, float]]:
+    if not isinstance(raw, dict):
+        return None
+    schedule: Dict[int, float] = {}
+    for year_key, val in raw.items():
+        try:
+            year = int(year_key)
+            schedule[year] = float(val)
+        except Exception:
+            continue
+    return schedule or None
+
+
+def _map_dri_carrier_to_config(name: Any) -> str:
+    key = str(name or "").strip().lower()
+    mapping = {
+        "gas": "Natural Gas",
+        "natural gas": "Natural Gas",
+        "biomethane": "Biomethane-100",
+        "biomethane-100": "Biomethane-100",
+        "green hydrogen": "Green H2",
+        "green h2": "Green H2",
+        "gray hydrogen": "Gray H2",
+        "grey hydrogen": "Gray H2",
+        "gray h2": "Gray H2",
+        "grey h2": "Gray H2",
+        "h2": "Green H2",
+    }
+    return mapping.get(key, str(name))
+
+def _normalize_dri_config_label(name: Any) -> str:
+    key = str(name or "").strip().lower()
+    mapping = {
+        "gas": "Natural Gas",
+        "natural gas": "Natural Gas",
+        "ng": "Natural Gas",
+        "biomethane": "Biomethane-100",
+        "biomethane-100": "Biomethane-100",
+        "green hydrogen": "Green H2",
+        "green h2": "Green H2",
+        "gray hydrogen": "Gray H2",
+        "grey hydrogen": "Gray H2",
+        "gray h2": "Gray H2",
+        "grey h2": "Gray H2",
+        "h2": "Green H2",
+    }
+    return mapping.get(key, str(name))
+
+
+def _build_dri_mix_schedule(defs: Any, mix_name: Any) -> Optional[Dict[int, Dict[str, float]]]:
+    if not isinstance(defs, dict):
+        return None
+    options = defs.get(mix_name) or defs.get(str(mix_name)) or {}
+    if not isinstance(options, dict):
+        return None
+    schedule: Dict[int, Dict[str, float]] = {}
+    for year_key, carriers in options.items():
+        try:
+            year = int(year_key)
+        except Exception:
+            continue
+        if not isinstance(carriers, dict):
+            continue
+        mix: Dict[str, float] = {}
+        for carrier, share in carriers.items():
+            try:
+                val = float(share)
+                if val > 1.0:
+                    val /= 100.0
+            except Exception:
+                continue
+            mix[_map_dri_carrier_to_config(carrier)] = val
+        if mix:
+            schedule[year] = mix
+    return schedule or None
+
+
+def _build_param_grid_from_config(cfg: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if not isinstance(cfg, dict) or not cfg:
+        return None
+    grid = cfg.get("grid")
+    if not isinstance(grid, dict):
+        return None
+    policies = cfg.get("grid_policies") or {}
+
+    scenarios = [_normalize_scenario(s) for s in _as_list(grid.get("scenario"), ["conservative"])]
+    scenarios = [s for s in scenarios if s]
+    if not scenarios:
+        scenarios = ["conservative"]
+
+    utils: list[float] = []
+    for raw in _as_list(grid.get("utilization_rate"), [0.8]):
+        try:
+            val = float(raw)
+            if val > 1.0:
+                val /= 100.0
+            utils.append(val)
+        except Exception:
+            continue
+    if not utils:
+        utils = [0.8]
+
+    improvements: list[float] = []
+    for raw in _as_list(grid.get("intensity_improvement"), [1.0]):
+        try:
+            val = float(raw)
+            improvements.append(val / 100.0)
+        except Exception:
+            continue
+    if not improvements:
+        improvements = [0.01]
+
+    char_sched = _normalize_capacity_schedule(policies.get("charcoal_capacity_schedule"))
+    char_modes = _as_list(grid.get("charcoal_expansion"), [None])
+    charcoal_expansion: list[Optional[Dict[int, float]]] = []
+    for mode in char_modes:
+        if _is_expansion_mode(mode) and char_sched:
+            charcoal_expansion.append(char_sched)
+        else:
+            charcoal_expansion.append(None)
+    if not charcoal_expansion:
+        charcoal_expansion = [None]
+
+    dri_defs = policies.get("dri_mix_definitions") or {}
+    dri_mixes: list[Dict[int, Dict[str, float]]] = []
+    for mix_name in _as_list(grid.get("dri_mix"), []):
+        sched = _build_dri_mix_schedule(dri_defs, mix_name)
+        if sched:
+            dri_mixes.append(sched)
+
+    if not dri_mixes:
+        dri_mixes = [
+            {
+                2030: {"Natural Gas": 1.0},
+                2040: {"Natural Gas": 0.7, "Biomethane-100": 0.1, "Green H2": 0.2},
+            }
+        ]
+
+    return {
+        "scenario": scenarios,
+        "utilization_rate": utils,
+        "annual_improvement": improvements,
+        "charcoal_expansion": charcoal_expansion,
+        "dri_mix": dri_mixes,
+    }
+
+
+_DEFAULT_PARAM_GRID = {
+    "scenario": ["conservative"],
+    "utilization_rate": [0.80],
+    "annual_improvement": [0.01],
+    "charcoal_expansion": [None],
+    "dri_mix": [
+        {
+            2030: {"Natural Gas": 1.0},
+            2040: {"Natural Gas": 0.7, "Biomethane-100": 0.1, "Green H2": 0.2},
+        },
+    ],
 }
+
+param_grid = _build_param_grid_from_config(_load_paper_grid_config()) or _DEFAULT_PARAM_GRID
 
 def generate_combinations(grid):
     """Generate all parameter combinations."""
@@ -620,7 +1028,8 @@ def simulate_steel_transition(bf_fleet, **params):
         if dri_cap > 0 and params.get('dri_mix'):
             mix_year = max(y for y in params['dri_mix'].keys() if y <= year)
             for config, share in params['dri_mix'][mix_year].items():
-                dri_ef = get_emission_factor("DRI-EAF", config, year, base_year=2025, annual_improvement=annual_improvement)
+                cfg = _normalize_dri_config_label(config)
+                dri_ef = get_emission_factor("DRI-EAF", cfg, year, base_year=2025, annual_improvement=annual_improvement)
                 dri_emis += dri_cap * share * utilization * dri_ef
         
         results.append({
@@ -1141,8 +1550,9 @@ def simulate_aggressive_transition(bf_fleet, transition_year, **params):
             )
             if current_mix:
                 for config, share in current_mix.items():
+                    cfg = _normalize_dri_config_label(config)
                     dri_ef = get_emission_factor(
-                        "DRI-EAF", config, year,
+                        "DRI-EAF", cfg, year,
                         base_year=2025,
                         annual_improvement=params.get('annual_improvement', 0.0)
                     )
@@ -1158,11 +1568,24 @@ def simulate_aggressive_transition(bf_fleet, transition_year, **params):
     
     return pd.DataFrame(results)
 
+def _run_transition_sweep(transition_years, params, label):
+    all_results = []
+    for tyear in tqdm(transition_years, desc=f"Testing transition years ({label})"):
+        df = simulate_aggressive_transition(bf_fleet, tyear, **params)
+        df['Cumulative_Emissions'] = df['Total_Emissions'].cumsum()
+        df['Transition_Scenario'] = label
+        all_results.append(df)
+    return pd.concat(all_results)
+
+def _final_emissions_by_transition(df: pd.DataFrame) -> pd.Series:
+    return (df.groupby('Transition_Year')['Cumulative_Emissions']
+              .last()
+              .sort_index() / 1000000)  # Gt
+
 # Run simulations with validation
 transition_years = range(2026, 2050)
-all_results = []
 
-base_params = {
+base_params_ng = {
     'scenario': 'aggressive',
     'utilization_rate': 0.8,
     'annual_improvement': 0.01,
@@ -1173,12 +1596,35 @@ base_params = {
     }
 }
 
-for tyear in tqdm(transition_years, desc="Testing transition years"):
-    df = simulate_aggressive_transition(bf_fleet, tyear, **base_params)
-    df['Cumulative_Emissions'] = df['Total_Emissions'].cumsum()
-    all_results.append(df)
+green_h2_params = {
+    'scenario': base_params_ng['scenario'],
+    'utilization_rate': base_params_ng['utilization_rate'],
+    'annual_improvement': base_params_ng['annual_improvement'],
+    'dri_mix': {year: {"Green H2": 1.0} for year in base_params_ng['dri_mix'].keys()},
+}
 
-transition_results = pd.concat(all_results)
+transition_results_ng = _run_transition_sweep(transition_years, base_params_ng, "DRI (NG mix)")
+transition_results_h2 = _run_transition_sweep(transition_years, green_h2_params, "DRI (100% Green H2)")
+biomethane_params = {
+    'scenario': base_params_ng['scenario'],
+    'utilization_rate': base_params_ng['utilization_rate'],
+    'annual_improvement': base_params_ng['annual_improvement'],
+    'dri_mix': {year: {"Biomethane-100": 1.0} for year in base_params_ng['dri_mix'].keys()},
+}
+transition_results_bio = _run_transition_sweep(transition_years, biomethane_params, "DRI (100% Biomethane)")
+transition_results = transition_results_ng
+
+# Persist comparison data for inspection
+try:
+    base_dir = _os.getenv('FORGE_TABLE_DIR', 'results/tables')
+    out_dir = _Path(base_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / 'transition_comparison.csv'
+    comp = pd.concat([transition_results_ng, transition_results_h2, transition_results_bio], ignore_index=True)
+    comp.to_csv(out_path, index=False)
+    print(f"[table] transition comparison written to {out_path}")
+except Exception as e:
+    print(f"[table] failed to write transition comparison: {e}")
 
 # Data validation
 print("\nData validation:")
@@ -1186,9 +1632,7 @@ print(f"Total emissions range: {transition_results['Total_Emissions'].min()/1e9:
 print(f"Number of simulations: {len(transition_results['Transition_Year'].unique())}")
 
 # Correct plotting
-final_emissions = (transition_results
-                  .groupby('Transition_Year')['Cumulative_Emissions']
-                  .last() / 1000000)  # Now correctly in Gt
+final_emissions = _final_emissions_by_transition(transition_results)
 
 # Filter to relevant years
 years_to_plot = [2030, 2035, 2040, 2045]
@@ -1230,6 +1674,28 @@ plt.xlabel('Cumulative CO₂ Emissions (Gt)')
 plt.ylabel('Transition Start Year')
 plt.title('Cumulative Emissions Increase with Delayed Transition\n(2025–2050, Aggressive Scenario)', fontsize=14, pad=15)
 #plt.grid(axis='x', linestyle='--', alpha=0.4)
+plt.tight_layout()
+plt.show()
+
+# Comparison: fixed NG mix baseline vs 100% Green H2 across start years
+h2_curve = _final_emissions_by_transition(transition_results_h2)
+bio_curve = _final_emissions_by_transition(transition_results_bio)
+ng_baseline_year = 2030
+ng_baseline = _final_emissions_by_transition(transition_results_ng).get(ng_baseline_year)
+if ng_baseline is None:
+    print(f"[transition] NG baseline year {ng_baseline_year} not found; skipping baseline line.")
+    ng_baseline = float("nan")
+
+plt.figure(figsize=(10, 5))
+plt.plot(h2_curve.index, np.full(len(h2_curve), ng_baseline),
+         color='#1f77b4', linewidth=2.5, label=f'DRI (NG mix, start {ng_baseline_year})')
+plt.plot(h2_curve.index, h2_curve.values, color='#2ca02c', linewidth=2.5, label='DRI (100% Green H2)')
+plt.plot(bio_curve.index, bio_curve.values, color='#ff7f0e', linewidth=2.5, label='DRI (100% Biomethane)')
+plt.xlabel('Transition Start Year')
+plt.ylabel('Cumulative CO₂ Emissions (Gt)')
+plt.title('Cumulative Emissions vs Transition Start\n(NG baseline vs 100% Green H2 vs Biomethane)', fontsize=14, pad=15)
+plt.grid(alpha=0.3, linestyle='--')
+plt.legend(frameon=True)
 plt.tight_layout()
 plt.show()
 

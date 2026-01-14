@@ -8,3 +8,7 @@ route_overrides:
   Charcoal from Market: 0.0   # optional, to force Wood → kiln path
   Charcoal Production: 1.0
   Coke Production: 1.0
+
+gas_routing:
+  direct_use_fraction: 0.0
+  electricity_fraction: 1.0

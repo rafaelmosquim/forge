@@ -45,10 +45,11 @@ recipe_overrides:
       Limestone: 0.0400 * 1.0
       Coke: 0.0
       Coal: 0.0
+      Charcoal: "energy_int['Blast Furnace'] * energy_shares['Blast Furnace']['Charcoal'] / energy_content['Charcoal']"
 
   Charcoal Production:
     inputs:  { Wood: 2.5226 }
-    outputs: { Charcoal (raw): 1.0 }
+    outputs: { Charcoal: 1.0 }
 
   # Since Coke Production is disabled, this block is unnecessary; remove or leave harmlessly
   # Coke Production:

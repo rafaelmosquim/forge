@@ -350,11 +350,17 @@ def _portfolio_spec_for_route(route: str) -> Optional[str]:
 
     Priority:
       1) FORGE_PAPER_PORTFOLIO_SPEC if set
-      2) configs/finished_steel_portfolio.yml if present
+      2) configs/paper_portfolio.yml if running the paper profile
+      3) configs/finished_steel_portfolio.yml if present
       3) fallback to configs/finished_steel_portfolio_eaf.yml
     """
     if PORTFOLIO_SPEC_OVERRIDE:
         return PORTFOLIO_SPEC_OVERRIDE
+    label = (_os.getenv("FORGE_OUTPUT_LABEL", "") or "").strip().lower()
+    if label == "paper":
+        paper_spec = _Path('configs/paper_portfolio.yml')
+        if paper_spec.exists():
+            return str(paper_spec)
     # Prefer a unified portfolio file if it exists
     unified = _Path('configs/finished_steel_portfolio.yml')
     if unified.exists():
@@ -386,6 +392,10 @@ def _compute_portfolio_ef(route: str, config: str, year: int, base_year: int, an
             if isinstance(b, dict) and str(b.get('name','')).strip() == PORTFOLIO_BLEND_OVERRIDE:
                 blend = b
                 break
+        if blend is None:
+            raise ValueError(
+                f"portfolio blend '{PORTFOLIO_BLEND_OVERRIDE}' not found in {spec_path}"
+            )
     if blend is None:
         for b in blends:
             if isinstance(b, dict):
@@ -445,6 +455,10 @@ def _portfolio_blend_parts() -> Tuple[Optional[list[Tuple[float, Dict[str, str]]
             if isinstance(b, dict) and str(b.get('name','')).strip() == PORTFOLIO_BLEND_OVERRIDE:
                 blend = b
                 break
+        if blend is None:
+            raise ValueError(
+                f"portfolio blend '{PORTFOLIO_BLEND_OVERRIDE}' not found in {spec_path}"
+            )
     if blend is None:
         for b in blends:
             if isinstance(b, dict):
@@ -479,8 +493,8 @@ def _cost_components_for_route(
     picks: Dict[str, str],
     scenario_defaults: Optional[Dict[str, Any]] = None,
     scenario_overrides: Optional[Dict[str, Any]] = None,
-) -> Tuple[float, float, float, float, float]:
-    """Return (uvc, capex_payment_total, oem_cost, total_cost, emission_factor)."""
+) -> Tuple[float, float, float, float, float, float]:
+    """Return (uvc, capex_payment, relining_payment, oem_cost, total_cost, emission_factor)."""
     base_defaults = _route_defaults_scenario(route, config)
     if route.upper().startswith("BF"):
         scn = _scenario_for_bf_config(config)
@@ -525,7 +539,7 @@ def _cost_components_for_route(
         total_cost = float("nan")
     else:
         total_cost = uvc + capex_total_payment + oem_cost
-    return uvc, capex_total_payment, oem_cost, total_cost, ef
+    return uvc, capex_payment_val, relining_val, oem_cost, total_cost, ef
 
 
 def _write_cost_breakdown_table() -> None:
@@ -588,12 +602,13 @@ def _write_cost_breakdown_table() -> None:
     for spec in route_specs:
         uvc_total = 0.0
         capex_total = 0.0
+        relining_total = 0.0
         oem_total = 0.0
         ef_total = 0.0
         valid = True
         for share, picks in parts:
             w = max(0.0, share) / total_share
-            uvc, capex_payment, oem, _, ef = _cost_components_for_route(
+            uvc, capex_payment, relining_payment, oem, _, ef = _cost_components_for_route(
                 spec["route"],
                 spec["config"],
                 picks,
@@ -604,7 +619,8 @@ def _write_cost_breakdown_table() -> None:
                 valid = False
                 break
             uvc_total += w * uvc
-            capex_total += w * capex_payment
+            capex_total += w * (capex_payment + relining_payment)
+            relining_total += w * relining_payment
             oem_total += w * oem
             ef_total += w * ef
         total_cost = uvc_total + capex_total + oem_total if valid else float("nan")
@@ -615,6 +631,7 @@ def _write_cost_breakdown_table() -> None:
             "emission_factor": ef_total if valid else float("nan"),
             "uvc": uvc_total if valid else float("nan"),
             "capex_payment": capex_total if valid else float("nan"),
+            "relining_payment": relining_total if valid else float("nan"),
             "oem_cost": oem_total if valid else float("nan"),
             "total_cost": total_cost,
         })
@@ -628,6 +645,160 @@ def _write_cost_breakdown_table() -> None:
         print(f"[table] cost breakdown written to {out_path}")
     except Exception as e:
         print(f"[table] failed to write cost breakdown: {e}")
+
+
+def _load_portfolio_parts_from_spec(spec_path: str, blend_name: str) -> Tuple[Optional[list[Tuple[float, Dict[str, str]]]], float, Dict[str, Any], Optional[str]]:
+    """Load (share, picks) parts plus scenario defaults/country from a portfolio spec."""
+    try:
+        with open(spec_path, 'r', encoding='utf-8') as fh:
+            spec = yaml.safe_load(fh) or {}
+    except Exception as exc:
+        print(f"[table] failed to read portfolio spec {spec_path}: {exc}")
+        return None, 0.0, {}, None
+    defaults = spec.get('defaults') or {}
+    defaults_picks = (defaults.get('picks_by_material') or {})
+    scenario_defaults = defaults.get('scenario') or {}
+    country_code = defaults.get('country_code') or None
+    runs = spec.get('runs') or []
+    run_map = {r.get('name'): (r.get('picks_by_material') or {}) for r in runs if isinstance(r, dict)}
+    blends = spec.get('blends') or []
+    blend = None
+    for b in blends:
+        if isinstance(b, dict) and str(b.get('name', '')).strip() == blend_name:
+            blend = b
+            break
+    if blend is None:
+        for b in blends:
+            if isinstance(b, dict):
+                blend = b
+                break
+    if not blend:
+        print(f"[table] no blend found in {spec_path}")
+        return None, 0.0, scenario_defaults, country_code
+    comps = blend.get('components') or []
+    if not comps:
+        print(f"[table] blend {blend_name} has no components in {spec_path}")
+        return None, 0.0, scenario_defaults, country_code
+    total_share = 0.0
+    parts: list[Tuple[float, Dict[str, str]]] = []
+    for comp in comps:
+        try:
+            run_name = comp.get('run')
+            share = float(comp.get('share', 0.0) or 0.0)
+        except Exception:
+            continue
+        picks_run = run_map.get(run_name, {})
+        picks_merged = dict(defaults_picks)
+        picks_merged.update(picks_run)
+        parts.append((share, picks_merged))
+        total_share += max(0.0, share)
+    if total_share <= 0.0:
+        print(f"[table] blend {blend_name} has zero total share in {spec_path}")
+        return None, 0.0, scenario_defaults, country_code
+    return parts, total_share, scenario_defaults, country_code
+
+
+def _resolve_energy_price_key(carrier: str, prices: Dict[str, float]) -> Optional[str]:
+    if carrier in prices:
+        return carrier
+    carrier_s = str(carrier)
+    for key in prices.keys():
+        if str(key).lower() == carrier_s.lower():
+            return key
+    key = carrier_s.strip().lower()
+    if key in {"green hydrogen", "green h2", "h2e", "hydrogen (electrolysis)"}:
+        if "green H2" in prices:
+            return "green H2"
+        if "H2E" in prices:
+            return "H2E"
+    if key in {"gray hydrogen", "grey hydrogen", "gray h2", "grey h2", "h2m", "hydrogen (methane reforming)"}:
+        if "gray H2" in prices:
+            return "gray H2"
+        if "H2M" in prices:
+            return "H2M"
+    if key == "charcoal" and "Charcoal M" in prices:
+        return "Charcoal M"
+    return None
+
+
+def _energy_usage_per_kg(out: Any, demand_qty: float, carrier: str) -> float:
+    eb = getattr(out, "energy_balance", None)
+    if eb is None or getattr(eb, "empty", True):
+        return float("nan")
+    total_row = eb.loc['TOTAL'] if 'TOTAL' in eb.index else eb.sum(numeric_only=True)
+    try:
+        val = float(total_row.get(carrier, 0.0) or 0.0)
+    except Exception:
+        val = 0.0
+    return val / demand_qty if demand_qty > 0 else float("nan")
+
+
+def _external_material_usage_per_kg(out: Any, demand_qty: float, material: str) -> float:
+    bm = getattr(out, "balance_matrix", None)
+    if bm is None or getattr(bm, "empty", True):
+        return float("nan")
+    external_rows = None
+    try:
+        meta = getattr(out, "meta", {}) or {}
+        external_rows = meta.get("external_purchase_rows")
+    except Exception:
+        external_rows = None
+    if not external_rows:
+        external_rows = [
+            'External Inputs',
+            'Scrap Purchase',
+            'Limestone from Market',
+            'Burnt Lime from market',
+            'Dolomite from market',
+            'Nitrogen from market',
+            'Oxygen from market',
+        ]
+    total_qty = 0.0
+    for row_name in external_rows:
+        if row_name in bm.index:
+            row_data = bm.loc[row_name]
+            try:
+                qty = float(row_data.get(material, 0.0) or 0.0)
+            except Exception:
+                qty = 0.0
+            if qty > 0:
+                total_qty += qty
+    return total_qty / demand_qty if demand_qty > 0 else float("nan")
+
+
+def _run_route_out(
+    route: str,
+    config: str,
+    picks: Dict[str, str],
+    scenario_defaults: Optional[Dict[str, Any]] = None,
+    scenario_overrides: Optional[Dict[str, Any]] = None,
+    *,
+    stage_key: str = "Finished",
+    stage_role: Optional[str] = None,
+) -> Any:
+    base_defaults = _route_defaults_scenario(route, config)
+    if route.upper().startswith("BF"):
+        scn = _scenario_for_bf_config(config)
+    elif route.upper().startswith("DRI"):
+        scn = _scenario_for_dri_config(config)
+    else:
+        scn = {}
+    if base_defaults:
+        scn = _merge_scenarios(base_defaults, scn)
+    if scenario_defaults:
+        scn = _merge_scenarios(scn, scenario_defaults)
+    if scenario_overrides:
+        scn = _merge_scenarios(scn, scenario_overrides)
+    rc = RouteConfig(
+        route_preset=route,
+        stage_key=stage_key,
+        stage_role=stage_role,
+        demand_qty=1000.0,
+        picks_by_material=dict(picks or {}),
+        pre_select_soft={},
+    )
+    si = ScenarioInputs(country_code=_PAPER_COUNTRY_CODE, scenario=scn, route=rc)
+    return run_scenario(DATA_DIR, si)
 
 
 def _load_bf_fleet() -> pd.DataFrame:
@@ -929,20 +1100,14 @@ def _build_param_grid_from_config(cfg: Dict[str, Any]) -> Optional[Dict[str, Any
     }
 
 
-_DEFAULT_PARAM_GRID = {
-    "scenario": ["conservative"],
-    "utilization_rate": [0.80],
-    "annual_improvement": [0.01],
-    "charcoal_expansion": [None],
-    "dri_mix": [
-        {
-            2030: {"Natural Gas": 1.0},
-            2040: {"Natural Gas": 0.7, "Biomethane-100": 0.1, "Green H2": 0.2},
-        },
-    ],
-}
-
-param_grid = _build_param_grid_from_config(_load_paper_grid_config()) or _DEFAULT_PARAM_GRID
+_paper_cfg = _load_paper_grid_config()
+param_grid = _build_param_grid_from_config(_paper_cfg)
+if not param_grid:
+    cfg_path = _os.getenv("FORGE_PAPER_CONFIG", "configs/paper_grid.yml")
+    raise ValueError(
+        f"paper grid config missing/invalid: {cfg_path}. "
+        "Define a 'grid' (axes) and 'grid_policies' (rules)."
+    )
 
 def generate_combinations(grid):
     """Generate all parameter combinations."""
@@ -1505,7 +1670,9 @@ def simulate_aggressive_transition(bf_fleet, transition_year, **params):
     """Run aggressive scenario where plants convert to DRI at relining after transition year"""
     results = []
     coal_bfs = bf_fleet[bf_fleet["Fuel"] == "coal"].copy()
+    charcoal_bfs = bf_fleet[bf_fleet["Fuel"] == "charcoal"].copy()
     original_coal_cap = coal_bfs["Capacity"].sum()
+    charcoal_cap = charcoal_bfs["Capacity"].sum()
     
     active_coal_bfs = coal_bfs.copy()
     dri_cap = 0  # Track DRI capacity directly
@@ -1534,12 +1701,21 @@ def simulate_aggressive_transition(bf_fleet, transition_year, **params):
         
         # Emissions calculations
         utilization = params.get('utilization_rate', 0.8)
+        annual_improvement = params.get('annual_improvement', 0.0)
         coal_ef = get_emission_factor(
             "BF-BOF", "Coke", year,
             base_year=2025,
-            annual_improvement=params.get('annual_improvement', 0.0)
+            annual_improvement=annual_improvement,
         )
         coal_emis = coal_cap * utilization * coal_ef
+        charcoal_emis = 0.0
+        if charcoal_cap > 0:
+            charcoal_ef = get_emission_factor(
+                "BF-BOF", "Charcoal", year,
+                base_year=2025,
+                annual_improvement=annual_improvement,
+            )
+            charcoal_emis = charcoal_cap * utilization * charcoal_ef
         
         # DRI emissions (only if capacity exists)
         dri_emis = 0
@@ -1554,7 +1730,7 @@ def simulate_aggressive_transition(bf_fleet, transition_year, **params):
                     dri_ef = get_emission_factor(
                         "DRI-EAF", cfg, year,
                         base_year=2025,
-                        annual_improvement=params.get('annual_improvement', 0.0)
+                        annual_improvement=annual_improvement,
                     )
                     dri_emis += dri_cap * share * utilization * dri_ef
         
@@ -1562,8 +1738,10 @@ def simulate_aggressive_transition(bf_fleet, transition_year, **params):
             'Year': year,
             'Transition_Year': transition_year,
             'BF_Coal_Capacity': coal_cap,
+            'BF_Charcoal_Capacity': charcoal_cap,
             'DRI_Capacity': dri_cap,
-            'Total_Emissions': coal_emis + dri_emis
+            'Charcoal_Emissions': charcoal_emis,
+            'Total_Emissions': coal_emis + charcoal_emis + dri_emis
         })
     
     return pd.DataFrame(results)
@@ -1581,6 +1759,188 @@ def _final_emissions_by_transition(df: pd.DataFrame) -> pd.Series:
     return (df.groupby('Transition_Year')['Cumulative_Emissions']
               .last()
               .sort_index() / 1000000)  # Gt
+
+def _map_mix_carrier_to_energy(name: Any) -> Optional[str]:
+    key = str(name or "").strip().lower()
+    mapping = {
+        "gas": "Gas",
+        "natural gas": "Gas",
+        "ng": "Gas",
+        "biomethane": "Biomethane",
+        "biomethane-100": "Biomethane",
+        "green h2": "Green hydrogen",
+        "green hydrogen": "Green hydrogen",
+        "gray h2": "Gray hydrogen",
+        "grey h2": "Gray hydrogen",
+        "gray hydrogen": "Gray hydrogen",
+        "grey hydrogen": "Gray hydrogen",
+    }
+    return mapping.get(key)
+
+def _build_dri_mix_schedule_for_energy(raw: Any) -> Dict[int, Dict[str, float]]:
+    if not isinstance(raw, dict):
+        return {}
+    schedule: Dict[int, Dict[str, float]] = {}
+    for year_key, mix in raw.items():
+        try:
+            year = int(year_key)
+        except Exception:
+            continue
+        if not isinstance(mix, dict):
+            continue
+        mapped: Dict[str, float] = {}
+        for carrier, share in mix.items():
+            mapped_name = _map_mix_carrier_to_energy(carrier)
+            if not mapped_name:
+                continue
+            try:
+                val = float(share)
+                if val > 1.0:
+                    val /= 100.0
+            except Exception:
+                continue
+            mapped[mapped_name] = val
+        if mapped:
+            schedule[year] = mapped
+    return schedule
+
+def _weighted_energy_per_kg(
+    route: str,
+    config: str,
+    year: int,
+    carriers: list[str],
+    parts: list[tuple[float, Dict[str, str]]],
+    total_share: float,
+    scenario_defaults: Dict[str, Any],
+    scenario_overrides: Dict[str, Any],
+) -> Dict[str, float]:
+    totals = {carrier: 0.0 for carrier in carriers}
+    for share, picks in parts:
+        w = max(0.0, share) / total_share
+        out = _run_route_out(route, config, picks, scenario_defaults, scenario_overrides)
+        for carrier in carriers:
+            use_per_kg = _energy_usage_per_kg(out, 1000.0, carrier)
+            if not np.isnan(use_per_kg):
+                totals[carrier] += w * use_per_kg
+    return totals
+
+def _write_transition_energy_demand_table(
+    transition_df: pd.DataFrame,
+    params: Dict[str, Any],
+    transition_year: int,
+) -> None:
+    if transition_df is None or transition_df.empty:
+        print("[table] transition energy demand skipped (no transition results).")
+        return
+
+    carriers = ["Gas", "Biomethane", "Green hydrogen"]
+    schedule = _build_dri_mix_schedule_for_energy(params.get("dri_mix", {}))
+    if not schedule:
+        print("[table] transition energy demand skipped (no DRI mix schedule).")
+        return
+
+    parts, scenario_defaults = _portfolio_blend_parts()
+    if not parts:
+        parts = [(1.0, dict(FINAL_PICKS))]
+        scenario_defaults = {}
+    total_share = sum(max(0.0, share) for share, _ in parts) or 1.0
+
+    utilization = float(params.get("utilization_rate", 0.8))
+    annual_improvement = float(params.get("annual_improvement", 0.0))
+    rate_pct = annual_improvement * 100.0
+    base_year = 2025
+    kg_per_kilotonne = 1_000_000.0
+
+    filtered = transition_df[transition_df["Transition_Year"] == transition_year].copy()
+    if filtered.empty:
+        print(f"[table] transition energy demand skipped (no data for {transition_year}).")
+        return
+    filtered = filtered.sort_values("Year")
+
+    rows = []
+    for _, row in filtered.iterrows():
+        year = int(row["Year"])
+        coal_cap = float(row.get("BF_Coal_Capacity", 0.0) or 0.0)
+        dri_cap = float(row.get("DRI_Capacity", 0.0) or 0.0)
+
+        schedule_overrides = {
+            "energy_int_schedule": {
+                "rate_pct_per_year": rate_pct,
+                "baseline_year": base_year,
+                "target_year": year,
+            },
+            "snapshot_year": year,
+        }
+        bf_overrides = dict(schedule_overrides)
+        bf_overrides["energy_int_floor"] = {"Blast Furnace": 11.0}
+
+        dri_overrides = dict(schedule_overrides)
+        dri_overrides["dri_mix"] = "Custom"
+        dri_overrides["dri_mix_definitions"] = {"Custom": schedule}
+        dri_overrides["dri_mix_scope"] = "process"
+
+        if coal_cap > 0:
+            bf_per_kg = _weighted_energy_per_kg(
+                "BF-BOF",
+                "Coke",
+                year,
+                carriers,
+                parts,
+                total_share,
+                scenario_defaults,
+                bf_overrides,
+            )
+        else:
+            bf_per_kg = {carrier: 0.0 for carrier in carriers}
+
+        if dri_cap > 0:
+            dri_per_kg = _weighted_energy_per_kg(
+                "DRI-EAF",
+                "Natural Gas",
+                year,
+                carriers,
+                parts,
+                total_share,
+                scenario_defaults,
+                dri_overrides,
+            )
+        else:
+            dri_per_kg = {carrier: 0.0 for carrier in carriers}
+
+        scale = utilization * kg_per_kilotonne
+        row_out: Dict[str, Any] = {
+            "Year": year,
+            "Transition_Year": transition_year,
+            "Utilization_Rate": utilization,
+            "Annual_Improvement": annual_improvement,
+            "BF_Coal_Capacity": coal_cap,
+            "DRI_Capacity": dri_cap,
+        }
+        total_mj = 0.0
+        for carrier in carriers:
+            col = "Green_H2" if carrier == "Green hydrogen" else carrier
+            bf_mj = bf_per_kg.get(carrier, 0.0) * coal_cap * scale
+            dri_mj = dri_per_kg.get(carrier, 0.0) * dri_cap * scale
+            demand_mj = bf_mj + dri_mj
+            row_out[f"{col}_MJ"] = demand_mj
+            total_mj += demand_mj
+        row_out["Total_MJ"] = total_mj
+        rows.append(row_out)
+
+    out_df = pd.DataFrame(rows)
+    for col in ["Gas_MJ", "Biomethane_MJ", "Green_H2_MJ", "Total_MJ"]:
+        if col in out_df.columns:
+            out_df[f"Cumulative_{col}"] = out_df[col].cumsum()
+
+    try:
+        base_dir = _os.getenv('FORGE_TABLE_DIR', 'results/tables')
+        out_dir = _Path(base_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / 'transition_energy_demand.csv'
+        out_df.to_csv(out_path, index=False)
+        print(f"[table] transition energy demand written to {out_path}")
+    except Exception as e:
+        print(f"[table] failed to write transition energy demand: {e}")
 
 # Run simulations with validation
 transition_years = range(2026, 2050)
@@ -1613,6 +1973,8 @@ biomethane_params = {
 }
 transition_results_bio = _run_transition_sweep(transition_years, biomethane_params, "DRI (100% Biomethane)")
 transition_results = transition_results_ng
+ng_baseline_year = 2030
+_write_transition_energy_demand_table(transition_results_ng, base_params_ng, ng_baseline_year)
 
 # Persist comparison data for inspection
 try:
@@ -1680,7 +2042,6 @@ plt.show()
 # Comparison: fixed NG mix baseline vs 100% Green H2 across start years
 h2_curve = _final_emissions_by_transition(transition_results_h2)
 bio_curve = _final_emissions_by_transition(transition_results_bio)
-ng_baseline_year = 2030
 ng_baseline = _final_emissions_by_transition(transition_results_ng).get(ng_baseline_year)
 if ng_baseline is None:
     print(f"[transition] NG baseline year {ng_baseline_year} not found; skipping baseline line.")

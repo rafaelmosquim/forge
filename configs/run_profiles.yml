@@ -12,6 +12,7 @@ profiles:
   paper:
     desc: "Run paper portfolio (paper_scenarios)"
     env:
+      FORGE_PAPER_CONFIG: configs/paper_grid.yml
       FORGE_PAPER_PRODUCT_CONFIG: portfolio
       FORGE_PAPER_PORTFOLIO_SPEC: configs/paper_portfolio.yml
       FORGE_PAPER_PORTFOLIO_BLEND: paper_portfolio

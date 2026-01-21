@@ -1855,6 +1855,200 @@ if run_now:
                 d4.download_button("LCI (CSV)", data=lci_df.to_csv(index=False).encode("utf-8"),
                                    file_name="lci.csv", mime="text/csv")
 
+            # Sankey diagrams (Plotly)
+            with st.expander("Sankey diagrams", expanded=False):
+                c_font, c_size, c_theme = st.columns([2, 1, 1])
+                with c_font:
+                    font_choice = st.selectbox(
+                        "Font",
+                        options=["System UI", "Arial", "Open Sans", "Source Sans Pro"],
+                        index=0,
+                        key="sankey_font_family",
+                    )
+                with c_size:
+                    font_size = st.slider(
+                        "Font size",
+                        min_value=8,
+                        max_value=24,
+                        value=int(st.session_state.get("sankey_font_size", 14)),
+                        step=1,
+                        key="sankey_font_size",
+                    )
+                with c_theme:
+                    match_theme = st.checkbox(
+                        "Match theme",
+                        value=bool(st.session_state.get("sankey_match_theme", False)),
+                        key="sankey_match_theme",
+                        help="When off, disables Streamlit's Plotly theming for crisper text on some systems.",
+                    )
+
+                crisp_labels = st.checkbox(
+                    "Crisp labels (disable halo/shadow)",
+                    value=bool(st.session_state.get("sankey_crisp_labels", True)),
+                    key="sankey_crisp_labels",
+                    help="Plotly adds a label halo for readability that can look blurry on some displays.",
+                )
+                if crisp_labels:
+                    st.markdown(
+                        """
+                        <style>
+                        /* Plotly Sankey label halo/shadow can look blurry; disable it for crisper text. */
+                        .js-plotly-plot .plotly .sankey text,
+                        .js-plotly-plot .plotly .sankeylayer text,
+                        .js-plotly-plot .plotly g.sankeylayer text {
+                            text-shadow: none !important;
+                            stroke: none !important;
+                            stroke-width: 0 !important;
+                            paint-order: normal !important;
+                            text-rendering: geometricPrecision !important;
+                        }
+                        </style>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                font_family = {
+                    "System UI": "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+                    "Arial": "Arial, sans-serif",
+                    "Open Sans": "Open Sans, Arial, sans-serif",
+                    "Source Sans Pro": "Source Sans Pro, Arial, sans-serif",
+                }.get(font_choice, "Arial, sans-serif")
+
+                plotly_cfg = {"responsive": True, "displaylogo": False}
+                plotly_theme = "streamlit" if match_theme else None
+
+                def _apply_sankey_text_style(fig) -> None:
+                    try:
+                        fig.update_traces(
+                            textfont=dict(family=font_family, size=int(font_size)),
+                            selector=dict(type="sankey"),
+                        )
+                    except Exception:
+                        pass
+                    try:
+                        fig.update_layout(font=dict(family=font_family, size=int(font_size)))
+                    except Exception:
+                        pass
+
+                recipes_dict_for_sankey = {p.name: p for p in (recipes_for_ui or [])}
+                tab_mass, tab_energy, tab_ranked, tab_hybrid = st.tabs(
+                    ["Mass flow", "Energy flow", "Energy → processes", "Hybrid (energy → CO₂)"]
+                )
+
+                with tab_mass:
+                    min_flow = st.number_input(
+                        "Min flow (recipe units × runs)",
+                        min_value=0.0,
+                        value=float(st.session_state.get("sankey_mass_min_flow", 0.5)),
+                        step=0.1,
+                        key="sankey_mass_min_flow",
+                    )
+                    if isinstance(prod_lvl, dict) and prod_lvl and recipes_dict_for_sankey:
+                        fig = make_mass_sankey(
+                            prod_lvl,
+                            recipes_dict_for_sankey,
+                            min_flow=min_flow,
+                            title=f"Mass Flow Sankey — {route} @ {stage_key}",
+                        )
+                        _apply_sankey_text_style(fig)
+                        st.plotly_chart(fig, use_container_width=True, theme=plotly_theme, config=plotly_cfg)
+                    else:
+                        st.info("Mass Sankey needs production runs and recipes.")
+
+                with tab_energy:
+                    min_mj = st.number_input(
+                        "Min flow (MJ)",
+                        min_value=0.0,
+                        value=float(st.session_state.get("sankey_energy_min_mj", 10.0)),
+                        step=1.0,
+                        key="sankey_energy_min_mj",
+                    )
+                    if isinstance(energy_balance, pd.DataFrame) and not energy_balance.empty:
+                        fig = make_energy_sankey(
+                            energy_balance,
+                            min_MJ=min_mj,
+                            title=f"Energy Flow Sankey — {route} @ {stage_key}",
+                        )
+                        _apply_sankey_text_style(fig)
+                        st.plotly_chart(fig, use_container_width=True, theme=plotly_theme, config=plotly_cfg)
+                    else:
+                        st.info("Energy Sankey needs an energy balance table.")
+
+                with tab_ranked:
+                    c_sort, c_min = st.columns([1, 1])
+                    with c_sort:
+                        sort_by = st.selectbox(
+                            "Rank processes by",
+                            options=["emissions", "energy"],
+                            index=0,
+                            key="sankey_rank_sort_by",
+                        )
+                    with c_min:
+                        min_mj_rank = st.number_input(
+                            "Min flow (MJ)",
+                            min_value=0.0,
+                            value=float(st.session_state.get("sankey_rank_min_mj", 10.0)),
+                            step=1.0,
+                            key="sankey_rank_min_mj",
+                        )
+
+                    if isinstance(energy_balance, pd.DataFrame) and not energy_balance.empty:
+                        fig = make_energy_to_process_sankey(
+                            energy_balance,
+                            emissions_df=emissions if isinstance(emissions, pd.DataFrame) else None,
+                            sort_by=sort_by,
+                            min_MJ=min_mj_rank,
+                            title=f"Energy → Processes — {route} @ {stage_key}",
+                        )
+                        _apply_sankey_text_style(fig)
+                        st.plotly_chart(fig, use_container_width=True, theme=plotly_theme, config=plotly_cfg)
+                    else:
+                        st.info("Energy → processes Sankey needs an energy balance table.")
+
+                with tab_hybrid:
+                    c1, c2, c3 = st.columns([1, 1, 1])
+                    with c1:
+                        min_mj_h = st.number_input(
+                            "Min energy link (MJ)",
+                            min_value=0.0,
+                            value=float(st.session_state.get("sankey_hybrid_min_mj", 10.0)),
+                            step=1.0,
+                            key="sankey_hybrid_min_mj",
+                        )
+                    with c2:
+                        min_co2 = st.number_input(
+                            "Min CO₂ link (same units as emissions table)",
+                            min_value=0.0,
+                            value=float(st.session_state.get("sankey_hybrid_min_co2", 0.1)),
+                            step=0.1,
+                            key="sankey_hybrid_min_co2",
+                        )
+                    with c3:
+                        split_sinks = st.checkbox(
+                            "Split CO₂ sinks (energy/direct)",
+                            value=bool(st.session_state.get("sankey_hybrid_split", True)),
+                            key="sankey_hybrid_split",
+                        )
+
+                    if (
+                        isinstance(energy_balance, pd.DataFrame)
+                        and not energy_balance.empty
+                        and isinstance(emissions, pd.DataFrame)
+                        and not emissions.empty
+                    ):
+                        fig = make_hybrid_sankey(
+                            energy_balance,
+                            emissions,
+                            min_MJ=min_mj_h,
+                            min_kg=min_co2,
+                            include_direct_and_energy_sinks=split_sinks,
+                            title=f"Hybrid Sankey — {route} @ {stage_key}",
+                        )
+                        _apply_sankey_text_style(fig)
+                        st.plotly_chart(fig, use_container_width=True, theme=plotly_theme, config=plotly_cfg)
+                    else:
+                        st.info("Hybrid Sankey requires both energy balance and emissions tables.")
+
             # Tables
             
             if isinstance(balance_matrix, pd.DataFrame) and not balance_matrix.empty:

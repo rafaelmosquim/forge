@@ -64,8 +64,6 @@ def _install_safe_show():
 
 
 
-
-
 # ============================================
 # 1. SETUP (Input Data & Helper Functions)
 # ============================================
@@ -1109,6 +1107,40 @@ if not param_grid:
         "Define a 'grid' (axes) and 'grid_policies' (rules)."
     )
 
+def _ensure_dri_mix_baseline(schedule: Dict[int, Dict[str, float]], base_year: int = 2025) -> Dict[int, Dict[str, float]]:
+    if not schedule:
+        return schedule
+    try:
+        base_year = int(base_year)
+    except Exception:
+        base_year = 2025
+    if base_year in schedule:
+        return {int(k): dict(v) for k, v in schedule.items()}
+    years = sorted(int(k) for k in schedule.keys())
+    if not years:
+        return schedule
+    out = {int(k): dict(v) for k, v in schedule.items()}
+    out[base_year] = dict(schedule[years[0]])
+    return out
+
+def _comparison_base_params(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    policies = (cfg or {}).get("grid_policies") or {}
+    dri_defs = policies.get("dri_mix_definitions") or {}
+    dri_mix = _build_dri_mix_schedule(dri_defs, "Blue")
+    if not dri_mix:
+        dri_mix = {
+            2030: {"Natural Gas": 1.0},
+            2040: {"Natural Gas": 0.70, "Biomethane-100": 0.10, "Green H2": 0.20},
+        }
+    dri_mix = _ensure_dri_mix_baseline(dri_mix, 2025)
+    return {
+        "scenario": _normalize_scenario("conservative"),
+        "utilization_rate": 0.8,
+        "annual_improvement": 0.01,
+        "charcoal_expansion": None,
+        "dri_mix": dri_mix,
+    }
+
 def generate_combinations(grid):
     """Generate all parameter combinations."""
     keys, values = zip(*grid.items())
@@ -1336,6 +1368,297 @@ for ax in axes:
 
 plt.tight_layout()
 plt.show()
+
+# ============================================
+# Stress test sensitivities (relining + forced retirement)
+# ============================================
+
+def _stress_test_years(start: int = 2025, end: int = 2050) -> list[int]:
+    return list(range(int(start), int(end) + 1))
+
+def _current_dri_mix(year: int, schedule: Dict[int, Dict[str, float]]) -> Dict[str, float]:
+    if not schedule:
+        return {"Natural Gas": 1.0}
+    years = sorted(int(y) for y in schedule.keys())
+    chosen = None
+    for y in years:
+        if y <= year:
+            chosen = y
+    if chosen is None:
+        chosen = years[0]
+    return schedule.get(chosen) or {}
+
+def _stress_test_ef_map(years: list[int], annual_improvement: float) -> Dict[Tuple[str, str], Dict[int, float]]:
+    configs = [
+        ("BF-BOF", "Coke"),
+        ("BF-BOF", "Charcoal"),
+        ("DRI-EAF", "Natural Gas"),
+        ("DRI-EAF", "Biomethane-100"),
+        ("DRI-EAF", "Green H2"),
+    ]
+    ef_map: Dict[Tuple[str, str], Dict[int, float]] = {k: {} for k in configs}
+    for year in years:
+        for route, config in configs:
+            ef_map[(route, config)][year] = get_emission_factor(
+                route,
+                config,
+                year,
+                base_year=2025,
+                annual_improvement=annual_improvement,
+            )
+    return ef_map
+
+def _conversion_year(relining_year: int, interval: int, transition_year: int) -> int:
+    if relining_year >= transition_year:
+        return relining_year
+    steps = int(np.ceil((transition_year - relining_year) / float(interval)))
+    return int(relining_year + steps * interval)
+
+def _simulate_relining_interval(
+    coal_bfs: pd.DataFrame,
+    charcoal_cap: float,
+    ef_map: Dict[Tuple[str, str], Dict[int, float]],
+    years: list[int],
+    *,
+    interval_years: int,
+    transition_year: int,
+    utilization: float,
+    annual_improvement: float,
+    dri_mix: Dict[int, Dict[str, float]],
+) -> float:
+    active = coal_bfs.copy()
+    active["Capacity"] = pd.to_numeric(active["Capacity"], errors="coerce").fillna(0.0).astype(float)
+    active["Relining"] = pd.to_numeric(active["Relining"], errors="coerce").fillna(9999).astype(int)
+    active["Conv"] = active["Relining"].apply(lambda y: _conversion_year(int(y), interval_years, transition_year))
+    original_coal_cap = float(active["Capacity"].sum())
+    dri_cap = 0.0
+    cumulative = 0.0
+
+    for year in years:
+        if year < transition_year:
+            coal_cap = float(active["Capacity"].sum())
+        else:
+            mask = active["Conv"] == year
+            converted = float(active.loc[mask, "Capacity"].sum())
+            dri_cap += converted
+            active = active.loc[~mask]
+            coal_cap = float(active["Capacity"].sum())
+            if not np.isclose(coal_cap + dri_cap, original_coal_cap, rtol=0.01):
+                dri_cap = original_coal_cap - coal_cap
+
+        coal_ef = ef_map[("BF-BOF", "Coke")][year]
+        charcoal_ef = ef_map[("BF-BOF", "Charcoal")][year]
+        coal_emis = coal_cap * utilization * coal_ef
+        charcoal_emis = charcoal_cap * utilization * charcoal_ef
+
+        dri_emis = 0.0
+        mix = _current_dri_mix(year, dri_mix)
+        for cfg, share in mix.items():
+            cfg_norm = _normalize_dri_config_label(cfg)
+            dri_ef = ef_map[("DRI-EAF", cfg_norm)][year]
+            dri_emis += dri_cap * float(share) * utilization * dri_ef
+
+        cumulative += coal_emis + charcoal_emis + dri_emis
+
+    return cumulative / 1e6  # Gt CO2
+
+def _remaining_life_fraction(eol_year: float, year: int, lifespan: float) -> float:
+    frac = (float(eol_year) - float(year)) / float(lifespan)
+    if frac < 0.0:
+        return 0.0
+    if frac > 1.0:
+        return 1.0
+    return float(frac)
+
+def _retire_capacity(
+    plants: pd.DataFrame,
+    year: int,
+    retire_rate: float,
+    *,
+    allocation: str,
+    lifespan: float,
+    capex_per_t: float,
+) -> Tuple[pd.DataFrame, float, float]:
+    total = float(plants["Capacity"].sum())
+    if total <= 0.0:
+        return plants, 0.0, 0.0
+    target = float(retire_rate) * total
+    if target <= 0.0:
+        return plants, 0.0, 0.0
+
+    stranded_usd = 0.0
+    retired_kt = 0.0
+    out = plants.copy()
+
+    if allocation == "proportional":
+        retired = out["Capacity"] * float(retire_rate)
+        for idx, r in retired.items():
+            if r <= 0:
+                continue
+            frac = _remaining_life_fraction(out.at[idx, "EOL"], year, lifespan)
+            stranded_usd += float(r) * 1000.0 * capex_per_t * frac
+        out["Capacity"] = out["Capacity"] - retired
+        retired_kt = float(retired.sum())
+        return out, retired_kt, stranded_usd
+
+    if allocation not in {"oldest_first", "newest_first"}:
+        raise ValueError(f"unknown allocation: {allocation}")
+
+    ascending = allocation == "oldest_first"
+    out["_rem_life_y"] = out["EOL"] - year
+    out = out.sort_values(["_rem_life_y", "BF"], ascending=[ascending, True])
+
+    remaining = target
+    for idx, row in out.iterrows():
+        if remaining <= 0.0:
+            break
+        cap = float(row["Capacity"])
+        if cap <= 0.0:
+            continue
+        take = cap if cap <= remaining else remaining
+        frac = _remaining_life_fraction(row["EOL"], year, lifespan)
+        stranded_usd += take * 1000.0 * capex_per_t * frac
+        out.at[idx, "Capacity"] = cap - take
+        remaining -= take
+        retired_kt += take
+
+    out = out.drop(columns=["_rem_life_y"])
+    return out, retired_kt, stranded_usd
+
+def _simulate_forced_retirement(
+    coal_bfs: pd.DataFrame,
+    charcoal_cap: float,
+    ef_map: Dict[Tuple[str, str], Dict[int, float]],
+    years: list[int],
+    *,
+    retire_rate: float,
+    allocation: str,
+    utilization: float,
+    dri_mix: Dict[int, Dict[str, float]],
+    lifespan: float,
+    capex_per_t: float,
+) -> Tuple[float, float]:
+    coal = coal_bfs.copy()
+    coal["Capacity"] = pd.to_numeric(coal["Capacity"], errors="coerce").fillna(0.0).astype(float)
+    coal["EOL"] = pd.to_numeric(coal["EOL"], errors="coerce").fillna(0.0).astype(float)
+    dri_cap = 0.0
+    cumulative_emis = 0.0
+    cumulative_stranded = 0.0
+
+    for year in years:
+        coal, retired_kt, stranded_usd = _retire_capacity(
+            coal,
+            year,
+            retire_rate,
+            allocation=allocation,
+            lifespan=lifespan,
+            capex_per_t=capex_per_t,
+        )
+        dri_cap += retired_kt
+        coal_cap = float(coal["Capacity"].sum())
+
+        coal_ef = ef_map[("BF-BOF", "Coke")][year]
+        charcoal_ef = ef_map[("BF-BOF", "Charcoal")][year]
+        coal_emis = coal_cap * utilization * coal_ef
+        charcoal_emis = charcoal_cap * utilization * charcoal_ef
+
+        dri_emis = 0.0
+        mix = _current_dri_mix(year, dri_mix)
+        for cfg, share in mix.items():
+            cfg_norm = _normalize_dri_config_label(cfg)
+            dri_ef = ef_map[("DRI-EAF", cfg_norm)][year]
+            dri_emis += dri_cap * float(share) * utilization * dri_ef
+
+        cumulative_emis += coal_emis + charcoal_emis + dri_emis
+        cumulative_stranded += stranded_usd
+
+    return cumulative_emis / 1e6, cumulative_stranded / 1e9
+
+def _write_stress_test_csv() -> None:
+    years = _stress_test_years()
+    base_params = _comparison_base_params(_paper_cfg)
+    utilization = float(base_params.get("utilization_rate", 0.8))
+    annual_improvement = float(base_params.get("annual_improvement", 0.0))
+    dri_mix = base_params.get("dri_mix") or {2025: {"Natural Gas": 1.0}}
+
+    ef_map = _stress_test_ef_map(years, annual_improvement)
+
+    fleet = bf_fleet.copy()
+    coal_bfs = fleet[fleet["Fuel"] == "coal"].copy()
+    charcoal_bfs = fleet[fleet["Fuel"] == "charcoal"].copy()
+    charcoal_cap = float(pd.to_numeric(charcoal_bfs["Capacity"], errors="coerce").fillna(0.0).sum())
+
+    capex_cfg = {}
+    try:
+        capex_path = _Path(DATA_DIR) / "capex.yml"
+        with capex_path.open("r", encoding="utf-8") as fh:
+            capex_cfg = yaml.safe_load(fh) or {}
+    except Exception:
+        capex_cfg = {}
+    capex_per_t = float(((capex_cfg.get("capex") or {}).get("BF-BOF", 0.0)) or 0.0)
+    lifespan = float(((capex_cfg.get("lifespan") or {}).get("BF-BOF", 50.0)) or 50.0)
+
+    rows = []
+
+    # Relining interval sensitivities (transition year 2030 and 2025)
+    for transition_year in (2030, 2025):
+        for interval in (15, 20, 25):
+            cum_emis = _simulate_relining_interval(
+                coal_bfs,
+                charcoal_cap,
+                ef_map,
+                years,
+                interval_years=interval,
+                transition_year=transition_year,
+                utilization=utilization,
+                annual_improvement=annual_improvement,
+                dri_mix=dri_mix,
+            )
+            rows.append({
+                "test": "relining_interval",
+                "transition_year": transition_year,
+                "relining_interval_years": interval,
+                "forced_retire_rate": float("nan"),
+                "forced_retire_allocation": "",
+                "cumulative_emissions_gtco2": cum_emis,
+                "cumulative_stranded_capex_bn_usd": float("nan"),
+            })
+
+    # Forced retirement stress test (10% of remaining coal capacity per year from 2025)
+    for allocation in ("oldest_first", "proportional", "newest_first"):
+        cum_emis, cum_stranded = _simulate_forced_retirement(
+            coal_bfs,
+            charcoal_cap,
+            ef_map,
+            years,
+            retire_rate=0.10,
+            allocation=allocation,
+            utilization=utilization,
+            dri_mix=dri_mix,
+            lifespan=lifespan,
+            capex_per_t=capex_per_t,
+        )
+        rows.append({
+            "test": "forced_retirement_10pct_remaining",
+            "transition_year": 2025,
+            "relining_interval_years": float("nan"),
+            "forced_retire_rate": 0.10,
+            "forced_retire_allocation": allocation,
+            "cumulative_emissions_gtco2": cum_emis,
+            "cumulative_stranded_capex_bn_usd": cum_stranded,
+        })
+
+    try:
+        base_dir = _os.getenv("FORGE_TABLE_DIR", "results/tables")
+        out_dir = _Path(base_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "stress_test_sensitivity.csv"
+        pd.DataFrame(rows).to_csv(out_path, index=False)
+        print(f"[table] stress test sensitivity written to {out_path}")
+    except Exception as exc:
+        print(f"[table] failed to write stress test sensitivity: {exc}")
+
+_write_stress_test_csv()
 
 # ============================================
 # Emission evolution
@@ -1667,7 +1990,7 @@ plt.show()
 # ============================================
 
 def simulate_aggressive_transition(bf_fleet, transition_year, **params):
-    """Run aggressive scenario where plants convert to DRI at relining after transition year"""
+    """Run transition scenario with year-dependent conversion (aggressive = relining, conservative = EOL)."""
     results = []
     coal_bfs = bf_fleet[bf_fleet["Fuel"] == "coal"].copy()
     charcoal_bfs = bf_fleet[bf_fleet["Fuel"] == "charcoal"].copy()
@@ -1676,28 +1999,32 @@ def simulate_aggressive_transition(bf_fleet, transition_year, **params):
     
     active_coal_bfs = coal_bfs.copy()
     dri_cap = 0  # Track DRI capacity directly
+    scenario = _normalize_scenario(params.get("scenario"))
+    if scenario not in {"business_as_usual", "conservative", "aggressive"}:
+        scenario = "aggressive"
     
     for year in range(2025, 2051):
-        # Get plants reaching relining year
-        relining_mask = active_coal_bfs["Relining"] == year
-        relining_bfs = active_coal_bfs[relining_mask]
-        
-        # Before transition: keep all coal plants
-        if year < transition_year:
+        if scenario == "business_as_usual":
             coal_cap = active_coal_bfs["Capacity"].sum()
-        
-        # After transition: convert relining plants
+        elif scenario == "conservative":
+            if year >= transition_year:
+                eol_mask = active_coal_bfs["EOL"] == year
+                converted_cap = active_coal_bfs[eol_mask]["Capacity"].sum()
+                dri_cap += converted_cap
+                active_coal_bfs = active_coal_bfs[~eol_mask]
+            coal_cap = active_coal_bfs["Capacity"].sum()
         else:
-            # Calculate conversion
-            converted_cap = relining_bfs["Capacity"].sum()
-            dri_cap += converted_cap
-            active_coal_bfs = active_coal_bfs[~relining_mask]
+            if year >= transition_year:
+                relining_mask = active_coal_bfs["Relining"] == year
+                converted_cap = active_coal_bfs[relining_mask]["Capacity"].sum()
+                dri_cap += converted_cap
+                active_coal_bfs = active_coal_bfs[~relining_mask]
             coal_cap = active_coal_bfs["Capacity"].sum()
-            
-            # Validate immediately
-            if not np.isclose(coal_cap + dri_cap, original_coal_cap, rtol=0.01):
-                print(f"Capacity error during {year} conversion: Coal={coal_cap:.1f}, DRI={dri_cap:.1f}")
-                dri_cap = original_coal_cap - coal_cap  # Force balance
+        
+        # Validate immediately
+        if not np.isclose(coal_cap + dri_cap, original_coal_cap, rtol=0.01):
+            print(f"Capacity error during {year} conversion: Coal={coal_cap:.1f}, DRI={dri_cap:.1f}")
+            dri_cap = original_coal_cap - coal_cap  # Force balance
         
         # Emissions calculations
         utilization = params.get('utilization_rate', 0.8)
@@ -1945,16 +2272,7 @@ def _write_transition_energy_demand_table(
 # Run simulations with validation
 transition_years = range(2026, 2050)
 
-base_params_ng = {
-    'scenario': 'aggressive',
-    'utilization_rate': 0.8,
-    'annual_improvement': 0.01,
-    'dri_mix': {
-        2025: {"Natural Gas": 1.0},  # Baseline
-        2030: {"Natural Gas": 0.7, "Biomethane-100": 0.1, "Green H2": 0.2},
-        2040: {"Natural Gas": 0.4, "Biomethane-100": 0.2, "Green H2": 0.4}
-    }
-}
+base_params_ng = _comparison_base_params(_paper_cfg)
 
 green_h2_params = {
     'scenario': base_params_ng['scenario'],
@@ -2034,7 +2352,12 @@ for bar, val, label in zip(bars, subset.values, subset.index):
 # Axis and layout
 plt.xlabel('Cumulative CO₂ Emissions (Gt)')
 plt.ylabel('Transition Start Year')
-plt.title('Cumulative Emissions Increase with Delayed Transition\n(2025–2050, Aggressive Scenario)', fontsize=14, pad=15)
+base_scn_label = str(base_params_ng.get("scenario", "aggressive")).replace("_", " ").title()
+plt.title(
+    f'Cumulative Emissions Increase with Delayed Transition\n(2025–2050, {base_scn_label} Scenario)',
+    fontsize=14,
+    pad=15,
+)
 #plt.grid(axis='x', linestyle='--', alpha=0.4)
 plt.tight_layout()
 plt.show()

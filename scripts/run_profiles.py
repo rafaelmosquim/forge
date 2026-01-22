@@ -17,6 +17,7 @@ import argparse
 import os
 import sys
 import subprocess as sp
+import pty
 from pathlib import Path
 import yaml
 from datetime import datetime
@@ -37,6 +38,17 @@ def ensure_log_path(env: dict, profile: str) -> Path:
     return log_dir / "run.log"
 
 
+def _is_truthy(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _log_write(log_fh, text: str) -> None:
+    if "b" in getattr(log_fh, "mode", ""):
+        log_fh.write(text.encode("utf-8"))
+    else:
+        log_fh.write(text)
+
+
 def run_profile(name: str, spec: dict, *, parallel: bool = False) -> int:
     env = os.environ.copy()
     env_spec = spec.get("env") or {}
@@ -52,19 +64,42 @@ def run_profile(name: str, spec: dict, *, parallel: bool = False) -> int:
     print(f"  log: {log_path}")
 
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_fh = open(log_path, "a", buffering=1, encoding="utf-8")
-    log_fh.write(f"\n=== START {name} at {datetime.now().isoformat()} ===\n")
+    live = _is_truthy(env.get("FORGE_RUN_LIVE"))
+    if live:
+        log_fh = open(log_path, "ab", buffering=0)
+    else:
+        log_fh = open(log_path, "a", buffering=1, encoding="utf-8")
+    _log_write(log_fh, f"\n=== START {name} at {datetime.now().isoformat()} ===\n")
 
     if parallel:
         proc = sp.Popen(cmd, stdout=log_fh, stderr=sp.STDOUT, env=env)
         return proc.pid  # return PID marker; caller will not wait
     else:
         try:
+            if live:
+                master_fd, slave_fd = pty.openpty()
+                proc = sp.Popen(cmd, stdout=slave_fd, stderr=slave_fd, env=env)
+                os.close(slave_fd)
+                try:
+                    while True:
+                        try:
+                            chunk = os.read(master_fd, 4096)
+                        except OSError:
+                            break
+                        if not chunk:
+                            break
+                        sys.stdout.buffer.write(chunk)
+                        sys.stdout.flush()
+                        log_fh.write(chunk)
+                finally:
+                    os.close(master_fd)
+                code = int(proc.wait() or 0)
+                return code
             res = sp.run(cmd, stdout=log_fh, stderr=sp.STDOUT, env=env, check=False)
             code = int(res.returncode or 0)
             return code
         finally:
-            log_fh.write(f"\n=== END {name} at {datetime.now().isoformat()} ===\n")
+            _log_write(log_fh, f"\n=== END {name} at {datetime.now().isoformat()} ===\n")
             log_fh.close()
 
 
@@ -117,4 +152,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

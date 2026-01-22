@@ -216,11 +216,24 @@ def _ef_core_cached(route: str, config: str, year: int, base_year: int, annual_i
 # -----------------
 # Optional disk cache
 # -----------------
+import hashlib as _hashlib
+import json as _json
 import pickle as _pkl
 import threading as _th
 
 _EF_CACHE_LOCK = _th.Lock()
 _EF_CACHE: Dict[tuple, float] | None = None
+_EF_MEM_CACHE: Dict[tuple, float] = {}
+_EF_CACHE_VERSION = 2
+
+def _scenario_sig(payload: Optional[Dict[str, Any]]) -> str:
+    if not payload:
+        return ""
+    try:
+        blob = _json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    except Exception:
+        blob = str(payload)
+    return _hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 def _cache_dir_file() -> tuple[_Path, _Path]:
     base = _os.getenv('FORGE_PAPER_CACHE_DIR', 'results/cache')
@@ -252,12 +265,34 @@ def _save_ef_cache():
     except Exception:
         pass
 
-def _make_ef_key(route: str, config: str, year: int, base_year: int, annual_improvement: float, picks: Optional[Dict[str, str]] = None) -> tuple:
+def _make_ef_key(
+    route: str,
+    config: str,
+    year: int,
+    base_year: int,
+    annual_improvement: float,
+    picks: Optional[Dict[str, str]] = None,
+    scenario_defaults: Optional[Dict[str, Any]] = None,
+    country_code: Optional[str] = None,
+) -> tuple:
     # Round improvement to 1e-6 to avoid float chatter
     imp = round(float(annual_improvement), 6)
     picks_src = picks if isinstance(picks, dict) else FINAL_PICKS
     picks_sig = tuple(sorted(picks_src.items()))
-    return (str(route), str(config), int(year), int(base_year), imp, str(DATA_DIR), picks_sig)
+    scn_sig = _scenario_sig(scenario_defaults)
+    cc = (country_code or "").strip().upper()
+    return (
+        str(route),
+        str(config),
+        int(year),
+        int(base_year),
+        imp,
+        str(DATA_DIR),
+        picks_sig,
+        cc,
+        scn_sig,
+        _EF_CACHE_VERSION,
+    )
 
 def _ef_core_cached_disk(route: str, config: str, year: int, base_year: int, annual_improvement: float) -> float:
     """Disk-backed cache wrapper around _ef_core_cached.
@@ -267,7 +302,16 @@ def _ef_core_cached_disk(route: str, config: str, year: int, base_year: int, ann
     use_cache = _os.getenv('FORGE_PAPER_CACHE', '0').strip() not in {'0', 'false', 'off'}
     if not use_cache:
         return _ef_core_cached(route, config, year, base_year, annual_improvement)
-    key = _make_ef_key(route, config, year, base_year, annual_improvement, None)
+    key = _make_ef_key(
+        route,
+        config,
+        year,
+        base_year,
+        annual_improvement,
+        None,
+        None,
+        _PAPER_COUNTRY_CODE,
+    )
     with _EF_CACHE_LOCK:
         cache = _load_ef_cache()
         if key in cache:
@@ -329,18 +373,33 @@ def _ef_core_run_with_picks(route: str, config: str, year: int, base_year: int, 
 
 def _ef_core_cached_disk_with_picks(route: str, config: str, year: int, base_year: int, annual_improvement: float, picks: Dict[str, str], scenario_defaults: Optional[Dict[str, Any]] = None) -> float:
     use_cache = _os.getenv('FORGE_PAPER_CACHE', '1').strip() not in {'0', 'false', 'off'}
-    if not use_cache:
-        return _ef_core_run_with_picks(route, config, year, base_year, annual_improvement, picks, scenario_defaults)
-    key = _make_ef_key(route, config, year, base_year, annual_improvement, picks)
-    with _EF_CACHE_LOCK:
-        cache = _load_ef_cache()
-        if key in cache:
-            return cache[key]
+    key = _make_ef_key(
+        route,
+        config,
+        year,
+        base_year,
+        annual_improvement,
+        picks,
+        scenario_defaults,
+        _PAPER_COUNTRY_CODE,
+    )
+    if use_cache:
+        with _EF_CACHE_LOCK:
+            cache = _load_ef_cache()
+            if key in cache:
+                return cache[key]
+    else:
+        with _EF_CACHE_LOCK:
+            if key in _EF_MEM_CACHE:
+                return _EF_MEM_CACHE[key]
     val = _ef_core_run_with_picks(route, config, year, base_year, annual_improvement, picks, scenario_defaults)
     with _EF_CACHE_LOCK:
-        cache = _load_ef_cache()
-        cache[key] = val
-        _save_ef_cache()
+        if use_cache:
+            cache = _load_ef_cache()
+            cache[key] = val
+            _save_ef_cache()
+        else:
+            _EF_MEM_CACHE[key] = val
     return val
 
 def _portfolio_spec_for_route(route: str) -> Optional[str]:
@@ -366,15 +425,18 @@ def _portfolio_spec_for_route(route: str) -> Optional[str]:
     # Fallback to previous EAF-based basket
     return 'configs/finished_steel_portfolio_eaf.yml'
 
+@lru_cache(maxsize=16)
+def _load_portfolio_spec(spec_path: str) -> Dict[str, Any]:
+    with open(spec_path, 'r', encoding='utf-8') as fh:
+        return yaml.safe_load(fh) or {}
+
 def _compute_portfolio_ef(route: str, config: str, year: int, base_year: int, annual_improvement: float) -> float:
-    import yaml as _yaml
     spec_path = _portfolio_spec_for_route(route)
     if not spec_path:
         # Fallback to simple picks
         return _ef_core_cached_disk(route, config, year, base_year, annual_improvement)
     try:
-        with open(spec_path, 'r', encoding='utf-8') as fh:
-            spec = _yaml.safe_load(fh) or {}
+        spec = _load_portfolio_spec(spec_path)
     except Exception:
         return _ef_core_cached_disk(route, config, year, base_year, annual_improvement)
     defaults = spec.get('defaults') or {}
@@ -432,13 +494,11 @@ def _portfolio_blend_parts() -> Tuple[Optional[list[Tuple[float, Dict[str, str]]
     """Load portfolio blend picks + scenario defaults for cost calculations."""
     if PRODUCT_CONFIG != 'portfolio':
         return None, {}
-    import yaml as _yaml
     spec_path = _portfolio_spec_for_route("BF-BOF")
     if not spec_path:
         return None, {}
     try:
-        with open(spec_path, 'r', encoding='utf-8') as fh:
-            spec = _yaml.safe_load(fh) or {}
+        spec = _load_portfolio_spec(spec_path)
     except Exception:
         return None, {}
     defaults = spec.get('defaults') or {}
@@ -648,8 +708,7 @@ def _write_cost_breakdown_table() -> None:
 def _load_portfolio_parts_from_spec(spec_path: str, blend_name: str) -> Tuple[Optional[list[Tuple[float, Dict[str, str]]]], float, Dict[str, Any], Optional[str]]:
     """Load (share, picks) parts plus scenario defaults/country from a portfolio spec."""
     try:
-        with open(spec_path, 'r', encoding='utf-8') as fh:
-            spec = yaml.safe_load(fh) or {}
+        spec = _load_portfolio_spec(spec_path)
     except Exception as exc:
         print(f"[table] failed to read portfolio spec {spec_path}: {exc}")
         return None, 0.0, {}, None
@@ -1123,6 +1182,28 @@ def _ensure_dri_mix_baseline(schedule: Dict[int, Dict[str, float]], base_year: i
     out[base_year] = dict(schedule[years[0]])
     return out
 
+def _default_relining_interval_years(cfg: Dict[str, Any]) -> int:
+    policies = (cfg or {}).get("grid_policies") or {}
+    raw = policies.get("relining_interval_years")
+    if raw is not None:
+        try:
+            val = int(float(raw))
+            if val > 0:
+                return val
+        except Exception:
+            pass
+    try:
+        capex_path = _Path(DATA_DIR) / "capex.yml"
+        with capex_path.open("r", encoding="utf-8") as fh:
+            capex_cfg = yaml.safe_load(fh) or {}
+        relining_cfg = capex_cfg.get("relining") or {}
+        val = relining_cfg.get("BF-BOF")
+        if val is not None:
+            return int(float(val))
+    except Exception:
+        pass
+    return 20
+
 def _comparison_base_params(cfg: Dict[str, Any]) -> Dict[str, Any]:
     policies = (cfg or {}).get("grid_policies") or {}
     dri_defs = policies.get("dri_mix_definitions") or {}
@@ -1139,6 +1220,7 @@ def _comparison_base_params(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "annual_improvement": 0.01,
         "charcoal_expansion": None,
         "dri_mix": dri_mix,
+        "relining_interval_years": _default_relining_interval_years(cfg),
     }
 
 def generate_combinations(grid):
@@ -1668,7 +1750,11 @@ _write_stress_test_csv()
 all_simulations = []
 
 # Loop through each scenario and run the simulation
-for _, scenario_params in results_df.iterrows():
+for _, scenario_params in tqdm(
+    results_df.iterrows(),
+    total=len(results_df),
+    desc="Running simulations (evolution)",
+):
     # Run the simulation for this scenario
     sim_results = simulate_steel_transition(bf_fleet, **scenario_params)
     
@@ -2002,6 +2088,18 @@ def simulate_aggressive_transition(bf_fleet, transition_year, **params):
     scenario = _normalize_scenario(params.get("scenario"))
     if scenario not in {"business_as_usual", "conservative", "aggressive"}:
         scenario = "aggressive"
+    interval_years = params.get("relining_interval_years")
+    try:
+        interval_years = int(float(interval_years)) if interval_years is not None else None
+    except Exception:
+        interval_years = None
+    use_interval = scenario == "aggressive" and interval_years is not None and interval_years > 0
+    active_coal_bfs["Capacity"] = pd.to_numeric(active_coal_bfs["Capacity"], errors="coerce").fillna(0.0).astype(float)
+    active_coal_bfs["Relining"] = pd.to_numeric(active_coal_bfs["Relining"], errors="coerce").fillna(9999).astype(int)
+    if use_interval:
+        active_coal_bfs["Conv"] = active_coal_bfs["Relining"].apply(
+            lambda y: _conversion_year(int(y), interval_years, transition_year)
+        )
     
     for year in range(2025, 2051):
         if scenario == "business_as_usual":
@@ -2015,7 +2113,10 @@ def simulate_aggressive_transition(bf_fleet, transition_year, **params):
             coal_cap = active_coal_bfs["Capacity"].sum()
         else:
             if year >= transition_year:
-                relining_mask = active_coal_bfs["Relining"] == year
+                if use_interval:
+                    relining_mask = active_coal_bfs["Conv"] == year
+                else:
+                    relining_mask = active_coal_bfs["Relining"] == year
                 converted_cap = active_coal_bfs[relining_mask]["Capacity"].sum()
                 dri_cap += converted_cap
                 active_coal_bfs = active_coal_bfs[~relining_mask]
@@ -2272,13 +2373,16 @@ def _write_transition_energy_demand_table(
 # Run simulations with validation
 transition_years = range(2026, 2050)
 
-base_params_ng = _comparison_base_params(_paper_cfg)
+base_params_ng = dict(_comparison_base_params(_paper_cfg))
+# Transition-figure baseline uses aggressive (relining) conversion for consistency.
+base_params_ng["scenario"] = _normalize_scenario("aggressive")
 
 green_h2_params = {
     'scenario': base_params_ng['scenario'],
     'utilization_rate': base_params_ng['utilization_rate'],
     'annual_improvement': base_params_ng['annual_improvement'],
     'dri_mix': {year: {"Green H2": 1.0} for year in base_params_ng['dri_mix'].keys()},
+    'relining_interval_years': base_params_ng.get('relining_interval_years'),
 }
 
 transition_results_ng = _run_transition_sweep(transition_years, base_params_ng, "DRI (NG mix)")
@@ -2288,6 +2392,7 @@ biomethane_params = {
     'utilization_rate': base_params_ng['utilization_rate'],
     'annual_improvement': base_params_ng['annual_improvement'],
     'dri_mix': {year: {"Biomethane-100": 1.0} for year in base_params_ng['dri_mix'].keys()},
+    'relining_interval_years': base_params_ng.get('relining_interval_years'),
 }
 transition_results_bio = _run_transition_sweep(transition_years, biomethane_params, "DRI (100% Biomethane)")
 transition_results = transition_results_ng

@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.0.0 — 2026-01-22
+- 
+
 ## Unreleased
 - Core refactor: no `steel_model_core` dependency
   - Introduced `forge.core.engine` (engine trio): `calculate_balance_matrix`, `calculate_energy_balance`, `calculate_emissions`.
@@ -35,7 +38,10 @@
 
 - Miscellaneous
   - Added provenance manifest to Engine CLI outputs.
-  - Removed unused legacy CLI wrapper.
+- Removed unused legacy CLI wrapper.
+
+## v2.0.0 — 2026-01-22
+- Supporting information release for the policy paper; Zenodo DOI pending.
 
 ## v1.0.2 — 2025-10-06
 - JOSS submission snapshot.

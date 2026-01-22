@@ -6,7 +6,7 @@ This utility executes one or multiple scenarios through ``run_scenario`` without
 going through the Streamlit UI. Scenarios can be supplied directly on the command
 line or through a YAML/JSON spec that describes a batch. Typical workflow:
 
-    python steel_batch_cli.py run --spec configs/batch.yml --output results.csv
+    python -m forge.cli.steel_batch_cli run --spec configs/batch.yml --output results.csv
 
 Spec files can be either a list of runs or a mapping containing ``defaults`` and
 ``runs``. Each run entry supports:

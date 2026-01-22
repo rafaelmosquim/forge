@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "forge"
-version = "0.0.0"
+version = "2.0.0"
 description = "Forge core model and scenario tools"
 authors = [{name = "Forge Developers", email = "dev@example.com"}]
 readme = "README.md"

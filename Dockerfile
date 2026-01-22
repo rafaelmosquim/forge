@@ -26,9 +26,10 @@ RUN python -m pip install --upgrade pip \
 
 # Copy the rest of the application code and datasets
 COPY . .
+RUN python -m pip install -e .
 
 # Streamlit server port
 EXPOSE 8501
 
-# Default entrypoint runs the Streamlit app. Override with `docker run ... python steel_batch_cli.py ...` for CLIs.
-CMD ["streamlit", "run", "streamlit_app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
+# Default entrypoint runs the Streamlit app. Override with `docker run ... python -m forge.cli.steel_batch_cli ...` for CLIs.
+CMD ["streamlit", "run", "src/forge/apps/streamlit_app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]

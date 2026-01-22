@@ -3,20 +3,12 @@
 **FORGE** is a transparent, YAML-driven steel plant model that computes **cradle-to-gate** energy use and GHG emissions across multiple routes (BF-BOF, DRI-EAF, EAF-scrap) and downstream options. It supports route locking by scenario, on-site electricity crediting, sensitivity analysis, and Monte Carlo uncertainty.
 
 [![CI](https://github.com/rafaelmosquim/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/rafaelmosquim/forge/actions/workflows/ci.yml)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17246738.svg)](https://doi.org/10.5281/zenodo.17246738)
 
+> Supporting information repository for the policy paper. Release tag/version and DOI will be added after v2.0.0.
 
-> **Reference this release:**  
-> This paper uses **FORGE v1.0.2** — Zenodo DOI: **10.5281/zenodo.17279849**  
-> Concept DOI (always points to latest): **10.5281/zenodo.17145189**
-
-## How to cite
-Mosquim, R., Lima, P. S. P., Pastre, L., & Seabra, J. (2025).
-*FORGE — Flexible Optimization of Routes for GHG & Energy* (v1.0.2).
-Zenodo. https://doi.org/10.5281/zenodo.17279849
-
-For general reference to the project (latest version):  
-https://doi.org/10.5281/zenodo.17145189
+## Citation
+Citation metadata (v2.0.0 tag/DOI) will be added after the GitHub release.
+Until then, cite the repository and commit SHA.
 ---
 
 **AI assistance:** Portions of the Python were generated from author-written prompts; model design, review, validation, and all architectural decisions are human-led.
@@ -47,11 +39,12 @@ git clone https://github.com/rafaelmosquim/forge.git
 cd forge
 python -m venv .venv && source .venv/bin/activate   # on Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ## Quick start (Streamlit)
 ```bash
-streamlit run streamlit_app.py
+streamlit run src/forge/apps/streamlit_app.py
 ```
 In the main UI:
 1. Landing screen → Sector = Steel, click Continue
@@ -77,7 +70,7 @@ make engine-smoke   # single refactored engine run (BF-BOF, Finished, 1000 kg)
 Run a single scenario through the refactored engine via the public API:
 
 ```bash
-PYTHONPATH=src python3 -m forge.cli.engine_cli \
+python3 -m forge.cli.engine_cli \
   --data datasets/steel/likely --route BF-BOF --stage Finished \
   --country BRA --demand 1000 --lci --out results/engine_demo
 ```

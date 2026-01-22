@@ -1,8 +1,10 @@
 
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below. Supporting information for the policy paper; release tag and DOI are pending."
+message: "If you use this software, please cite it as below. Supporting information for the policy paper."
 title: "FORGE — Flexible Optimization of Routes for GHG & Energy"
 version: "2.0.0"
+doi: 10.5281/zenodo.18338837
+date-released: 2026-01-22
 authors:
   - family-names: Mosquim
     given-names: Rafael
@@ -31,4 +33,5 @@ preferred-citation:
       given-names: Joaquim
   title: "FORGE — Flexible Optimization of Routes for GHG & Energy"
   version: "2.0.0"
-  year: 2025
+  doi: 10.5281/zenodo.18338837
+  year: 2026

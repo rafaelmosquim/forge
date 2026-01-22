@@ -4,11 +4,11 @@
 
 [![CI](https://github.com/rafaelmosquim/forge/actions/workflows/ci.yml/badge.svg)](https://github.com/rafaelmosquim/forge/actions/workflows/ci.yml)
 
-> Supporting information repository for the policy paper. Release tag/version and DOI will be added after v2.0.0.
+> Supporting information repository for the policy paper.
 
 ## Citation
-Citation metadata (v2.0.0 tag/DOI) will be added after the GitHub release.
-Until then, cite the repository and commit SHA.
+Version DOI: **10.5281/zenodo.18338837**  
+Concept DOI (all versions): **10.5281/zenodo.17145189**
 ---
 
 **AI assistance:** Portions of the Python were generated from author-written prompts; model design, review, validation, and all architectural decisions are human-led.

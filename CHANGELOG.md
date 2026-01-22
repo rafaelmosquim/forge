@@ -41,7 +41,8 @@
 - Removed unused legacy CLI wrapper.
 
 ## v2.0.0 — 2026-01-22
-- Supporting information release for the policy paper; Zenodo DOI pending.
+- Supporting information release for the policy paper.
+- Zenodo version DOI: 10.5281/zenodo.18338837 (concept DOI: 10.5281/zenodo.17145189).
 
 ## v1.0.2 — 2025-10-06
 - JOSS submission snapshot.

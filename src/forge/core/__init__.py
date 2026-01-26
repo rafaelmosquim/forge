@@ -18,6 +18,7 @@ Downstream code can start importing from `forge.core.*` immediately.
 
 from . import models, io, routing, compute, viz  # baseline
 from . import costs, transforms, engine  # additional subpackages
+from . import latex  # reporting helpers
 
 __all__ = [
     "models",
@@ -28,4 +29,5 @@ __all__ = [
     "costs",
     "transforms",
     "engine",
+    "latex",
 ]

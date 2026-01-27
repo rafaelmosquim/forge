@@ -1,8 +1,11 @@
 # Simple make targets to streamline long runs
 
 PY ?= python3
+ifneq ("$(wildcard .venv/bin/python)","")
+PY := .venv/bin/python
+endif
 
-.PHONY: help list finished paper aluminum aluminum_fgv mc-as-cast mc-finished run parallel validation-table
+.PHONY: help list finished paper aluminum aluminum_fgv mc-as-cast mc-finished run parallel validation-table reference-aluminum reference-aluminum-primary reference-aluminum-finished reference-aluminum-finished-all
 
 help:
 	@echo "Targets:"
@@ -11,6 +14,9 @@ help:
 	@echo "  paper           - run paper portfolio"
 	@echo "  aluminum        - run aluminum baseline scenarios via CLI"
 	@echo "  aluminum_fgv    - run aluminum FGV portfolio (rolled/extruded/casted blend)"
+	@echo "  reference-aluminum - generate aluminum primary finished/BRA reference tables"
+	@echo "  reference-aluminum-primary  - generate aluminum primary/BRA reference tables"
+	@echo "  reference-aluminum-finished - generate aluminum finished/BRA reference tables"
 	@echo "  mc-as-cast      - Monte Carlo as-cast portfolio (via run_profiles)"
 	@echo "  mc-finished     - Monte Carlo finished portfolio (via run_profiles)"
 	@echo "  run PROFILE=... - run a named profile from configs/run_profiles.yml"
@@ -65,6 +71,36 @@ mc-finished:
 
 validation-table:
 	PYTHONPATH=src $(PY) scripts/generate_validation_table.py --routes BF-BOF,DRI-EAF,EAF-Scrap --stage Cast
+
+# Aluminum reference tables (BRA, 1000 kg)
+reference-aluminum:
+	PYTHONPATH=src $(PY) scripts/generate_reference_tables.py \
+	  --data datasets/aluminum/baseline \
+	  --route Primary \
+	  --stage finished \
+	  --scenario primary-al.yml \
+	  --country BRA \
+	  --name aluminum_primary_finished_bra
+
+reference-aluminum-primary:
+	PYTHONPATH=src $(PY) scripts/generate_reference_tables.py \
+	  --data datasets/aluminum/baseline \
+	  --route Primary \
+	  --stage primary \
+	  --scenario primary-al.yml \
+	  --country BRA \
+	  --name aluminum_primary_bra
+
+reference-aluminum-finished:
+	PYTHONPATH=src $(PY) scripts/generate_reference_tables.py \
+	  --data datasets/aluminum/baseline \
+	  --route Primary \
+	  --stage finished \
+	  --scenario primary-al.yml \
+	  --country BRA \
+	  --name aluminum_finished_bra
+
+reference-aluminum-finished-all: reference-aluminum-finished
 
 # --- Docker helpers ---
 docker-build:

@@ -16,6 +16,7 @@ if SRC.exists() and str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from forge.core.latex import render_run_tables_to_latex
+from forge.descriptor import load_sector_descriptor
 from forge.steel_core_api_v2 import RouteConfig, ScenarioInputs, run_scenario
 
 
@@ -28,6 +29,18 @@ ROUTE_SCENARIO_FILES = {
 FINISHED_PICKS = {
     "Manufactured Feed (IP4)": "Stamping/calendering/lamination",
     "Finished Products": "No Coating",
+}
+
+ALUMINUM_FINISHED_PICKS = {
+    "Metallurgical Aluminum": "Metallurgical Aluminum from Series 1",
+    "Basic Aluminum Products": "Raw Aluminum (rolled)",
+    "Manufactured Aluminum Products": "Direct use of Basic Aluminum Products",
+    "Finished Aluminum Products": "No Coating",
+}
+
+FINISHED_PICKS_BY_SECTOR = {
+    "steel": FINISHED_PICKS,
+    "aluminum": ALUMINUM_FINISHED_PICKS,
 }
 
 
@@ -83,6 +96,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Data directory not found: {data_dir}", file=sys.stderr)
         return 2
 
+    sector_key: str | None = None
+    try:
+        descriptor = load_sector_descriptor(data_dir)
+        sector_key = str(getattr(descriptor, "key", "") or "").strip().lower() or None
+    except Exception:
+        sector_key = None
+
     scenario: dict[str, Any] = {}
     scenario_path: Path | None = None
     if args.scenario:
@@ -120,7 +140,10 @@ def main(argv: list[str] | None = None) -> int:
         else:
             raise ValueError(f"Expected mapping in picks file {picks_path}, got {type(payload).__name__}")
     elif str(args.stage).strip().lower() == "finished":
-        picks_by_material = dict(FINISHED_PICKS)
+        if sector_key and sector_key in FINISHED_PICKS_BY_SECTOR:
+            picks_by_material = dict(FINISHED_PICKS_BY_SECTOR[sector_key])
+        else:
+            picks_by_material = dict(FINISHED_PICKS)
 
     name = args.name
     if not name:

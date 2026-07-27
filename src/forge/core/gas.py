@@ -161,9 +161,15 @@ def apply_gas_routing_and_credits(
             rows.append({'process': proc_name, 'carrier': carrier_name, 'mj': contribution})
         return rows
 
+    def _process_gas_ef_fallback() -> float:
+        # No internal process gas to blend (e.g. its source processes aren't
+        # running on this route) -> treat that share as natural gas instead
+        # of silently zero.
+        return float(e_efs.get(process_gas_carrier, e_efs.get(natural_gas_carrier, 0.0)))
+
     EF_coke_gas = _blend_EF(energy_shares.get('Coke Production', {}), e_efs)
     EF_bf_gas = _blend_EF(energy_shares.get('Blast Furnace', {}), e_efs)
-    EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
+    EF_process_gas = _process_gas_ef_fallback()
 
     process_gas_specs = gas_config.get('process_gas_sources') or []
     if route_preset and route_preset not in {"BF-BOF", "BF_BOF"}:
@@ -195,9 +201,10 @@ def apply_gas_routing_and_credits(
                 if ef_source <= 0:
                     ef_source = float(e_efs.get(row['carrier'], e_efs.get(process_gas_carrier, 0.0)))
                 ef_weighted += ef_source * row['mj']
-            EF_process_gas = ef_weighted / total_gas_MJ if ef_weighted > 0 else float(e_efs.get(process_gas_carrier, 0.0))
+            EF_process_gas = ef_weighted / total_gas_MJ if ef_weighted > 0 else _process_gas_ef_fallback()
         else:
-            EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
+            EF_process_gas = _process_gas_ef_fallback()
+    # else: process_gas_specs empty -> EF_process_gas keeps its fallback value from above
     try:
         util_eff = recipes_dict.get(utility_process_name, Process('',{},{})).outputs.get('Electricity', 0.0)
     except Exception:

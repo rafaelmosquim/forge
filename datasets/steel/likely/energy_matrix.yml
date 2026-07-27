@@ -34,7 +34,7 @@ processes:
     Coal: null
     Charcoal: null
     Coke: null
-  Silicon from market:
+  Silicon from Market:
     Electricity: null
     Gas: null
     Wood: null
@@ -279,7 +279,7 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
-  Nitrogen from Market:
+  Nitrogen from market:
     Electricity: null
     Gas: null
     Wood: null
@@ -293,7 +293,7 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
-  Oxygen from Market:
+  Oxygen from market:
     Electricity: null
     Gas: null
     Wood: null
@@ -307,7 +307,7 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
-  Burnt Lime from Market:
+  Burnt Lime from market:
     Electricity: null
     Gas: null
     Wood: null
@@ -321,7 +321,7 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
-  Dolomite from Market:
+  Dolomite from market:
     Electricity: null
     Gas: null
     Wood: null
@@ -363,7 +363,7 @@ processes:
     Coal: null
     Charcoal: null
     Coke: null
-  Direct Iron ore:
+  Direct Iron Ore:
     Electricity: null
     Gas: null
     Wood: null

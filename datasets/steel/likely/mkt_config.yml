@@ -8,7 +8,7 @@
   value: 1
 - name: "Copper from Market"
   value: 1
-- name: "Silicon from market"
+- name: "Silicon from Market"
   value: 1
 - name: "Vanadium from market"
   value: 1
@@ -76,19 +76,19 @@
   value: 2
 - name: "Utility Plant"
   value: 2  # Internal manufacturing process
-- name: "Nitrogen from Market"
+- name: "Nitrogen from market"
   value: 1
 - name: "Nitrogen Production"
   value: 2
-- name: "Oxygen from Market"
+- name: "Oxygen from market"
   value: 1
 - name: "Oxygen Production"
   value: 2
-- name: "Burnt Lime from Market"
+- name: "Burnt Lime from market"
   value: 1
 - name: "Burnt Lime Production"
   value: 2
-- name: "Dolomite from Market"
+- name: "Dolomite from market"
   value: 1
 - name: "Dolomite Production"
   value: 2
@@ -104,7 +104,7 @@
   value: 1
 - name: "Iron Ore from Market"
   value: 1
-- name: "Direct Iron ore"
+- name: "Direct Iron Ore"
   value: null  # Missing value in input
 - name: "Sintering"
   value: 2

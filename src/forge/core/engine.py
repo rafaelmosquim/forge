@@ -5,7 +5,6 @@ Additional functions compute energy balances and emissions based on production l
 """
 from __future__ import annotations
 
-from matplotlib.pylab import mat
 import pandas as pd
 from collections import defaultdict, deque
 from typing import Dict

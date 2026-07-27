@@ -8,9 +8,9 @@ from forge.steel_core_api_v2 import run_scenario, ScenarioInputs, RouteConfig
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "direct,use_expected", [
-        (0.0, 2998.0),
-        (0.5, 2827.0),
-        (1.0, 2651.0),
+        (0.0, 3312.0),
+        (0.5, 3141.0),
+        (1.0, 2965.0),
     ],
 )
 def test_bf_bof_validation_as_cast_bra_gas_routing_snapshots(data_dir, direct, use_expected):
@@ -18,6 +18,22 @@ def test_bf_bof_validation_as_cast_bra_gas_routing_snapshots(data_dir, direct, u
 
     Verifies total CO2e (kg) for BF-BOF under gas routing fractions
     0.0 (all natural gas), 0.5 split, and 1.0 (all internal process gas).
+
+    Snapshot updated 2026-07-27 (was 2998/2827/2651): the prior values baked
+    in 6 process-name case mismatches (e.g. "Nitrogen from Market" vs
+    "Nitrogen from market") across energy_int.yml/energy_matrix.yml/
+    process_emissions.yml/mkt_config.yml that silently zeroed the energy
+    intensity and emission factor for Nitrogen/Oxygen/Burnt Lime/Dolomite/
+    Silicon/Direct Iron Ore whenever selected as producer -- a consistent
+    ~314 kg undercount across all three fractions. Fixing those raised the
+    snapshot by ~314 kg here.
+
+    Known remaining gap, NOT reflected in this snapshot: the Gas Router's
+    "Process Gas (internal)" carrier (used by Coke Production/Blast Furnace/
+    Basic Oxygen Furnace/Hot Rolling) has no emission factor defined
+    anywhere, so that portion of their energy is still treated as
+    zero-emission. This snapshot will need another update once that's
+    resolved.
     """
     scn = ScenarioInputs(
         country_code="BRA",

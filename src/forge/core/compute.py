@@ -128,6 +128,12 @@ def _build_routes_from_picks(
             continue
         allowed = [p for p in cand_all if pre_mask.get(p.name, 1) > 0]
         if not allowed:
+            # Every candidate producer for this material is masked off. Record
+            # that explicitly so callers (e.g. calculate_balance_matrix, which
+            # defaults missing processes to "enabled") don't silently fall
+            # back to running them anyway.
+            for r in cand_all:
+                chosen[r.name] = 0
             continue
         pick_name = picks_by_material.get(mat, "")
         pick = next((p for p in allowed if p.name == pick_name), None) if pick_name else None

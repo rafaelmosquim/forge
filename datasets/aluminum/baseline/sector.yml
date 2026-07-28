@@ -2,16 +2,42 @@ sector_key: aluminum
 sector_name: Aluminum
 
 stage_menu:
+  - key: alumina
+    stage_id: alumina
+    label: "Alumina"
+    description: "Refined alumina (Bayer process output), before electrolysis. Primary route only."
+  - key: primary
+    stage_id: primary
+    label: "Primary Aluminum (liquid)"
+    description: "Primary liquid aluminum from electrolysis, before ingot melting/alloying."
+  - key: remelt
+    stage_id: remelt
+    label: "Remelt Blend (Secondary)"
+    description: "Blended primary/recycled aluminum feed for downstream alloying."
+  - key: alloys
+    stage_id: alloys
+    label: "Aluminum Alloys"
+    description: "Alloyed metallurgical aluminum, before forming/finishing."
+  - key: basic
+    stage_id: basic
+    label: "Basic Aluminum Products"
+    description: "Rolled, extruded, or cast aluminum products, before machining/coating."
   - key: finished
     stage_id: finished
     label: "Finished Aluminum"
     description: "Finished aluminum products after downstream processing and coating."
 
 stages:
+  alumina:
+    material: "Alumina"
   primary:
     material: "Primary Aluminum"
   remelt:
     material: "Remelt Blend"
+  alloys:
+    material: "Metallurgical Aluminum"
+  basic:
+    material: "Basic Aluminum Products"
   finished:
     material: "Finished Aluminum Products"
 

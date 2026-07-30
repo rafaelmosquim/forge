@@ -23,3 +23,15 @@ electricity_intensity:
   intensity: 178.33
 - code: TUR
   intensity: 103.55
+# World grid, from iq-usp/grid-treadmill's own canonical sources
+# (world_grid_intensity_world_summary.csv / grid_treadmill_global_overview_iea_2050.csv):
+# WLD = 2024 actual (OWID, 471.84 gCO2/kWh); WLD (STEPS 2035/2050) = IEA WEO2025
+# Stated Policies Scenario (288.7 / 145.5 gCO2/kWh) -- STEPS chosen over Current
+# Policies to match grid-treadmill's own convention. All divided by 3.6 to match
+# this file's gCO2/MJ basis.
+- code: WLD
+  intensity: 131.07
+- code: WLD (STEPS 2035)
+  intensity: 80.20
+- code: WLD (STEPS 2050)
+  intensity: 40.41

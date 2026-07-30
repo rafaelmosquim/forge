@@ -5,6 +5,8 @@ __pycache__/
 *.egg
 *.pdb
 *.log
+build/
+dist/
 
 # Virtual envs & local configs
 .venv/

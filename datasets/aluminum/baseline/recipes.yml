@@ -99,13 +99,13 @@
     Pitch: 0.0019
     Alumina: 1.8970
     Cryolite: 0.0016
-    Carbon Anode Prebaked: 0.4750
-    AlF3: 0.0210 
+    Carbon Anode Prebaked: 0.430
+    AlF3: 0.0210
   outputs:
     Primary Liquid Aluminum (prebaked): 1.0
     CO2: 1.4965
     CO: 0.0917
-    Other: 0.4284
+    Other: 0.20
 
 - process: Electrolysis (Soderberg)
   inputs:

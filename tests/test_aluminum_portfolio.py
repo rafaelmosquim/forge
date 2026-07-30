@@ -3,23 +3,25 @@ import pytest
 from forge.cli import steel_batch_cli as batch_cli
 
 
-# Canonical outputs for `make aluminum_fgv` as of this branch.
+# Canonical outputs for `make aluminum_fgv` as of this branch (post external-
+# validation calibration: secondary remelting energy, prebaked PFC, anode
+# consumption -- see forge_aluminum_calibration_external memory).
 AL_FGV_EXPECTED = {
     "aluminum_rolled_direct_no_coat": {
-        "raw_co2e_kg": 8664.446343132184,
-        "total_co2e_kg": 9120.469834875983,
+        "raw_co2e_kg": 8474.989141141185,
+        "total_co2e_kg": 8921.041201201248,
     },
     "aluminum_extruded_direct_no_coat": {
-        "raw_co2e_kg": 8816.369127132184,
-        "total_co2e_kg": 9280.388554875984,
+        "raw_co2e_kg": 8626.911925141183,
+        "total_co2e_kg": 9080.959921201245,
     },
     "aluminum_cast_direct_no_coat": {
-        "raw_co2e_kg": 8191.184493532184,
-        "total_co2e_kg": 8622.299466875984,
+        "raw_co2e_kg": 8001.727291541184,
+        "total_co2e_kg": 8422.870833201247,
     },
     "aluminum_fgv_portfolio": {
-        "raw_co2e_kg": 8400.998809212184,
-        "total_co2e_kg": 8843.156641275984,
+        "raw_co2e_kg": 8211.541607221185,
+        "total_co2e_kg": 8643.728007601247,
     },
 }
 
@@ -110,7 +112,7 @@ def test_aluminum_primary_baseline(aluminum_data_dir, _load_yaml):
     out = run_scenario(str(aluminum_data_dir), scn)
     assert out is not None
     assert out.emissions is not None and not out.emissions.empty
-    assert out.total_co2e_kg == pytest.approx(7801.666253532184, rel=0.0, abs=1e-6)
+    assert out.total_co2e_kg == pytest.approx(7612.209051541183, rel=0.0, abs=1e-6)
     assert out.meta.get("sector_key") == "aluminum"
     assert out.meta.get("stage_key") == stage_key
 
@@ -133,7 +135,7 @@ def test_aluminum_secondary_remelt(aluminum_data_dir, _load_yaml):
     out = run_scenario(str(aluminum_data_dir), scn)
     assert out is not None
     assert out.emissions is not None and not out.emissions.empty
-    assert out.total_co2e_kg == pytest.approx(820.78, rel=0.0, abs=1e-2)
+    assert out.total_co2e_kg == pytest.approx(462.19, rel=0.0, abs=1e-2)
     assert out.meta.get("sector_key") == "aluminum"
     assert out.meta.get("stage_key") == stage_key
 

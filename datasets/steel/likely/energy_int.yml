@@ -38,9 +38,9 @@ processes:
   "Coke Production": 45.33
   "Steam Production": ~
   "Nitrogen from market": ~
-  "Nitrogen Production": 4.94
+  "Nitrogen Production": 1.3
   "Oxygen from market": ~
-  "Oxygen Production": 4.5
+  "Oxygen Production": 1.0
   "Burnt Lime from market": ~
   "Burnt Lime Production": 6.61
   "Dolomite from market": ~
@@ -52,7 +52,7 @@ processes:
   "Direct Iron Ore": ~
   "Sintering": 2.0
   "Pelletizing": 1.1
-  "Blast Furnace": 15.89
+  "Blast Furnace": 19.4
   "Direct Reduction Iron": 10.0
   "Iron Foundry": 0.0
   "Electric Arc Furnace": 4.0
@@ -62,7 +62,7 @@ processes:
   "Steel Refining (High Alloy)": 6.5
   "Continuous Casting": 0.25
   "Ingot Casting": 0.0
-  "Hot Rolling": 2.5
+  "Hot Rolling": 3.2
   "Cold Rolling": 1.1
   "Rod/bar/section Mill": 3.0
   "Steel Thermal Treatment": 2.0

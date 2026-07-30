@@ -10,7 +10,7 @@ processes:
   "Niobium from market": 17.21
   "Aluminium from market": 21.85
   "Zinc from Market": 5.45
-  "Limestone from Market": 0.44
+  "Limestone from Market": 0.004
   "Process Gas": ~
   "Fuel Oil from Market": 0.66
   "Diesel from Market": 0.82
@@ -38,13 +38,13 @@ processes:
   "Charcoal Production": 1.75
   "Coke Production": 0.87
   "Steam Production": 0.00
-  "Nitrogen from market": 0.44
+  "Nitrogen from market": 0.05
   "Nitrogen Production": 0.00
-  "Oxygen from market": 1.09
+  "Oxygen from market": 0.0385
   "Oxygen Production": 0.00
   "Burnt Lime from market": 1.16
   "Burnt Lime Production": 1.16
-  "Dolomite from market": 0.13
+  "Dolomite from market": 0.57
   "Dolomite Production": 0.09
   "Alloys Mix for Low Alloy Steel (LAS)": 11.17
   "Alloys Mix for High Alloy Steel (HAS)": 13.77

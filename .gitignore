@@ -59,3 +59,7 @@ _preview_*.txt
 # Keep paper figures versioned
 !paper/figs/
 !paper/figs/**
+
+# Reference material (user's own, not FORGE source data)
+training-balances/
+datasets/aluminum/*.xlsx

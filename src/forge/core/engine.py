@@ -172,6 +172,8 @@ def calculate_emissions(
     outside_mill_procs: set | None = None,
     allow_direct_onsite: set | None = None,
     process_output_emissions: dict | None = None,
+    gas_credit_details: dict | None = None,
+    gas_credit_exempt: set | None = None,
 ):
     """
     This should be a simple emission calculator but needed some tailoring for steel processes. Aluminum will probably need similar treatment.
@@ -236,8 +238,10 @@ def calculate_emissions(
             elec_ef_for_proc = ef_grid if is_outside else ef_elec_mix
             if proc_name in energy_df.index:
                 for carrier, cons in energy_df.loc[proc_name].items():
-                    if proc_name == "Coke Production" and carrier == "Coal":
-                        continue # we treat coal as feedstock, not energy, for coke production
+                    # NOTE: coking coal FEEDSTOCK is a material flow (recipes.yml
+                    # 'Coke Production: inputs {Coal: ...}'), so it never reaches
+                    # energy_df. What is here is the oven's OWN fuel and must be
+                    # charged. See the process-gas credit below.
                     if carrier == 'Electricity':
                         row['Energy Emissions'] += float(cons) * elec_ef_for_proc
                     else:
@@ -248,6 +252,20 @@ def calculate_emissions(
                 row['Direct Emissions'] = runs * 1000.0 * float(process_efs.get(proc_name, 0.0))
             else:
                 row['Direct Emissions'] = 0.0
+
+        # --- process-gas credit (scheme (a)) -------------------------------
+        # Recovered process gas is charged to whoever BURNS it, at EF_process_gas.
+        # A source that already paid for the carbon leaving as gas must therefore
+        # be credited for it, or that carbon is charged twice.
+        #
+        # Exempt: Coke Production. Its gas comes from the coking-coal FEEDSTOCK,
+        # which is deliberately never charged (it leaves in the coke and is
+        # charged at the blast furnace). Crediting it would make that carbon
+        # vanish rather than be counted once.
+        if gas_credit_details and proc_name in gas_credit_details:
+            if proc_name not in (gas_credit_exempt or {"Coke Production"}):
+                exported_MJ = float(gas_credit_details[proc_name].get("mj", 0.0) or 0.0)
+                row["Energy Emissions"] -= exported_MJ * float(EF_process_gas or 0.0)
 
         rows.append(row)
 

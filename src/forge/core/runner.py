@@ -222,6 +222,7 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
         final_demand=final_demand,
         total_gas_MJ=gas_meta.get("total_process_gas_MJ", 0.0),
         EF_process_gas=gas_meta.get("EF_process_gas", 0.0),
+        gas_credit_details=gas_meta.get("gas_credit_details", {}),
         internal_fraction_plant=gas_meta.get("f_internal", 0.0),
         ef_internal_electricity=gas_meta.get("ef_internal_electricity", 0.0),
         outside_mill_procs=scn.outside_mill_procs,

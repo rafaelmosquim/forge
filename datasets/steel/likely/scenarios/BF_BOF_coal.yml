@@ -9,6 +9,14 @@ route_overrides:
   Charcoal Production: 1.0
   Coke Production: 1.0
 
+# Recovered process gas (coke oven / BF / BOF) is split evenly between direct
+# use in plant processes and on-site power generation. This is the intended
+# paper configuration and matches sector.yml's default_direct_use_fraction of
+# 0.5; it is stated explicitly here so it cannot drift by inheritance.
+# Direct use displaces purchased natural gas (72.73 gCO2e/MJ); electricity
+# generation displaces the Brazilian grid (38.5 gCO2e/MJ), so this split is
+# load-bearing for the BF-BOF baseline: 0.0/1.0 gives 3.2029 tCO2e/tfs and
+# 1.0/0.0 gives 2.7398, against 3.0602 here.
 gas_routing:
-  direct_use_fraction: 0.0
-  electricity_fraction: 1.0
+  direct_use_fraction: 0.5
+  electricity_fraction: 0.5

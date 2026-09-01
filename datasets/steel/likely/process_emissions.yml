@@ -4,7 +4,7 @@ processes:
   "Nickel from Market": 7.22
   "Molibdenium from Market": 14.4
   "Copper from Market": 5.16
-  "Silicon from market": 6.53
+  "Silicon from Market": 6.53
   "Vanadium from market": 21.07
   "Titanium from market": 49.54
   "Niobium from market": 17.21
@@ -38,19 +38,19 @@ processes:
   "Charcoal Production": 1.75
   "Coke Production": 0.87
   "Steam Production": 0.00
-  "Nitrogen from Market": 0.44
+  "Nitrogen from market": 0.44
   "Nitrogen Production": 0.00
-  "Oxygen from Market": 1.09
+  "Oxygen from market": 1.09
   "Oxygen Production": 0.00
-  "Burnt Lime from Market": 1.16
+  "Burnt Lime from market": 1.16
   "Burnt Lime Production": 1.16
-  "Dolomite from Market": 0.13
+  "Dolomite from market": 0.13
   "Dolomite Production": 0.09
   "Alloys Mix for Low Alloy Steel (LAS)": 11.17
   "Alloys Mix for High Alloy Steel (HAS)": 13.77
   "Scrap Purchase": 0.01
   "Iron Ore from Market": 0.01
-  "Direct Iron ore": 0.00
+  "Direct Iron Ore": 0.00
   "Sintering": 0.42
   "Pelletizing": 0.09
   "Blast Furnace": 1.69

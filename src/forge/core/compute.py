@@ -184,6 +184,12 @@ def apply_gas_routing_and_credits(
         denom = sum(s for _, s in fuels) or 1e-12
         return sum(s * float(efs.get(c, 0.0)) for c, s in fuels) / denom
 
+    def _process_gas_ef_fallback() -> float:
+        # No internal process gas to blend (e.g. its source processes aren't
+        # running on this route) -> treat that share as natural gas instead
+        # of silently zero. Ported from upstream 4c3b633.
+        return float(e_efs.get(process_gas_carrier, e_efs.get(natural_gas_carrier, 0.0)))
+
     EF_coke_gas = _blend_EF(energy_shares.get('Coke Production', {}), e_efs)
     EF_bf_gas = _blend_EF(energy_shares.get('Blast Furnace', {}), e_efs)
     EF_process_gas = EF_coke_gas if total_gas_MJ <= 1e-9 else (
@@ -230,12 +236,12 @@ def apply_gas_routing_and_credits(
         if weight_sum > 0:
             EF_process_gas = ef_weighted / weight_sum
         else:
-            EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
+            EF_process_gas = _process_gas_ef_fallback()
         gas_coke_MJ = float(gas_source_details.get('Coke Production', gas_coke_MJ))
         gas_bf_MJ = float(gas_source_details.get('Blast Furnace', gas_bf_MJ))
     else:
         if gas_sources_MJ <= 0 and total_gas_MJ <= 1e-9:
-            EF_process_gas = float(e_efs.get(process_gas_carrier, 0.0))
+            EF_process_gas = _process_gas_ef_fallback()
 
     try:
         util_eff = recipes_dict.get(utility_process_name, Process('',{},{})).outputs.get('Electricity', 0.0)

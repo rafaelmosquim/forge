@@ -44,7 +44,7 @@ processes:
     Coal: ~
     Charcoal: ~
     Coke: ~
-  "Silicon from market":
+  "Silicon from Market":
     Electricity: ~
     FLF: ~
     RLF: ~
@@ -350,7 +350,7 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
-  "Nitrogen from Market":
+  "Nitrogen from market":
     Electricity: ~
     FLF: ~
     RLF: ~
@@ -368,7 +368,7 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
-  "Oxygen from Market":
+  "Oxygen from market":
     Electricity: ~
     FLF: ~
     RLF: ~
@@ -386,7 +386,7 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
-  "Burnt Lime from Market":
+  "Burnt Lime from market":
     Electricity: ~
     FLF: ~
     RLF: ~
@@ -404,7 +404,7 @@ processes:
     Coal: 0
     Charcoal: 0
     Coke: 0
-  "Dolomite from Market":
+  "Dolomite from market":
     Electricity: ~
     FLF: ~
     RLF: ~
@@ -458,7 +458,7 @@ processes:
     Coal: ~
     Charcoal: ~
     Coke: ~
-  "Direct Iron ore":
+  "Direct Iron Ore":
     Electricity: ~
     FLF: ~
     RLF: ~

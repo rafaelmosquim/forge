@@ -252,13 +252,13 @@ processes:
     Charcoal: 0
     Coke: 0
   Coke Production:
-    Electricity: 0.01
-    Process Gas (internal): 0.09
+    Electricity: 0.005
+    Process Gas (internal): 0
     Gas: 0
     Wood: 0
-    Coal: 0.67
+    Coal: 0.995
     Charcoal: 0
-    Coke: 0.23
+    Coke: 0
   Utility Plant:
     Electricity: 0
     Gas: 1

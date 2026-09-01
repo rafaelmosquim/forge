@@ -223,7 +223,7 @@
     Coal: 1.1 
   outputs:
     Coke: 1.0
-    Coke Process Gas: "process_gases['Coke Process Gas']['recovery_fraction'] * energy_int['Coke Production'] / energy_content['Coke Process Gas']" 
+    Coke Process Gas: "process_gases['Coke Process Gas']['recovery_fraction'] * inputs['Coal'] * energy_content['Coal'] / energy_content['Coke Process Gas']" 
 
 - process: Steam Production
   inputs: {}

@@ -50,5 +50,10 @@ _preview_*.txt
 
 **/*.json
 **/*.csv
+# Fleet data is an INPUT, not an output: it must be tracked or the model
+# silently falls back to a 2-row toy fleet. The loader prefers
+# <DATA_DIR>/plants.csv and falls back to datasets/steel/plants.csv.
+!datasets/steel/plants.csv
+!datasets/steel/*/plants.csv
 **/*.png
 **/*.log

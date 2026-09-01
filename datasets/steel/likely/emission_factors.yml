@@ -9,8 +9,21 @@ emission_factors:
   Biomethane: 5.55
   Green hydrogen: 21.47
   Blue hydrogen: 89.88
-  Wood: 9.82
+  Wood: 9.82  # biogenic-neutral, see Charcoal note above
   Coal: 111.95
+  # Charcoal and Wood are BIOGENIC-NEUTRAL factors: the CO2 released on
+  # combustion is treated as balanced by regrowth (sustainably sourced planted
+  # biomass) and is NOT counted. What remains covers carbonisation losses, kiln
+  # methane and transport. This is a convention, not a measurement, and it is
+  # load-bearing: charcoal supplies ~15.5 GJ/t crude in the BF-BOF charcoal
+  # route, so this factor essentially sets that route's result.
+  #   biogenic-neutral (here)        -> 0.283 tCO2e/t crude
+  #   carbon counted as if fossil    -> 1.395 tCO2e/t crude  (103.9 gCO2e/MJ,
+  #     stoichiometric for ~85% C at ~30 MJ/kg; an upper bound representing
+  #     non-renewable sourcing, and itself a strong assumption in the opposite
+  #     direction since it ignores the regrowth sink entirely)
+  # Coke-based BF-BOF is 2.242 tCO2e/t crude for comparison: the charcoal
+  # advantage holds under either bound, at 87% or 38% respectively.
   Charcoal: 20.43
   Coke: 107.51
   Coke Process Gas: 44.40 # these are not used for now

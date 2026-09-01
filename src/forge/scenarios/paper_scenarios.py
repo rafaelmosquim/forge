@@ -209,6 +209,50 @@ import threading as _th
 _EF_CACHE_LOCK = _th.Lock()
 _EF_CACHE: Dict[tuple, float] | None = None
 
+# ---------------------------------------------------------------------------
+# Model fingerprint: makes the on-disk EF cache staleness-aware.
+#
+# The cache key covered only scenario arguments, so a change to model source or
+# dataset YAMLs left every cached value silently valid. Stale numbers could
+# survive arbitrary code and data changes -- which is how three generations of
+# emission factors coexisted in this repo. The fingerprint hashes the forge
+# package sources and the active dataset, so any edit to either invalidates it.
+# ---------------------------------------------------------------------------
+_MODEL_FINGERPRINT: Optional[str] = None
+
+
+def _compute_model_fingerprint() -> str:
+    import hashlib as _hashlib
+    h = _hashlib.sha256()
+    pkg_root = _Path(__file__).resolve().parent.parent
+    for f in sorted(pkg_root.rglob("*.py")):
+        try:
+            h.update(str(f.relative_to(pkg_root)).encode()); h.update(f.read_bytes())
+        except Exception:
+            continue
+    data_root = _Path(DATA_DIR)
+    if data_root.is_dir():
+        for f in sorted(data_root.rglob("*")):
+            if f.is_file() and f.suffix.lower() in {".yml", ".yaml", ".csv", ".json"}:
+                try:
+                    h.update(str(f.relative_to(data_root)).encode()); h.update(f.read_bytes())
+                except Exception:
+                    continue
+    return h.hexdigest()[:16]
+
+
+def model_fingerprint() -> str:
+    """Short hash of forge sources + active dataset. Stamp this on any output."""
+    global _MODEL_FINGERPRINT
+    if _MODEL_FINGERPRINT is None:
+        _MODEL_FINGERPRINT = _compute_model_fingerprint()
+    return _MODEL_FINGERPRINT
+
+
+def _cache_disabled() -> bool:
+    return (_os.getenv("FORGE_PAPER_NO_CACHE", "") or "").strip().lower() in {"1", "true", "yes"}
+
+
 def _cache_dir_file() -> tuple[_Path, _Path]:
     base = _os.getenv('FORGE_PAPER_CACHE_DIR', 'results/cache')
     d = _Path(base)
@@ -231,6 +275,8 @@ def _load_ef_cache() -> Dict[tuple, float]:
     return _EF_CACHE
 
 def _save_ef_cache():
+    if _cache_disabled():
+        return
     d, f = _cache_dir_file()
     try:
         d.mkdir(parents=True, exist_ok=True)
@@ -244,7 +290,7 @@ def _make_ef_key(route: str, config: str, year: int, base_year: int, annual_impr
     imp = round(float(annual_improvement), 6)
     picks_src = picks if isinstance(picks, dict) else FINAL_PICKS
     picks_sig = tuple(sorted(picks_src.items()))
-    return (str(route), str(config), int(year), int(base_year), imp, str(DATA_DIR), picks_sig)
+    return (str(route), str(config), int(year), int(base_year), imp, str(DATA_DIR), picks_sig, model_fingerprint())
 
 def _ef_core_cached_disk(route: str, config: str, year: int, base_year: int, annual_improvement: float) -> float:
     """Disk-backed cache wrapper around _ef_core_cached.

@@ -38,6 +38,22 @@ from forge.scenarios.utils import label_from_spec_path as _label_from_spec_path,
 import matplotlib as _mpl
 import matplotlib.pyplot as _plt
 _FIG_INDEX = 0
+_FIG_NAME = None
+
+
+def name_next_figure(name: str) -> None:
+    """Declare the CONTENT name for the next figure emitted via plt.show().
+
+    Figures used to be named from a global counter -- paper_fig_03.png meant
+    "the third figure this run happened to emit". Adding, removing or reordering
+    a plot shifted every later filename while the manuscript kept including the
+    same name, so a .tex could silently embed a different chart. Naming by
+    content removes that coupling; the counter survives only as a fallback and
+    warns when it fires.
+    """
+    global _FIG_NAME
+    _FIG_NAME = str(name).strip() or None
+
 
 def _install_safe_show():
     global _FIG_INDEX
@@ -55,10 +71,17 @@ def _install_safe_show():
 
     def _safe_show(*args, **kwargs):
         nonlocal out_path
-        global _FIG_INDEX
-        _FIG_INDEX += 1
+        global _FIG_INDEX, _FIG_NAME
         prefix = _os.getenv('FORGE_FIG_PREFIX', 'paper')
-        fname = f'{prefix}_fig_{_FIG_INDEX:02d}.png'
+        if _FIG_NAME:
+            fname = f'{_FIG_NAME}.png'
+            _FIG_NAME = None
+        else:
+            _FIG_INDEX += 1
+            fname = f'{prefix}_fig_{_FIG_INDEX:02d}.png'
+            print(f"[fig] WARNING: unnamed figure -> {fname}. This name depends on "
+                  f"execution order and will shift if plots are added or reordered. "
+                  f"Call name_next_figure('...') before plt.show().")
         path = out_path / fname
         _plt.gcf().savefig(path, dpi=200, bbox_inches='tight')
         _plt.close(_plt.gcf())
@@ -678,6 +701,7 @@ ax.ticklabel_format(axis='y', useOffset=False, style='plain')
 
 plt.tight_layout()
 plt.savefig('best_worst_scenarios.png', dpi=300, bbox_inches='tight')
+name_next_figure('best_worst_scenarios')
 plt.show()
 
 
@@ -724,6 +748,7 @@ for ax in axes:
     ax.grid(True, alpha=0.3, linestyle='--')
 
 plt.tight_layout()
+name_next_figure('scenario_boxplots')
 plt.show()
 
 # ============================================
@@ -874,6 +899,7 @@ plt.ylabel('Emission Intensity (tCO₂/t steel)')
 plt.legend(frameon=True)
 plt.grid(alpha=0.2)
 plt.tight_layout()
+name_next_figure('emission_intensity_scenarios')
 plt.show()
 
 # ============================================
@@ -1019,6 +1045,7 @@ plt.ylabel('Transition Start Year')
 plt.title('Cumulative Emissions Increase with Delayed Transition\n(2025–2050, Aggressive Scenario)', fontsize=14, pad=15)
 #plt.grid(axis='x', linestyle='--', alpha=0.4)
 plt.tight_layout()
+name_next_figure('transition_start_year')
 plt.show()
 
 # ============================================
@@ -1087,6 +1114,7 @@ def plot_capacity_comparison(results_df):
                
              
     plt.tight_layout()
+    name_next_figure('capacity_by_fuel')
     plt.show()
 
 # Generate the plot
@@ -1256,6 +1284,7 @@ plt.legend(
 )
 
 plt.tight_layout()
+name_next_figure('tornado_intensity')
 plt.show()
 
 # ============================================
@@ -1419,4 +1448,5 @@ plt.legend(
 )
 
 plt.tight_layout()
+name_next_figure('tornado_cumulative')
 plt.show()

@@ -38,16 +38,30 @@ def analyze_material_costs(matrix_data, mat_price: Dict[str, float], external_ro
     """
     material_cost = 0.0
 
-    default_rows = [
-        'External Inputs',
-        'Scrap Purchase',
-        'Limestone from Market',
-        'Burnt Lime from market',
-        'Dolomite from market',
-        'Nitrogen from market',
-        'Oxygen from market',
-    ]
-    external_purchase_rows = list(external_rows) if external_rows else default_rows
+    # Purchase rows are DERIVED from the balance matrix, not listed by hand.
+    #
+    # The hardcoded list this replaces omitted 'Anthracite Coal from Market',
+    # so BF-BOF's coal -- 625 kg/t at 0.2198 USD/kg, about 137 USD/t -- was
+    # costed at zero while scrap-EAF paid for its scrap in full. That made the
+    # coal route look cheaper than the scrap route, which it is not. Any new
+    # market row added upstream would have been silently free in the same way.
+    #
+    # Only positive quantities are summed (below), so offsetting negative
+    # entries on a producer's own row cannot subtract cost.
+    def _is_purchase_row(name) -> bool:
+        n = str(name).strip().lower()
+        return n == 'external inputs' or 'from market' in n or n.endswith('purchase')
+
+    derived = [r for r in matrix_data.index if _is_purchase_row(r)]
+    if external_rows:
+        external_purchase_rows = list(external_rows)
+        undeclared = [r for r in derived if r not in set(external_purchase_rows)]
+        if undeclared:
+            logger.warning(
+                "purchase rows present in the balance matrix but not declared in "
+                "costing.external_purchase_rows, so costed at ZERO: %s", undeclared)
+    else:
+        external_purchase_rows = derived
 
     logger.debug("Analyzing material costs from external purchase rows")
 

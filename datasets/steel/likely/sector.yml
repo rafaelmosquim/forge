@@ -110,6 +110,12 @@ costing:
     - 'Dolomite from market'
     - 'Nitrogen from market'
     - 'Oxygen from market'
+    # Coal enters the blast furnace and coke ovens through this row. It was
+    # missing, so ~625 kg/t at 0.2198 USD/kg -- about 137 USD/t -- was costed at
+    # zero, making the coal route look cheaper than scrap-EAF, which it is not.
+    - 'Anthracite Coal from Market'
+    # NOTE: 'Iron Ore from Market' is deliberately NOT listed. Ore is already
+    # counted on the 'External Inputs' row; adding it here would double count.
 
 gas:
   process_gas_carrier: 'Process Gas (internal)'

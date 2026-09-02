@@ -14,6 +14,13 @@ energy_prices: # USD/MJ
   green H2: 0.1096   # legacy alias
   gray H2: 0.0329
   Wood: 0.0049
+  # Charcoal enters the BF-BOF charcoal route as an ENERGY carrier via fuel
+  # substitution, so it has no material flow and no purchase row -- without a
+  # price here its ~15.5 GJ/t is free, which made the charcoal route the
+  # cheapest of all. Derived from material_prices (0.286 USD/kg) and
+  # energy_content (28.40 MJ/kg), the same way Coal's 0.0071 derives from
+  # 0.2198 / 30.96.
+  Charcoal: 0.01007
   Charcoal M: 0.0
   Coal: 0.0  # priced as material for now
   Anthracite: 0.0085

@@ -60,20 +60,26 @@ def apply_dri_mix(energy_shares: Dict[str, Dict[str, float]], scenario: Dict[str
         except Exception:
             return 0.0
 
+    carriers = ('Gas', 'Biomethane', 'Green hydrogen')
     fractions = {str(k): _as_frac(v) for k, v in plan.items()}
-    gas_left = base_gas
-    for carrier in ('Gas', 'Biomethane', 'Green hydrogen'):
+
+    # The mix is a SUBSTITUTION of the DRI unit's gas demand, not an addition to
+    # it. Only the share the plan leaves unassigned stays as gas; everything the
+    # plan assigns to another carrier must leave the gas line, or the unit ends
+    # up burning its full gas demand PLUS the substitute and cleaner fuels come
+    # out dirtier than the one they replace.
+    allocated = sum(float(fractions.get(c, 0.0) or 0.0) for c in carriers)
+    for carrier in carriers:
         frac = float(fractions.get(carrier, 0.0) or 0.0)
         if carrier == 'Gas':
-            new_val = base_gas * frac
-            es['Gas'] = new_val
-            gas_left = max(0.0, base_gas - new_val)
+            es['Gas'] = base_gas * frac
         else:
             add_val = base_gas * frac
             if add_val > 0:
                 es[carrier] = es.get(carrier, 0.0) + add_val
-    if gas_left > 0:
-        es['Gas'] = es.get('Gas', 0.0) + gas_left
+    unallocated = base_gas * max(0.0, 1.0 - allocated)
+    if unallocated > 0:
+        es['Gas'] = es.get('Gas', 0.0) + unallocated
 
 
 def apply_charcoal_expansion(energy_shares: Dict[str, Dict[str, float]], scenario: Dict[str, Any]) -> None:

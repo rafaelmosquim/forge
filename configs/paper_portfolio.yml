@@ -5,8 +5,13 @@ defaults:
   country_code: BR
   scenario:
     gas_routing:
-      direct_use_fraction: 0.0
-      electricity_fraction: 1.0
+      # Recovered process gas splits evenly between direct use and on-site
+      # power. This is the intended paper configuration and matches
+      # sector.yml's default_direct_use_fraction and
+      # finished_steel_portfolio.yml. The 0.0/1.0 value previously here came
+      # from 4f8537c and moved the BF-BOF baseline by +4.7%.
+      direct_use_fraction: 0.5
+      electricity_fraction: 0.5
   # Optionally set country_code or scenario.gas_routing here
   picks_by_material:
     Nitrogen: Nitrogen Production

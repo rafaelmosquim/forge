@@ -906,6 +906,97 @@ plt.show()
 # Transition year impact
 # ============================================
 
+def _remaining_life_fraction(eol_year, year: int, lifespan: float) -> float:
+    """Share of a plant's design life still unused when it is retired."""
+    frac = (float(eol_year) - float(year)) / float(lifespan)
+    return 0.0 if frac < 0.0 else (1.0 if frac > 1.0 else float(frac))
+
+
+def _retire_capacity(plants, year: int, retire_rate: float, *, allocation: str,
+                     lifespan: float, capex_per_t: float):
+    """Retire a share of remaining capacity and value what that strands.
+
+    Stranded value is the unrecovered capital: capacity retired, times the
+    build cost per tonne, times the fraction of design life still unused.
+    """
+    total = float(plants["Capacity"].sum())
+    target = float(retire_rate) * total
+    if total <= 0.0 or target <= 0.0:
+        return plants, 0.0, 0.0
+    if allocation not in {"oldest_first", "newest_first", "proportional"}:
+        raise ValueError(f"unknown allocation: {allocation}")
+
+    out = plants.copy()
+    stranded_usd = retired_kt = 0.0
+
+    if allocation == "proportional":
+        retired = out["Capacity"] * float(retire_rate)
+        for idx, r in retired.items():
+            if r > 0:
+                stranded_usd += float(r) * 1000.0 * capex_per_t * _remaining_life_fraction(
+                    out.at[idx, "EOL"], year, lifespan)
+        out["Capacity"] = out["Capacity"] - retired
+        return out, float(retired.sum()), stranded_usd
+
+    out["_rem_life_y"] = out["EOL"] - year
+    out = out.sort_values(["_rem_life_y", "BF"],
+                          ascending=[allocation == "oldest_first", True])
+    remaining = target
+    for idx, row in out.iterrows():
+        if remaining <= 0.0:
+            break
+        cap = float(row["Capacity"])
+        if cap <= 0.0:
+            continue
+        take = min(cap, remaining)
+        stranded_usd += take * 1000.0 * capex_per_t * _remaining_life_fraction(
+            row["EOL"], year, lifespan)
+        out.at[idx, "Capacity"] = cap - take
+        remaining -= take
+        retired_kt += take
+    return out.drop(columns=["_rem_life_y"]), retired_kt, stranded_usd
+
+
+def simulate_forced_retirement(fleet, years, *, retire_rate, allocation,
+                               utilization, dri_mix, lifespan, capex_per_t,
+                               annual_improvement=0.0, base_year=2025):
+    """Retire coal BF capacity at a fixed annual rate regardless of relining date.
+
+    Deliberately extreme: plants are closed on no economic or technical
+    rationale, to bound the stranded-asset exposure of a disorderly transition.
+    Returns (cumulative emissions Gt CO2e, stranded capital USD billion).
+    Capacities are in kt and emission factors in t CO2e per t steel, so the
+    product is kt CO2e; /1e6 gives Gt.
+    """
+    coal = fleet[fleet["Fuel"] == "coal"].copy()
+    coal["Capacity"] = pd.to_numeric(coal["Capacity"], errors="coerce").fillna(0.0).astype(float)
+    coal["EOL"] = pd.to_numeric(coal["EOL"], errors="coerce").fillna(0.0).astype(float)
+    charcoal_cap = float(pd.to_numeric(
+        fleet[fleet["Fuel"] == "charcoal"]["Capacity"], errors="coerce").fillna(0.0).sum())
+
+    dri_cap = cumulative_emis = cumulative_stranded = 0.0
+    for year in years:
+        coal, retired_kt, stranded_usd = _retire_capacity(
+            coal, year, retire_rate, allocation=allocation,
+            lifespan=lifespan, capex_per_t=capex_per_t)
+        dri_cap += retired_kt
+        coal_cap = float(coal["Capacity"].sum())
+
+        emis = (coal_cap * utilization
+                * get_emission_factor("BF-BOF", "Coke", year, base_year, annual_improvement))
+        emis += (charcoal_cap * utilization
+                 * get_emission_factor("BF-BOF", "Charcoal", year, base_year, annual_improvement))
+        if dri_cap > 0 and dri_mix:
+            mix_year = max(y for y in dri_mix if y <= year)
+            for config, share in dri_mix[mix_year].items():
+                emis += (dri_cap * float(share) * utilization
+                         * get_emission_factor("DRI-EAF", config, year, base_year, annual_improvement))
+        cumulative_emis += emis
+        cumulative_stranded += stranded_usd
+
+    return cumulative_emis / 1e6, cumulative_stranded / 1e9
+
+
 def simulate_aggressive_transition(bf_fleet, transition_year, **params):
     """Run aggressive scenario where plants convert to DRI at relining after transition year"""
     results = []

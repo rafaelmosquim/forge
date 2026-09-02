@@ -38,6 +38,7 @@ from forge.core.routing import STAGE_MATS
 from forge.core.runner import run_core_scenario
 from forge.core.gas import compute_inside_energy_reference_for_share
 from forge.scenarios.builder import build_core_scenario
+from forge.core.costs import compute_capex_costs
 from forge.scenarios.scenario_transforms import apply_dri_mix, apply_charcoal_expansion
 from forge.core.transforms import (
     apply_fuel_substitutions,
@@ -355,6 +356,11 @@ class RunOutputs:
     total_co2e_kg: Optional[float]
     total_cost: Optional[float] = None
     material_cost: Optional[float] = None
+    uvc: Optional[float] = None
+    capex_total: Optional[float] = None
+    capex_payment: Optional[float] = None
+    relining_payment: Optional[float] = None
+    oem_cost: Optional[float] = None
     balance_matrix: Optional[pd.DataFrame] = None
     meta: Dict[str, Any] = field(default_factory=dict)
 
@@ -643,9 +649,29 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
     ef_internal_electricity = float(gas_meta.get('ef_internal_electricity', 0.0))
     fyield = float(getattr(params, "finished_yield", 0.85))    
 
+    capex_total = capex_payment = relining_payment = oem_cost = uvc = None
     if is_cost_enabled():
         total_cost = core_res.total_cost
         material_cost = core_res.material_cost
+        # Annualized capital and O&M, from datasets/<set>/capex.yml.
+        try:
+            capex_cfg = load_data_from_yaml(os.path.join(base, 'capex.yml')) or {}
+            capex_vals = compute_capex_costs(capex_cfg, route_preset, core_res.production_routes)
+            capex_total = capex_vals.get('capex_total')
+            capex_payment = capex_vals.get('capex_payment')
+            relining_payment = capex_vals.get('relining_payment')
+            oem_cost = capex_vals.get('oem_cost')
+        except Exception:
+            capex_total = capex_payment = relining_payment = oem_cost = None
+        # Unit variable cost. Resolved energy + materials are assumed to be 80%
+        # of variable OPEX; the remaining 20% (consumables, maintenance
+        # materials, logistics, labour overheads) is an assumed uplift, not a
+        # plant-derived figure. Applied uniformly across routes.
+        try:
+            if total_cost is not None and material_cost is not None:
+                uvc = (float(total_cost) + float(material_cost)) / 0.8
+        except Exception:
+            uvc = None
     else:
         total_cost = None
         material_cost = None
@@ -728,6 +754,11 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         total_co2e_kg=total_co2,
         total_cost=total_cost,
         material_cost=material_cost,
+        uvc=uvc,
+        capex_total=capex_total,
+        capex_payment=capex_payment,
+        relining_payment=relining_payment,
+        oem_cost=oem_cost,
         balance_matrix=balance_matrix,
         meta=meta,
     )

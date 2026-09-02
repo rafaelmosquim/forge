@@ -1,7 +1,27 @@
-energy_prices:
-  Coal: 0.0071  # USD/MJ
-  Coke: 0.0110  # USD/MJ
-  Gas: 0.020   # USD/MJ
-  Wood: 1  # USD/MJ
-  Charcoal: 0.008 # USD/MJ
-  Electricity: 0.0352 #USD/MJ
+energy_prices: # USD/MJ
+  Fuel Oil: 0.0033
+  Diesel: 0.0190
+  Ethanol: 0.0192
+  Biodiesel: 0.0235
+  Gas: 0.0199 # Natural gas
+  LPG: 0.0288
+  Biomethane: 0.0322
+  # Carrier names here MUST match the names used in the energy balance --
+  # analyze_energy_costs does a direct dict lookup, so a mismatch costs the
+  # carrier at ZERO with no error. 'Green hydrogen' is the name the DRI mix
+  # and emission_factors.yml use; 'green H2' matched nothing.
+  Green hydrogen: 0.1096
+  green H2: 0.1096   # legacy alias
+  gray H2: 0.0329
+  Wood: 0.0049
+  Charcoal M: 0.0
+  Coal: 0.0  # priced as material for now
+  Anthracite: 0.0085
+  PCI: 0.0071
+  Coke MP: 0.0088
+  Coke MM: 0.0107
+  Electricity: 0.0352
+  Electricity Hydro: 0.0370
+  Electricity Eolic: 0.0370
+  Electricity Solar: 0.0370
+  Electricity Bio: 0.0370

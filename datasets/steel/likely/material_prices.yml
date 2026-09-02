@@ -1,9 +1,12 @@
 material_prices:
-  Iron Ore from Market: 1  # USD/kg
-  Scrap: 1
-  Limestone: 1
-  Burnt Lime: 1
-  Dolomite: 1
-  Nitrogen: 1
-  Oxygen: 1
+  Iron Ore from Market: 0.130  # USD/kg
+  Scrap: 0.200
+  Limestone: 0.033
+  Coal: 0.2198  # USD/kg (0.0071 USD/MJ * 30.96 MJ/kg)
+  Zinc: 3.000
+  Nitrogen: 0.066
+  Oxygen: 0.066
+  Dolomite: 0.049
+  Burnt Lime: 0.049
+  Charcoal: 0.286
 

@@ -75,8 +75,93 @@ def analyze_material_costs(matrix_data, mat_price: Dict[str, float], external_ro
     return material_cost
 
 
+def _annualize_capex(capex_value: float, interest_rate: float, lifespan_years: float) -> float:
+    """Compute an annualized payment using a standard capital recovery factor."""
+    try:
+        principal = float(capex_value)
+        years = float(lifespan_years)
+    except Exception:
+        return 0.0
+    if principal <= 0.0 or years <= 0.0:
+        return 0.0
+    try:
+        rate = float(interest_rate)
+    except Exception:
+        rate = 0.0
+    if rate <= 0.0:
+        return principal / years
+    factor = rate * (1.0 + rate) ** years / (((1.0 + rate) ** years) - 1.0)
+    return principal * factor
+
+
+def _infer_capex_route(route_preset: str, production_routes: Dict[str, int]) -> str:
+    """Infer a capex route key from selected production routes."""
+    if production_routes.get("Blast Furnace", 0) > 0:
+        return "BF-BOF"
+    if production_routes.get("Direct Reduction Iron", 0) > 0:
+        return "DRI-EAF"
+    if production_routes.get("Electric Arc Furnace", 0) > 0:
+        return "EAF-scrap"
+    key = str(route_preset or "").strip()
+    mapping = {
+        "BF-BOF": "BF-BOF",
+        "DRI-EAF": "DRI-EAF",
+        "EAF-Scrap": "EAF-scrap",
+        "EAF-scrap": "EAF-scrap",
+    }
+    return mapping.get(key, key)
+
+
+def compute_capex_costs(
+    capex_cfg: Dict[str, object],
+    route_preset: str,
+    production_routes: Dict[str, int],
+) -> Dict[str, Optional[float]]:
+    """Compute capex-related payments and oem cost for a scenario."""
+    if not isinstance(capex_cfg, dict):
+        return {
+            "capex_total": None,
+            "capex_payment": None,
+            "relining_payment": None,
+            "oem_cost": None,
+        }
+
+    capex_table = capex_cfg.get("capex", {}) if isinstance(capex_cfg, dict) else {}
+    lifespan_table = capex_cfg.get("lifespan", {}) if isinstance(capex_cfg, dict) else {}
+    relining_table = capex_cfg.get("relining", {}) if isinstance(capex_cfg, dict) else {}
+    oem_table = capex_cfg.get("oem_rate", {}) if isinstance(capex_cfg, dict) else {}
+    interest_rate = capex_cfg.get("interest_rate", 0.0) if isinstance(capex_cfg, dict) else 0.0
+
+    route_key = _infer_capex_route(route_preset, production_routes)
+    route_capex = float(capex_table.get(route_key, 0.0) or 0.0)
+    conformation_capex = float(capex_table.get("Conformation", 0.0) or 0.0)
+    if route_key == "DRI-EAF":
+        route_capex += float(capex_table.get("EAF-scrap", 0.0) or 0.0)
+    capex_total = route_capex + conformation_capex
+
+    lifespan_years = float(lifespan_table.get(route_key, 0.0) or 0.0)
+    capex_payment = _annualize_capex(capex_total, float(interest_rate or 0.0), lifespan_years)
+
+    relining_payment = None
+    if route_key == "BF-BOF":
+        relining_years = float(relining_table.get("BF-BOF", 20.0) or 20.0)
+        relining_capex = 0.3 * float(capex_table.get("BF-BOF", 0.0) or 0.0)
+        relining_payment = _annualize_capex(relining_capex, float(interest_rate or 0.0), relining_years)
+
+    oem_rate = float(oem_table.get(route_key, 0.0) or 0.0)
+    oem_cost = capex_total * oem_rate
+
+    return {
+        "capex_total": capex_total,
+        "capex_payment": capex_payment,
+        "relining_payment": relining_payment,
+        "oem_cost": oem_cost,
+    }
+
+
 __all__ = [
     "analyze_energy_costs",
     "analyze_material_costs",
+    "compute_capex_costs",
 ]
 

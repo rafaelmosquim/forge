@@ -98,6 +98,7 @@ class CoreScenario:
     energy_prices: Optional[Dict[str, float]] = None
     material_prices: Optional[Dict[str, float]] = None
     external_purchase_rows: Optional[Iterable[str]] = None
+    costed_elsewhere: Optional[Dict[str, str]] = None
 
 
 @dataclass
@@ -260,7 +261,8 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
         try:
             if scn.material_prices:
                 material_cost = analyze_material_costs(
-                    balance_matrix, scn.material_prices, external_rows=scn.external_purchase_rows
+                    balance_matrix, scn.material_prices, external_rows=scn.external_purchase_rows,
+                    costed_elsewhere=scn.costed_elsewhere,
                 )
         except Exception:
             material_cost = None

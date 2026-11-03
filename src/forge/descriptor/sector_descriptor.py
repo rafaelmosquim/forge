@@ -54,6 +54,10 @@ class RoutePreset:
 @dataclass(frozen=True)
 class CostingConfig:
     external_purchase_rows: Set[str] = field(default_factory=set)
+    # Purchase rows deliberately NOT costed as materials because their cost is
+    # charged elsewhere (row -> where). Declaring them keeps the "costed at
+    # ZERO" warning for rows that really are free.
+    costed_elsewhere: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -160,6 +164,7 @@ def _parse_route(entry: dict) -> RoutePreset:
 def _parse_costing(data: dict) -> CostingConfig:
     return CostingConfig(
         external_purchase_rows=_as_set(data.get("external_purchase_rows")),
+        costed_elsewhere={str(k): str(v) for k, v in (data.get("costed_elsewhere") or {}).items()},
     )
 
 

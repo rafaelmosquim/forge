@@ -114,8 +114,13 @@ costing:
     # missing, so ~625 kg/t at 0.2198 USD/kg -- about 137 USD/t -- was costed at
     # zero, making the coal route look cheaper than scrap-EAF, which it is not.
     - 'Anthracite Coal from Market'
-    # NOTE: 'Iron Ore from Market' is deliberately NOT listed. Ore is already
-    # counted on the 'External Inputs' row; adding it here would double count.
+  # Purchase rows deliberately NOT costed as materials, with where their cost
+  # is charged instead. Listing one under external_purchase_rows as well is
+  # rejected, since it would be charged twice; any purchase row in neither list
+  # is warned about as costed at zero.
+  costed_elsewhere:
+    'Iron Ore from Market': "charged on the 'External Inputs' row, at material_prices['Iron Ore from Market']"
+    'Natural gas from Market': "energy carrier 'Gas': charged on the energy balance at energy_prices['Gas']"
 
 gas:
   process_gas_carrier: 'Process Gas (internal)'

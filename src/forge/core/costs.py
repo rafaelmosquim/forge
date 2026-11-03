@@ -30,7 +30,8 @@ def analyze_energy_costs(bal_data, en_price: Dict[str, float]) -> float:
     return total_cost
 
 
-def analyze_material_costs(matrix_data, mat_price: Dict[str, float], external_rows: Optional[Iterable[str]] = None) -> float:
+def analyze_material_costs(matrix_data, mat_price: Dict[str, float], external_rows: Optional[Iterable[str]] = None,
+                           costed_elsewhere: Optional[Dict[str, str]] = None) -> float:
     """Calculate total material cost from external purchase rows in the balance matrix.
 
     Scans specific rows representing external purchases; sums positive material
@@ -53,9 +54,21 @@ def analyze_material_costs(matrix_data, mat_price: Dict[str, float], external_ro
         return n == 'external inputs' or 'from market' in n or n.endswith('purchase')
 
     derived = [r for r in matrix_data.index if _is_purchase_row(r)]
+    # Rows whose cost is charged elsewhere -- iron ore through 'External
+    # Inputs', natural gas as an energy carrier. Excluding them is correct;
+    # warning that they are "costed at ZERO" was not, and it was believed.
+    elsewhere = dict(costed_elsewhere or {})
     if external_rows:
         external_purchase_rows = list(external_rows)
-        undeclared = [r for r in derived if r not in set(external_purchase_rows)]
+        both = sorted(set(elsewhere) & set(external_purchase_rows))
+        if both:
+            raise ValueError(
+                "rows declared both as costed material purchases and as costed "
+                f"elsewhere would be charged twice: {both}")
+        for row in sorted(set(derived) & set(elsewhere)):
+            logger.debug("purchase row %s not costed as a material: %s", row, elsewhere[row])
+        undeclared = [r for r in derived
+                      if r not in set(external_purchase_rows) and r not in elsewhere]
         if undeclared:
             logger.warning(
                 "purchase rows present in the balance matrix but not declared in "

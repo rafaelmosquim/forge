@@ -182,7 +182,11 @@ def _scenario_for_dri_config(config: str) -> Dict[str, Any]:
         return _mix(gas=0.0, bio=1.0, h2=0.0)
     if name in {"green h2", "green hydrogen", "h2"}:
         return _mix(gas=0.0, bio=0.0, h2=1.0)
-    return _mix(gas=1.0, bio=0.0, h2=0.0)
+    # An unknown name used to fall back to natural gas silently, so a request
+    # for e.g. "Gray H2" or "full substitution" returned the NG-DRI result under
+    # another label. Fail instead.
+    raise ValueError(f"unknown DRI fuel configuration {config!r}; "
+                     "expected Natural Gas, Biomethane-100 or Green H2")
 
 @lru_cache(maxsize=2048)
 def _ef_core_cached(route: str, config: str, year: int, base_year: int, annual_improvement: float) -> float:

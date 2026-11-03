@@ -109,6 +109,7 @@ def build_core_scenario(
     gas_routing: Optional[Dict[str, Any]] = None,
     process_efs: Optional[Dict[str, float]] = None,
     external_purchase_rows: Optional[Iterable[str]] = None,
+    costed_elsewhere: Optional[Dict[str, str]] = None,
     energy_prices: Optional[Dict[str, float]] = None,
     material_prices: Optional[Dict[str, float]] = None,
     outside_mill_procs: Optional[Set[str]] = None,
@@ -233,6 +234,7 @@ def build_core_scenario(
         energy_prices=energy_prices,
         material_prices=material_prices,
         external_purchase_rows=list(external_purchase_rows or []),
+        costed_elsewhere=dict(costed_elsewhere or {}),
     )
 
     return ScenarioBuildResult(

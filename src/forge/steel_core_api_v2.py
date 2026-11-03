@@ -443,6 +443,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
 
     fallback_materials = set(descriptor.balance_fallback_materials or set())
     external_purchase_rows = list(descriptor.costing.external_purchase_rows or [])
+    costed_elsewhere = dict(descriptor.costing.costed_elsewhere or {})
     gas_reference_stage = reference_stage_for_gas(descriptor)
     gas_config = {
         "process_gas_carrier": descriptor.gas.process_gas_carrier or "Process Gas",
@@ -585,6 +586,7 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         gas_routing=scenario.get('gas_routing', {}),
         process_efs=process_emissions_table,
         external_purchase_rows=external_purchase_rows,
+        costed_elsewhere=costed_elsewhere,
         energy_prices=energy_prices,
         material_prices=material_prices,
         outside_mill_procs=set(OUTSIDE_MILL_PROCS or []),

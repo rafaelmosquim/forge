@@ -32,6 +32,7 @@ if str(_ROOT_DIR) not in sys.path:
 
 # Core bridge: run live FORGE model instead of static CSVs
 from forge.steel_core_api_v2 import RouteConfig, ScenarioInputs, run_scenario
+from forge.scenarios.fleet import relining_due as _fleet_relining_due
 from forge.scenarios.utils import label_from_spec_path as _label_from_spec_path, configure_output_roots as _auto_output_roots
 
 # ---- Make plt.show() safe in headless runs ----
@@ -100,13 +101,27 @@ def _install_safe_show():
 # ============================================
 
 DATA_DIR = "datasets/steel/likely"
+# The paper's reference product: HOT-ROLLED FLAT STEEL, the finished-steel
+# boundary of the manuscript (rolled after hot rolling; no post-forming, no
+# surface finishing). The scenario model must use the same product as the
+# route tables; it used to route through "Stamping/calendering/lamination",
+# which put every scenario EF ~0.07 t/t above Table 4.
+# steel-papers/tools/emit_paper_macros.py asserts its PICKS equal these.
 FINAL_PICKS = {
-    "Manufactured Feed (IP4)": "Stamping/calendering/lamination",
+    "Burnt Lime": "Burnt Lime Production",
+    "Cast Steel (IP1)": "Continuous Casting (R)",
+    "Dolomite": "Dolomite Production",
     "Finished Products": "No Coating",
+    "Intermediate Process 3": "Bypass Raw→IP3",
+    "Liquid Steel": "Regular Steel",
+    "Manufactured Feed (IP4)": "Direct use of Basic Steel Products",
+    "Nitrogen": "Nitrogen Production",
+    "Oxygen": "Oxygen Production",
+    "Raw Products (types)": "Hot Rolling",
 }
 
 # Toggle between simple product picks vs. portfolio basket
-# - simple: uses FINAL_PICKS (stamping/no coating)
+# - simple: uses FINAL_PICKS (hot-rolled flat steel, no coating)
 # - portfolio: blends EF across a portfolio spec (see configs/*finished_steel_portfolio*.yml)
 PRODUCT_CONFIG = _os.getenv('FORGE_PAPER_PRODUCT_CONFIG', 'simple').strip().lower()
 PORTFOLIO_SPEC_OVERRIDE = _os.getenv('FORGE_PAPER_PORTFOLIO_SPEC', '').strip() or None
@@ -478,11 +493,10 @@ def _compute_portfolio_ef(route: str, config: str, year: int, base_year: int, an
     return ef
 
 
-# Load BF fleet data (example); provide a CI-safe fallback
+# Load BF fleet data; FORGE_PLANTS_CSV points at an alternative fleet (sensitivity runs).
+PLANTS_CSV = _os.environ.get("FORGE_PLANTS_CSV", "datasets/steel/plants.csv")
 try:
-    bf_fleet = pd.read_csv(
-        "datasets/steel/plants.csv", sep=";", encoding="utf-8"
-    )
+    bf_fleet = pd.read_csv(PLANTS_CSV, sep=";", encoding="utf-8")
     bf_fleet["Capacity"] = pd.to_numeric(bf_fleet["Capacity"], errors="coerce")
 except FileNotFoundError:
     bf_fleet = pd.DataFrame(
@@ -493,6 +507,27 @@ except FileNotFoundError:
             "Relining": [2030, 2030],
         }
     )
+
+def _load_relining_interval() -> int:
+    try:
+        import yaml as _yaml
+        with open(_Path(DATA_DIR) / "capex.yml", encoding="utf-8") as fh:
+            return int(_yaml.safe_load(fh)["relining"]["BF-BOF"])
+    except Exception:
+        return 20
+
+
+# A blast furnace comes up for relining every RELINING_INTERVAL years from the
+# date in plants.csv ("Relining" is its next window). A furnace relined on coal
+# before the transition is allowed gets another window one campaign later, which
+# can fall inside the 2025-2050 horizon.
+RELINING_INTERVAL = _load_relining_interval()
+
+
+def relining_due(fleet: pd.DataFrame, year: int) -> pd.Series:
+    """Boolean mask: plants whose relining window falls in ``year``."""
+    return _fleet_relining_due(fleet, year, RELINING_INTERVAL)
+
 
 def get_emission_factor(route, config, year, base_year=2025, annual_improvement=0.0):
     """EF lookup (tCO2/t) computed entirely in core, including annual improvements.
@@ -556,7 +591,8 @@ def simulate_steel_transition(bf_fleet, **params):
     # Business-as-usual requires tracking original EOL schedule
     if params['scenario'] == "business_as_usual":
         original_eol_schedule = coal_bfs["EOL"].value_counts().sort_index()
-    
+    converted = pd.Series(False, index=coal_bfs.index)  # aggressive: already on DRI
+
     for year in range(2025, 2051):
         # Handle charcoal expansion FIRST (replaces coal-BF directly)
         if params.get('charcoal_expansion') and year in params['charcoal_expansion']:
@@ -582,8 +618,10 @@ def simulate_steel_transition(bf_fleet, **params):
             dri_cap += retiring_coal
         
         elif params['scenario'] == "aggressive" and year >= 2030:
-            # Convert coal plants reaching relining year to DRI
-            relining_coal = coal_bfs[coal_bfs["Relining"] == year]["Capacity"].sum()
+            # Convert coal plants reaching a relining window to DRI (once)
+            due = relining_due(coal_bfs, year) & ~converted
+            converted |= due
+            relining_coal = coal_bfs.loc[due, "Capacity"].sum()
             # Only convert remaining coal capacity (after charcoal replacement)
             relining_coal = min(relining_coal, coal_cap)
             coal_cap -= relining_coal
@@ -1011,8 +1049,8 @@ def simulate_aggressive_transition(bf_fleet, transition_year, **params):
     dri_cap = 0  # Track DRI capacity directly
     
     for year in range(2025, 2051):
-        # Get plants reaching relining year
-        relining_mask = active_coal_bfs["Relining"] == year
+        # Get plants reaching a relining window this year
+        relining_mask = relining_due(active_coal_bfs, year)
         relining_bfs = active_coal_bfs[relining_mask]
         
         # Before transition: keep all coal plants

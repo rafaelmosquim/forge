@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.1 (2026-11-05)
+
+Code version behind the Brazil steel policy paper ("Fleet Turnover, Not Fuel Choice, Sets the Pace of Steel Decarbonization: Evidence from Brazil").
+
+### Fixed
+- Recovered process gas is charged exactly once. It is now one pool, spent in order: losses (`gas.default_loss_fraction`), processes that burn it by design, a share of the mill's natural-gas demand (`gas.default_flexible_share`), on-site power up to demand, overflow flared. The former 50/50 direct/power split ignored gas that recipes already burn, charging up to 43% more gas than the plant made at one setting and losing up to 40% at another. Outside-mill lines buy natural gas and grid power.
+- Coke ovens are fired on recovered gas (4.1 MJ/kg coke), charge 1.31 kg coal per kg coke, and recover coke-oven gas at 20% of coal energy (ABM plant balances). They are charged for the coal they convert and credited for the coke they hand on, so coking coal and its upstream emissions are counted once.
+- Hot-rolling fuel is booked as natural-gas demand; DRI and scrap-EAF routes no longer burn free "process gas" they do not have.
+- Leftover natural gas keeps its own emission factor (it was blended, discounting the replaced share twice).
+- Blast-furnace fleet (`datasets/steel/plants.csv`) rebuilt from Global Energy Monitor with one rule per unit (`forge.scenarios.fleet`, `scripts/build_fleet_from_gem.py`, provenance in `plants_units.csv`). The hand-built file put a 2010 placeholder wherever the last relining was unknown -- an 11.9 Mt window in 2030 that does not exist -- and included a cancelled and an announced furnace.
+- Relining windows recur every campaign (`capex.yml` relining interval), so furnaces relined before 2030 get another window inside the horizon.
+- Paper scenarios run the reference product, hot-rolled flat steel (`FINAL_PICKS`); they routed through stamping, which put every scenario emission factor ~0.07 t/t above the route tables.
+
+### Changed
+- `gas_routing.direct_use_fraction` / `electricity_fraction` are ignored (with a warning); use `flexible_share` and `loss_fraction`. Realised shares are reported in run metadata.
+
 ## Unreleased
 
 ### Added

@@ -1,0 +1,35 @@
+unit_id,plant,unit,status,capacity,fuel,start,last_relining,planned_relining,Relining,EOL,rule,in_model
+U100000140036,AVB Açailândia steel plant,"1; ""Roberta""",operating,360.0,charcoal,2018,,,2101.0,2101.0,charcoal: no transition,True
+U100000140037,AVB Açailândia steel plant,"2; ""Regina""",operating,360.0,charcoal,2021,,,2101.0,2101.0,charcoal: no transition,True
+U100000140040,Aperam Timóteo steel plant,1,operating,237.25,charcoal,1949,2022,,2101.0,2101.0,charcoal: no transition,True
+U100000140041,Aperam Timóteo steel plant,2,operating,463.55,charcoal,1979,2005,,2101.0,2101.0,charcoal: no transition,True
+U100000140034,ArcelorMittal Juiz de Fora steel plant,1,operating,180.0,charcoal,2007,2020,,2101.0,2101.0,charcoal: no transition,True
+U100000140035,ArcelorMittal Juiz de Fora steel plant,2,operating,180.0,charcoal,2007,2021,,2101.0,2101.0,charcoal: no transition,True
+U100000140038,Gerdau Divinópolis steel plant,1,operating,112.0,charcoal,1957,2022,,2101.0,2101.0,charcoal: no transition,True
+U100000141457,Gerdau Divinópolis steel plant,2,operating,190.0,charcoal,2005,2022,,2101.0,2101.0,charcoal: no transition,True
+U100000140039,Gerdau Divinópolis steel plant,3,operating,128.0,charcoal,,2022,,2101.0,2101.0,charcoal: no transition,True
+U100000144441,Sinobras Marabá steel plant,unknown,operating,130.0,charcoal,,,,2101.0,2101.0,charcoal: no transition,True
+U100000140033,Vallourec Jeceaba steel plant,1,cancelled,500.0,charcoal,,,,,,,False
+U100000140032,Vallourec Jeceaba steel plant,2,operating,350.0,charcoal,2014,,,2101.0,2101.0,charcoal: no transition,True
+U100000140042,Viena Açailândia iron works,1,operating,100.0,charcoal,1988,,,2101.0,2101.0,charcoal: no transition,True
+U100000140043,Viena Açailândia iron works,2,operating,100.0,charcoal,1990,,,2101.0,2101.0,charcoal: no transition,True
+U100000140044,Viena Açailândia iron works,3,operating,100.0,charcoal,1992,,,2101.0,2101.0,charcoal: no transition,True
+U100000140045,Viena Açailândia iron works,4,operating,100.0,charcoal,1999,,,2101.0,2101.0,charcoal: no transition,True
+U100000140046,Viena Açailândia iron works,5,operating,100.0,charcoal,2004,,,2101.0,2101.0,charcoal: no transition,True
+U100000140020,ArcelorMittal Monlevade steel plant,A,operating,1040.0,coal,1999,2017,,2037.0,2049.0,last relining + 20,True
+U100000140021,ArcelorMittal Monlevade steel plant,B,announced,1200.0,coal,2026,,,,,,False
+U100000140028,ArcelorMittal Pecém steel plant,1,operating,3191.925,coal,2016,,,2036.0,2066.0,never relined: start-up + 20,True
+U100000140017,ArcelorMittal Tubarão steel plant,1,operating,3280.0,coal,1983,2012,,2032.0,2033.0,last relining + 20,True
+U100000140018,ArcelorMittal Tubarão steel plant,2,operating,1200.0,coal,1998,2019,,2039.0,2048.0,last relining + 20,True
+U100000140019,ArcelorMittal Tubarão steel plant,3,operating,2800.0,coal,2007,,,2027.0,2057.0,never relined: start-up + 20,True
+U100000140027,CSN Volta Redonda steel plant,2,operating,1680.0,coal,1954,2016,,2036.0,2036.0,last relining + 20,True
+U100000140026,CSN Volta Redonda steel plant,3,operating,3900.0,coal,1976,2019,,2039.0,2039.0,last relining + 20,True
+U100000140015,Gerdau Açominas Ouro Branco steel plant,1,operating,2815.0,coal,1986,2001,2025,2025.0,2036.0,GEM planned relining,True
+U100000140016,Gerdau Açominas Ouro Branco steel plant,2,operating,1533.0,coal,2007,,,2027.0,2057.0,never relined: start-up + 20,True
+U100000140024,Ternium Brasil Santa Cruz steel plant,1,operating,2650.0,coal,2010,,2025,2025.0,2060.0,GEM planned relining,True
+U100000140025,Ternium Brasil Santa Cruz steel plant,2,operating,2650.0,coal,2010,,,2030.0,2060.0,never relined: start-up + 20,True
+U100000140022,Usiminas Cubatão steel plant,1,mothballed,1600.0,coal,1965,2001,,2025.0,2025.0,last relining + 20,True
+U100000140023,Usiminas Cubatão steel plant,2,mothballed,2900.0,coal,1976,2001,,2025.0,2026.0,last relining + 20,True
+U100000140029,Usiminas Ipatinga steel plant,1,mothballed,660.0,coal,1962,2018,,2038.0,2038.0,last relining + 20,True
+U100000140030,Usiminas Ipatinga steel plant,2,operating,660.0,coal,1965,2021,,2041.0,2041.0,last relining + 20,True
+U100000140031,Usiminas Ipatinga steel plant,3,operating,3000.0,coal,1974,2023,,2043.0,2043.0,last relining + 20,True

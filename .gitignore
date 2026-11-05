@@ -55,6 +55,7 @@ _preview_*.txt
 **/*.png
 **/*.log
 !datasets/steel/plants.csv
+!datasets/steel/plants_units.csv
 
 # Keep paper figures versioned
 !paper/figs/

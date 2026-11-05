@@ -32,7 +32,7 @@ def test_apply_gas_routing_updates_efs_and_meta():
                 {'process': 'Coke Production', 'carrier': 'Process Gas', 'outputs_in_MJ': True},
             ],
         },
-        'gas_routing': {'direct_use_fraction': 0.5},
+        'gas_routing': {'flexible_share': 0.5},
     }
 
     eb2, efs2, meta = apply_gas_routing_and_credits(
@@ -112,7 +112,7 @@ def test_process_gas_efs_in_expected_range_and_bof_uses_carrier_ef():
     }
     scenario = {
         'gas_config': gas_config,
-        'gas_routing': {'direct_use_fraction': 1.0},
+        'gas_routing': {'flexible_share': 1.0},
     }
 
     _, efs2, meta = apply_gas_routing_and_credits(

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 import yaml
 
@@ -66,7 +66,13 @@ class GasConfig:
     natural_gas_carrier: Optional[str] = None
     utility_process: Optional[str] = None
     reference_stage_id: Optional[str] = None
-    default_direct_use_fraction: Optional[float] = None
+    default_direct_use_fraction: Optional[float] = None  # legacy, no longer used
+    # Recovered-gas allocation (forge.core.gas): share of the gas lost/flared,
+    # share of the plant's natural-gas demand met with recovered gas, and the
+    # processes charged for the fuel they convert (e.g. coke ovens).
+    default_loss_fraction: Optional[float] = None
+    default_flexible_share: Optional[float] = None
+    conversion_processes: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -175,6 +181,9 @@ def _parse_gas(data: dict) -> GasConfig:
         utility_process=data.get("utility_process"),
         reference_stage_id=data.get("reference_stage_id"),
         default_direct_use_fraction=data.get("default_direct_use_fraction"),
+        default_loss_fraction=data.get("default_loss_fraction"),
+        default_flexible_share=data.get("default_flexible_share"),
+        conversion_processes=tuple(data.get("conversion_processes") or ()),
     )
 
 

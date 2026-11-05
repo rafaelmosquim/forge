@@ -5,9 +5,7 @@ defaults:
     demand_qty: 1000
   country_code: BR
   scenario:
-    gas_routing:
-      direct_use_fraction: 0.5
-      electricity_fraction: 0.5
+    gas_routing: {}   # sector.yml defaults: loss_fraction 0.10, flexible_share 0.61
   picks_by_material:
     Nitrogen: Nitrogen Production
     Oxygen: Oxygen Production

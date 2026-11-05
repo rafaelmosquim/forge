@@ -174,6 +174,8 @@ def calculate_emissions(
     process_output_emissions: dict | None = None,
     gas_credit_details: dict | None = None,
     gas_credit_exempt: set | None = None,
+    flared_gas_MJ: float = 0.0,
+    conversion_emissions: dict | None = None,
 ):
     """
     This should be a simple emission calculator but needed some tailoring for steel processes. Aluminum will probably need similar treatment.
@@ -253,21 +255,36 @@ def calculate_emissions(
             else:
                 row['Direct Emissions'] = 0.0
 
-        # --- process-gas credit (scheme (a)) -------------------------------
-        # Recovered process gas is charged to whoever BURNS it, at EF_process_gas.
-        # A source that already paid for the carbon leaving as gas must therefore
-        # be credited for it, or that carbon is charged twice.
+        # --- conversion processes (e.g. coke ovens) --------------------------
+        # Charged for the fuel they convert (coking coal, at its life-cycle EF,
+        # so its mining and shipping are counted) and credited for the fuel they
+        # hand on (coke, charged again where it burns). Their recovered gas is
+        # credited below like any other source.
+        if conversion_emissions and proc_name in conversion_emissions:
+            row["Energy Emissions"] += float(conversion_emissions[proc_name] or 0.0)
+
+        # --- process-gas credit -------------------------------------------
+        # Recovered process gas is charged to whoever BURNS it, at EF_process_gas
+        # (including the flare row below). Every source is credited for the gas it
+        # produces at the same factor, so each MJ is counted exactly once.
         #
-        # Exempt: Coke Production. Its gas comes from the coking-coal FEEDSTOCK,
-        # which is deliberately never charged (it leaves in the coke and is
-        # charged at the blast furnace). Crediting it would make that carbon
-        # vanish rather than be counted once.
+        # gas_credit_exempt names a source whose feedstock is NOT charged (a coke
+        # plant without conversion accounting): crediting it would make the gas
+        # carbon vanish. The caller derives it; None means nothing is exempt.
         if gas_credit_details and proc_name in gas_credit_details:
-            if proc_name not in (gas_credit_exempt or {"Coke Production"}):
+            if proc_name not in (gas_credit_exempt or set()):
                 exported_MJ = float(gas_credit_details[proc_name].get("mj", 0.0) or 0.0)
                 row["Energy Emissions"] -= exported_MJ * float(EF_process_gas or 0.0)
 
         rows.append(row)
+
+    # Recovered gas lost or flared: emitted without useful heat.
+    if float(flared_gas_MJ or 0.0) > 1e-9:
+        rows.append({
+            "Process": "Process Gas Flaring",
+            "Energy Emissions": float(flared_gas_MJ) * float(EF_process_gas or 0.0),
+            "Direct Emissions": 0.0,
+        })
 
     # Add per-process direct emissions derived from recipe outputs (e.g., Electrolysis gas streams)
     if output_emissions:

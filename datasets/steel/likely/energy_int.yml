@@ -35,7 +35,10 @@ processes:
   "Electricity Biomass from Market": ~
   "Electricity Production": ~
   "Charcoal Production": ~
-  "Coke Production": 6.54
+  # Underfiring only: 4.1 MJ/kg coke of recovered gas (n=8 plant-years, ABM balances).
+  # Was 6.54, the ovens' NET consumption (coal in - coke/gas/tar out + firing),
+  # which double-booked the coal now carried by the recipe (1.31 kg/kg).
+  "Coke Production": 4.1
   "Steam Production": ~
   "Nitrogen from market": ~
   "Nitrogen Production": 1.3

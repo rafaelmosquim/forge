@@ -127,7 +127,15 @@ gas:
   natural_gas_carrier: 'Gas'
   utility_process: 'Utility Plant'
   reference_stage_id: IP3
-  default_direct_use_fraction: 0.5
+  # Recovered-gas allocation (forge.core.gas), from 13 plant-years of Brazilian
+  # integrated-plant energy balances (ABM 2010-2015; Usiminas BEG 2017-2021):
+  #   losses (flared/lost)            9.7% mean, 3-19% range
+  #   reheating fuel from plant gas   61% mean, 0% (CSN) to 99% (Tubarao)
+  default_loss_fraction: 0.10
+  default_flexible_share: 0.61
+  # charged for the fuel they convert (coal in, coke out); see core/runner.py
+  conversion_processes:
+    - Coke Production
 balance_fallback_materials: []
 prefer_internal_processes:
   Nitrogen from market: Nitrogen Production

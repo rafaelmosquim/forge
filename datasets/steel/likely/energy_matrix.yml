@@ -252,11 +252,13 @@ processes:
     Charcoal: 0
     Coke: 0
   Coke Production:
+    # Coke ovens are underfired with their own and blast-furnace gas in every
+    # Brazilian plant balance; the coal they convert is the recipe feedstock.
     Electricity: 0.005
-    Process Gas (internal): 0
+    Process Gas (internal): 0.995
     Gas: 0
     Wood: 0
-    Coal: 0.995
+    Coal: 0
     Charcoal: 0
     Coke: 0
   Utility Plant:
@@ -457,9 +459,12 @@ processes:
     Charcoal: 0
     Coke: 0
   Hot Rolling:
+    # All reheating fuel is booked as natural-gas demand; the gas pool meets a
+    # share of it (gas.default_flexible_share). Plants range from ~0% (CSN) to
+    # ~99% (Tubarao) recovered gas, so the split is a routing choice, not a recipe.
     Electricity: 0.37
-    Gas: 0.29
-    Process Gas (internal): 0.34
+    Gas: 0.63
+    Process Gas (internal): 0
     Wood: 0
     Coal: 0
     Charcoal: 0

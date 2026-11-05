@@ -151,6 +151,55 @@ def _process_output_emissions_from_recipes(recipes: List[Process], prod_levels: 
     return totals
 
 
+def _conversion_emissions(
+    recipes: List[Process],
+    prod_levels: Dict[str, float],
+    energy_content: Dict[str, float],
+    energy_efs: Dict[str, float],
+    processes: Iterable[str],
+    exclude_carriers: Iterable[str],
+) -> tuple:
+    """Net emissions (g) of fuel-conversion processes: fuel in minus fuel out.
+
+    A coke plant turns coking coal (a recipe input, never on the energy
+    balance) into coke (a recipe output, charged where it burns). Charging the
+    coal at its life-cycle EF and crediting the coke at its own EF keeps the
+    coal's carbon -- and its upstream emissions -- in the inventory exactly
+    once. Recovered gas is excluded here; it is credited by the gas logic.
+    """
+    recipes_dict = {r.name: r for r in recipes}
+    skip = set(exclude_carriers or [])
+    grams: Dict[str, float] = {}
+    diag: Dict[str, Dict[str, float]] = {}
+
+    def _fuel_side(flows: Dict[str, Any]) -> tuple:
+        mj = g = 0.0
+        for carrier, qty in (flows or {}).items():
+            if carrier in skip:
+                continue
+            try:
+                q = float(qty or 0.0)
+                lhv = float(energy_content.get(carrier, 0.0) or 0.0)
+                ef = float(energy_efs.get(carrier, 0.0) or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if q > 0 and lhv > 0 and ef > 0:
+                mj += q * lhv
+                g += q * lhv * ef
+        return mj, g
+
+    for name in processes or []:
+        runs = float(prod_levels.get(name, 0.0) or 0.0)
+        proc = recipes_dict.get(name)
+        if runs <= 1e-12 or proc is None:
+            continue
+        feed_mj, feed_g = _fuel_side(proc.inputs)
+        prod_mj, prod_g = _fuel_side(proc.outputs)
+        grams[name] = runs * (feed_g - prod_g)
+        diag[name] = {"feed_MJ": runs * feed_mj, "product_MJ": runs * prod_mj, "net_g": grams[name]}
+    return grams, diag
+
+
 def run_core_scenario(scn: CoreScenario) -> CoreResults:
     """Execute the deterministic compute for a resolved scenario."""
     # 1) Balance
@@ -182,6 +231,7 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
         stage_lookup=STAGE_MATS,
         fallback_materials=scn.fallback_materials or set(),
         material_credit_map=scn.material_credit_map,
+        exclude_processes=set(scn.outside_mill_procs or ()),
     )
     eb_adj, e_efs, gas_meta = apply_gas_routing_and_credits(
         energy_balance=energy_balance,
@@ -199,6 +249,7 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
             "stage_ref": scn.stage_ref,
             "gas_config": scn.gas_config,
             "fallback_materials": list(scn.fallback_materials or []),
+            "outside_mill_procs": list(scn.outside_mill_procs or []),
         },
         compute_inside_reference_fn=reference_fn,
     )
@@ -206,6 +257,19 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
     eb_for_emissions = eb_adj.copy()
 
     process_output_emissions = _process_output_emissions_from_recipes(scn.recipes, prod_levels)
+
+    gas_cfg = scn.gas_config or {}
+    conversion_procs = list(gas_cfg.get("conversion_processes") or [])
+    gas_carriers = {gas_cfg.get("process_gas_carrier") or "Process Gas"}
+    gas_carriers.update((gas_cfg.get("process_gases") or {}).keys())
+    gas_carriers.update(
+        str(s.get("carrier")) for s in (gas_cfg.get("process_gas_sources") or []) if s.get("carrier")
+    )
+    conversion_emissions, conversion_diag = _conversion_emissions(
+        scn.recipes, prod_levels, scn.energy_content, e_efs, conversion_procs, gas_carriers
+    )
+    # A coke plant whose coal is not charged must not be credited for its gas.
+    gas_credit_exempt = {"Coke Production"} - set(conversion_procs)
 
     # 4) Emissions (robust signature)
     emissions = _robust_call_calculate_emissions(
@@ -224,12 +288,19 @@ def run_core_scenario(scn: CoreScenario) -> CoreResults:
         total_gas_MJ=gas_meta.get("total_process_gas_MJ", 0.0),
         EF_process_gas=gas_meta.get("EF_process_gas", 0.0),
         gas_credit_details=gas_meta.get("gas_credit_details", {}),
+        gas_credit_exempt=gas_credit_exempt,
+        flared_gas_MJ=gas_meta.get("flared_gas_MJ", 0.0),
+        conversion_emissions=conversion_emissions,
         internal_fraction_plant=gas_meta.get("f_internal", 0.0),
         ef_internal_electricity=gas_meta.get("ef_internal_electricity", 0.0),
         outside_mill_procs=scn.outside_mill_procs,
         allow_direct_onsite=scn.allow_direct_onsite,
         process_output_emissions=process_output_emissions,
     )
+    gas_meta = dict(gas_meta)
+    gas_meta["conversion"] = conversion_diag
+    gas_meta["conversion_feed_MJ"] = float(sum(d["feed_MJ"] for d in conversion_diag.values()))
+    gas_meta["conversion_product_MJ"] = float(sum(d["product_MJ"] for d in conversion_diag.values()))
 
     total_co2 = None
     try:

@@ -435,7 +435,9 @@ def _load_for_picks(
         "process_gas_carrier": getattr(descriptor_gas, "process_gas_carrier", None) or "Process Gas",
         "natural_gas_carrier": getattr(descriptor_gas, "natural_gas_carrier", None) or "Gas",
         "utility_process": getattr(descriptor_gas, "utility_process", None),
-        "default_direct_use_fraction": getattr(descriptor_gas, "default_direct_use_fraction", None),
+        "default_loss_fraction": getattr(descriptor_gas, "default_loss_fraction", None),
+        "default_flexible_share": getattr(descriptor_gas, "default_flexible_share", None),
+        "conversion_processes": list(getattr(descriptor_gas, "conversion_processes", ()) or ()),
     }
     gas_config = _apply_process_gas_metadata(base, energy_content, params, gas_config)
 
@@ -679,18 +681,25 @@ with st.sidebar:
             scenario_name = "(no scenario)"
             st.warning(f"No scenario .yml files found in {DATA_ROOT}/scenarios")
 
-    default_direct_fraction = descriptor.gas.default_direct_use_fraction
-    if default_direct_fraction is None:
-        default_direct_fraction = 0.5
-
-    direct_use_fraction = st.slider(
-        "Direct Gas Use Fraction", 
-        min_value=0.0, 
-        max_value=1.0, 
-        value=float(default_direct_fraction),
-        step=0.25,  # 0%, 25%, 50%, 75%, 100%
-        #format="%f0%%",  # Display as percentages
-        help="What percentage of recovered process gas should be used directly as fuel (the rest goes to electricity generation)"
+    _flex_default = descriptor.gas.default_flexible_share
+    _loss_default = descriptor.gas.default_loss_fraction
+    flexible_share = st.slider(
+        "Reheating fuel from recovered gas",
+        min_value=0.0,
+        max_value=1.0,
+        value=float(0.61 if _flex_default is None else _flex_default),
+        step=0.05,
+        help="Share of the mill's natural-gas demand (reheating furnaces, kilns) met with recovered "
+             "process gas. Brazilian plants range from ~0% (CSN) to ~99% (Tubarao). Gas not needed "
+             "by the blast-furnace stoves, coke ovens or these burners goes to on-site power.",
+    )
+    loss_fraction = st.slider(
+        "Recovered gas flared or lost",
+        min_value=0.0,
+        max_value=0.3,
+        value=float(0.10 if _loss_default is None else _loss_default),
+        step=0.01,
+        help="Brazilian plant balances: 3-19%, mean ~10%.",
     )
 
     route = _route_from_scenario(scenario, scenario_name, descriptor)
@@ -1757,8 +1766,8 @@ if run_now:
     try:
         with st.spinner("Running model (core)…"):
             scenario['gas_routing'] = {
-                'direct_use_fraction': direct_use_fraction,
-                'electricity_fraction': 1.0 - direct_use_fraction
+                'flexible_share': flexible_share,
+                'loss_fraction': loss_fraction,
             }
             
             route_cfg = RouteConfig(

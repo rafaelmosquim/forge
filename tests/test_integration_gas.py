@@ -55,7 +55,7 @@ def test_apply_gas_routing_and_credits_basic():
                 {'process': 'Coke Production', 'carrier': 'Process Gas', 'outputs_in_MJ': True},
             ],
         },
-        'gas_routing': {'direct_use_fraction': 1.0, 'electricity_fraction': 0.0},
+        'gas_routing': {'flexible_share': 1.0, 'loss_fraction': 0.0},
         'inside_elec_ref': 0.0,
     }
 
@@ -74,9 +74,11 @@ def test_apply_gas_routing_and_credits_basic():
 
     # With all process gas routed to electricity and util eff 0.2, internal elec should be > 0
     assert 'Utility Plant' in eb_new.index
-    # Process gas EF should be derived from Coal (10.0) and applied to both 'Process Gas' and blended 'Gas'
+    # Process gas EF is derived from Coal (10.0). Natural gas keeps its own EF:
+    # the share replaced by recovered gas moves to the process-gas column, so
+    # blending the NG factor as well would discount that share twice.
     assert e_efs_new.get('Process Gas', None) == 10.0
-    assert e_efs_new.get('Gas', None) == 10.0
+    assert e_efs_new.get('Gas', None) == 50.0
     assert 'total_process_gas_MJ' in meta
     assert meta['total_process_gas_MJ'] == 5.0
 
@@ -109,7 +111,9 @@ def test_bf_bof_real_process_gas_efs_in_hundreds_range(data_dir, yload):
     # Run a full BF-BOF scenario on the Likely dataset
     scn = ScenarioInputs(
         country_code=None,
-        scenario={"gas_routing": {"direct_use_fraction": 1.0}},
+        # all natural-gas demand met with recovered gas, so the blended NG
+        # factor equals the process-gas factor
+        scenario={"gas_routing": {"flexible_share": 1.0}},
         route=RouteConfig(
             route_preset="BF-BOF",
             stage_key="Finished",

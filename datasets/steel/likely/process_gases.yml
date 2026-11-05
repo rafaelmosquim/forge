@@ -3,7 +3,7 @@ process_gases:
     source_process: "Coke Production"
     energy_gj_per_ndam3: 16.929   # Input data from plant (GJ per normal dam³)
     density_kg_per_nm3: 0.545     # kg per normal m³
-    recovery_fraction: 0.15
+    recovery_fraction: 0.20   # COG = 20% of coal energy (0.275 of coke energy, n=8; ABM plant energy balances 2010-2021 (Tubarao, CSN, Cubatao, Gerdau Ouro Branco, Ipatinga)); was 0.15
   BF Process Gas:
     source_process: "Blast Furnace"
     energy_gj_per_ndam3: 3.232

@@ -449,7 +449,9 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "process_gas_carrier": descriptor.gas.process_gas_carrier or "Process Gas",
         "natural_gas_carrier": descriptor.gas.natural_gas_carrier or "Gas",
         "utility_process": descriptor.gas.utility_process,
-        "default_direct_use_fraction": descriptor.gas.default_direct_use_fraction,
+        "default_loss_fraction": descriptor.gas.default_loss_fraction,
+        "default_flexible_share": descriptor.gas.default_flexible_share,
+        "conversion_processes": list(descriptor.gas.conversion_processes or ()),
     }
     gas_sources = [
         name for name, roles in descriptor.process_roles.items()
@@ -459,11 +461,8 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         gas_config['gas_sources'] = gas_sources
     process_gas_carrier = gas_config["process_gas_carrier"]
     natural_gas_carrier = gas_config["natural_gas_carrier"]
-    if (
-        'direct_use_fraction' not in scenario['gas_routing']
-        and gas_config["default_direct_use_fraction"] is not None
-    ):
-        scenario['gas_routing']['direct_use_fraction'] = gas_config["default_direct_use_fraction"]
+    # Loss fraction and flexible share default from sector.yml inside
+    # forge.core.gas; a scenario overrides them via gas_routing.
     # allow scenario to select an alternate energy_int file
     _ei_file = (scenario.get('energy_int_file') or 'energy_int.yml').strip()
     # simple guard against weird inputs
@@ -712,8 +711,22 @@ def run_scenario(data_dir: str, scn: ScenarioInputs) -> RunOutputs:
         "EF_bf_gas": gas_meta.get('EF_bf_gas', 0.0),
         "EF_process_gas": gas_meta.get('EF_process_gas', 0.0),
         "util_eff": gas_meta.get('util_eff', 0.0),
-        "direct_use_fraction": gas_meta.get('direct_use_fraction', 0.5),
-        "electricity_fraction": gas_meta.get('electricity_fraction', 0.5),
+        # realised shares of the recovered gas (reference plant)
+        "direct_use_fraction": gas_meta.get('direct_use_fraction', 0.0),
+        "electricity_fraction": gas_meta.get('electricity_fraction', 0.0),
+        "flare_fraction": gas_meta.get('flare_fraction', 0.0),
+        "flared_gas_MJ": gas_meta.get('flared_gas_MJ', 0.0),
+        "loss_fraction": gas_meta.get('loss_fraction', 0.0),
+        "flexible_share": gas_meta.get('flexible_share', 0.0),
+        "f_native": gas_meta.get('f_native', 1.0),
+        "gas_reference_MJ": gas_meta.get('gas_reference_MJ', 0.0),
+        "native_pg_demand_ref": gas_meta.get('native_pg_demand_ref', 0.0),
+        "ng_demand_ref": gas_meta.get('ng_demand_ref', 0.0),
+        "pool_reference": gas_meta.get('pool_reference', {}),
+        # fuel-conversion processes (coke ovens): coal in, coke out
+        "conversion": gas_meta.get('conversion', {}),
+        "conversion_feed_MJ": gas_meta.get('conversion_feed_MJ', 0.0),
+        "conversion_product_MJ": gas_meta.get('conversion_product_MJ', 0.0),
         "process_gas_carrier": gas_meta.get('process_gas_carrier', None),
         "natural_gas_carrier": gas_meta.get('natural_gas_carrier', None),
         "utility_process": gas_meta.get('utility_process', None),

@@ -7,39 +7,31 @@ from forge.steel_core_api_v2 import run_scenario, ScenarioInputs, RouteConfig
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
-    "direct,use_expected", [
-        (0.0, 3617.5),
-        (0.5, 3352.8),
-        (1.0, 3082.8),
+    "flexible,use_expected", [
+        (0.0, 2447.8),
+        (0.61, 2366.1),
+        (0.95, 2320.5),
     ],
 )
-def test_bf_bof_validation_as_cast_bra_gas_routing_snapshots(data_dir, direct, use_expected):
+def test_bf_bof_validation_as_cast_bra_gas_routing_snapshots(data_dir, flexible, use_expected):
     """Golden regression: Likely dataset, Brazil grid, Validation (as cast).
 
-    Verifies total CO2e (kg) for BF-BOF under gas routing fractions
-    0.0 (all natural gas), 0.5 split, and 1.0 (all internal process gas).
+    Total CO2e (kg) for BF-BOF as the share of the plant's natural-gas demand
+    met with recovered gas varies: 0.0 (CSN-like, reheating on natural gas),
+    0.61 (sector default, 13 plant-years) and 0.95 (Tubarao-like).
 
-    Snapshot updated 2026-07-27 (was 2998/2827/2651): the prior values baked
-    in 6 process-name case mismatches (e.g. "Nitrogen from Market" vs
-    "Nitrogen from market") across energy_int.yml/energy_matrix.yml/
-    process_emissions.yml/mkt_config.yml that silently zeroed the energy
-    intensity and emission factor for Nitrogen/Oxygen/Burnt Lime/Dolomite/
-    Silicon/Direct Iron Ore whenever selected as producer -- a consistent
-    ~314 kg undercount across all three fractions. Fixing those raised the
-    snapshot by ~314 kg here.
-
-    Known remaining gap, NOT reflected in this snapshot: the Gas Router's
-    "Process Gas (internal)" carrier (used by Coke Production/Blast Furnace/
-    Basic Oxygen Furnace/Hot Rolling) has no emission factor defined
-    anywhere, so that portion of their energy is still treated as
-    zero-emission. This snapshot will need another update once that's
-    resolved.
+    Snapshot updated 2026-11-05 (was 3617.5/3352.8/3082.8 keyed on
+    direct_use_fraction, already stale at 2440/2210/1972). The recovered gas
+    is now allocated from one pool so every MJ is charged once (forge.core.gas),
+    the coke ovens are fired on gas and charged for the coal they convert, and
+    10% of the gas is flared. The old 50/50 split charged more gas than the
+    plant made at one end and lost gas at the other.
     """
     scn = ScenarioInputs(
         country_code="BRA",
         scenario={
             # Gas routing selection for the run
-            "gas_routing": {"direct_use_fraction": direct},
+            "gas_routing": {"flexible_share": flexible},
         },
         route=RouteConfig(
             route_preset="BF-BOF",
@@ -57,7 +49,7 @@ def test_bf_bof_validation_as_cast_bra_gas_routing_snapshots(data_dir, direct, u
 
     # Allow small tolerance while converging (<= 10 kg)
     assert math.isclose(total_kg, use_expected, rel_tol=0.0, abs_tol=10.0), (
-        f"Got {total_kg} kg for direct_use_fraction={direct}; expected {use_expected} kg"
+        f"Got {total_kg} kg for flexible_share={flexible}; expected {use_expected} kg"
     )
 
 
@@ -101,17 +93,17 @@ def test_cli_style_run_matches_app_scenario(data_dir, yload):
 
 @pytest.mark.integration
 @pytest.mark.parametrize("route_preset", ["DRI-EAF", "EAF-Scrap"])
-def test_non_bf_routes_insensitive_to_direct_use_fraction(data_dir, route_preset):
+def test_non_bf_routes_insensitive_to_gas_routing(data_dir, route_preset):
     """For DRI-EAF and EAF-Scrap, gas routing should not affect results.
 
     Process-gas recovery logic is defined only for BF-BOF routes; changing
-    direct_use_fraction must not change total emissions for DRI/EAF routes.
+    the gas routing must not change total emissions for DRI/EAF routes.
     """
 
-    def _run_with_direct(direct):
+    def _run_with_direct(share):
         scn = ScenarioInputs(
             country_code="BRA",
-            scenario={"gas_routing": {"direct_use_fraction": direct}},
+            scenario={"gas_routing": {"flexible_share": share, "loss_fraction": share}},
             route=RouteConfig(
                 route_preset=route_preset,
                 stage_key="Finished",
@@ -127,6 +119,6 @@ def test_non_bf_routes_insensitive_to_direct_use_fraction(data_dir, route_preset
 
     # Results should be identical (within numerical noise) when toggling routing
     assert math.isclose(total_0, total_1, rel_tol=0.0, abs_tol=1e-6), (
-        f"{route_preset} total CO2e changed with direct_use_fraction: "
+        f"{route_preset} total CO2e changed with gas routing: "
         f"{total_0} vs {total_1}"
     )
